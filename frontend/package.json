@@ -1,0 +1,24 @@
+{
+  "name": "openprivatecloud-frontend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/app.js",
+  "scripts": {
+    "compile": "npx acts-util-apilib && tsc",
+    "build-debug": "npx webpack --config webpack.debug.config.js",
+    "deploy-debug": "ln -sf ../index.htm dist/ && ln -sf ../node_modules/acts-util-core/dist/acts-util-core.js dist/ && ln -sf ../node_modules/acfrontend/dist/acfrontend.js dist/ && ln -sf ../../backend/dist/openapi.json dist/openapi.json"
+  },
+  "keywords": [],
+  "author": "Amir Czwink",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "acfrontend": "*",
+    "acts-util-core": "*"
+  },
+  "devDependencies": {
+    "acts-util-apilib": "*",
+    "ts-loader": "^9.3.1",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0"
+  }
+}

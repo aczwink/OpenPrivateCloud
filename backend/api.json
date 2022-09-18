@@ -1,0 +1,12 @@
+{
+    "type": "openapi",
+    "source": "./src",
+    "destination": "./dist/openapi",
+    "securitySchemes": {
+        "bearerAuth": {
+            "global": true,
+            "type": "http",
+            "scheme": "bearer"
+        }
+    }
+}

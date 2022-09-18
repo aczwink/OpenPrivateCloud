@@ -1,0 +1,162 @@
+/**
+ * OpenPrivateCloud
+ * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * */
+
+import ssh2 from "ssh2";
+import { Injectable } from "acts-util-node";
+
+interface CommandResult
+{
+    stdErr: string;
+    stdOut: string;
+}
+
+export interface SSHConnection
+{
+    AppendFile(remotePath: string, content: string): Promise<void>;
+    Close(): void;
+    ExecuteBufferedCommand(command: string[]): Promise<CommandResult>;
+    ExecuteCommand(command: string[]): Promise<void>;
+    ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
+    WriteFile(remotePath: string, content: Buffer): Promise<void>;
+}
+
+class SSHConnectionImpl implements SSHConnection
+{
+    constructor(private conn: ssh2.Client, private sftp: ssh2.SFTPWrapper)
+    {
+    }
+
+    //Public methods
+    public async AppendFile(remotePath: string, content: string): Promise<void>
+    {
+        return new Promise<void>( (resolve, reject) => {
+            this.sftp.appendFile(remotePath, content, {
+                encoding: "utf-8"
+            }, err => {
+                if(err)
+                    reject(err);
+                else
+                    resolve();
+            });
+        });
+    }
+
+    public Close(): void
+    {
+        this.conn.end();
+    }
+
+    public async ExecuteBufferedCommand(command: string[]): Promise<CommandResult>
+    {
+        const channel = await this.ExecuteInteractiveCommand(command);
+
+        let stdOut = "";
+        let stdErr = "";
+
+        await new Promise<void>( (resolve, reject) => {
+            channel.stdout.setEncoding("utf-8");
+            channel.stderr.setEncoding("utf-8");
+
+            channel.stdout.on("data", (chunk: string) => stdOut += chunk);
+            channel.stderr.on("data", (chunk: string) => stdErr += chunk);
+            
+            channel.on("exit", code => {
+                resolve();
+            });
+        });
+
+        return {
+            stdErr,
+            stdOut
+        };
+    }
+
+    public async ExecuteCommand(command: string[]): Promise<void>
+    {
+        const channel = await this.ExecuteInteractiveCommand(command);
+        return new Promise<void>( (resolve, reject) => {
+            channel.stdout.setEncoding("utf-8");
+            channel.stderr.setEncoding("utf-8");
+
+            channel.stdout.on("data", console.log);
+            channel.stderr.on("data", console.error);
+            
+            channel.on("exit", code => {
+                resolve();
+            });
+        });
+    }
+
+    public ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>
+    {
+        const commandLine = command.join(" ");
+        return new Promise<ssh2.ClientChannel>( (resolve, reject) => {
+            this.conn.exec(commandLine, (err, channel) => {
+                if(err)
+                    reject(err);
+                else
+                    resolve(channel);
+            });
+        });
+    }
+
+    public async WriteFile(remotePath: string, content: Buffer): Promise<void>
+    {
+        return new Promise<void>( (resolve, reject) => {
+            this.sftp.writeFile(remotePath, content, err => {
+                if(err)
+                    reject(err);
+                else
+                    resolve();
+            });
+        });
+    }
+}
+
+@Injectable
+export class SSHService
+{
+    //Public methods
+    public async ConnectWithCredentials(host: string, userName: string, password: string): Promise<SSHConnection>
+    {
+        const conn = new ssh2.Client();
+
+        await new Promise<void>( (resolve, reject) => {
+            conn.on("ready", resolve).connect({
+                host,
+                username: userName,
+                password
+            });
+        });
+        const sftp = await this.GetSFTPWrapper(conn);
+        return new SSHConnectionImpl(conn, sftp);
+    }
+
+    //Private methods
+    private GetSFTPWrapper(conn: ssh2.Client)
+    {
+        return new Promise<ssh2.SFTPWrapper>( (resolve, reject) => {
+            conn.sftp((err, sftp) => {
+                if(err)
+                    reject(err);
+                else
+                    resolve(sftp);
+            });
+        });
+    }
+}

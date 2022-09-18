@@ -1,0 +1,23 @@
+{
+  "name": "openprivatecloud-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js",
+    "restart-service": "sudo systemctl restart openprivatecloud.service"
+  },
+  "keywords": [],
+  "author": "Amir Czwink",
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "acts-util-apilib": "*",
+    "acts-util-core": "*",
+    "acts-util-node": "*",
+    "ssh2": "^1.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.6.3",
+    "@types/ssh2": "^1.11.5"
+  }
+}
