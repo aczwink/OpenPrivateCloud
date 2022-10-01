@@ -16,29 +16,40 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-
-import { FileStorageProperties, Instance } from "../../dist/api";
+import { PublicUserData, UserCreationData } from "../../dist/api";
 import { APIService } from "../Services/APIService";
-import { CollectionViewModel, RoutingViewModel } from "../UI/ViewModel";
-import { instanceTypesRouting } from "./instancetypes";
+import { CollectionViewModel, ComponentViewModel, MultiPageViewModel, RoutingViewModel } from "../UI/ViewModel";
+import { FileManagerComponent } from "../Views/file-manager/FileManagerComponent";
 
-const instancesViewModel: CollectionViewModel<Instance, {}, APIService, FileStorageProperties> = {
+const asduserViewModel: ComponentViewModel = {
+    type: "component",
+    component: FileManagerComponent,
+};
+
+const userViewModel: MultiPageViewModel<{ userEmailAddress: string }, APIService> = {
+    type: "multiPage",
+    actions: [],
+    formTitle: ids => ids.userEmailAddress,
+    entries: [],
+    service: APIService,
+};
+
+const usersViewModel: CollectionViewModel<PublicUserData, {}, APIService, UserCreationData> = {
     actions: [
         {
             type: "create",
             createResource: async (service, _ids, props) => {
-                await service.instances.post(props);
+                await service.users.post(props);
             },
-            schemaName: "FileStorageProperties"
+            schemaName: "UserCreationData"
         }
     ],
-    customRouting: instanceFullName => "/instances" + instanceFullName,
-    child: instanceTypesRouting,
-    displayName: "Instances",
-    extractId: instance => instance.fullName,
-    idKey: "instanceFullName",
-    requestObjects: async service => (await service.instances.get()).data,
-    schemaName: "Instance",
+    child: userViewModel,
+    displayName: "Users",
+    extractId: user => user.emailAddress,
+    idKey: "userEmailAddress",
+    requestObjects: async service => (await service.users.get()).data,
+    schemaName: "PublicUserData",
     service: APIService,
     type: "collection"
 };
@@ -47,8 +58,8 @@ const root: RoutingViewModel = {
     type: "routing",
     entries: [
         {
-            key: "instances",
-            viewModel: instancesViewModel,
+            key: "users",
+            viewModel: usersViewModel,
         }
     ]
 }

@@ -26,8 +26,9 @@ interface ObjectListInput
 {
     actions: BoundResourceAction<any, any>[];
     baseUrl: string;
+    customRouting?: (id: number | string) => string;
     elementSchema: OpenAPI.ObjectSchema;
-    extractId: (object: any) => string;
+    extractId: (object: any) => number | string;
     heading: string;
     requestObjects: (routeParams: Dictionary<string>) => Promise<any[]>;
     unboundActions: UnboundResourceAction<any, any, any, any>[];
@@ -117,7 +118,10 @@ export class ObjectListComponent extends Component<ObjectListInput>
     {
         if(idx === 0)
         {
-            const route = this.ReplaceRouteParams(this.input.baseUrl + "/" + encodeURIComponent(this.ExtractId(obj)));
+            const id = this.ExtractId(obj);
+            const route = (this.input.customRouting === undefined)
+                ? this.ReplaceRouteParams(this.input.baseUrl + "/" + encodeURIComponent(id))
+                : this.input.customRouting(id);
             return <Anchor route={route}>{this.RenderObjectProperty(obj, key)}</Anchor>;
         }
         return this.RenderObjectProperty(obj, key);

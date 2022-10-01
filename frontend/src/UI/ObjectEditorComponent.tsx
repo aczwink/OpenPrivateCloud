@@ -16,9 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner } from "acfrontend";
+import { AutoCompleteSelectBox, CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select, SingleSelect } from "acfrontend";
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../Services/APISchemaService";
+import { APIService } from "../Services/APIService";
 import { RenderTitle } from "./ValuePresentation";
 
 
@@ -29,7 +30,7 @@ export class ObjectEditorComponent extends Component<{
     onObjectUpdated?: (newValue: any) => void;
 }>
 {
-    constructor(private apiSchemaService: APISchemaService)
+    constructor(private apiSchemaService: APISchemaService, private apiService: APIService)
     {
         super();
     }
@@ -41,11 +42,49 @@ export class ObjectEditorComponent extends Component<{
     }
 
     //Private methods
+    private async LoadHostNames(filterText: string)
+    {
+        const hosts = await this.apiService.hosts.get();
+        filterText = filterText.toLowerCase();
+
+        return hosts.data.Values()
+            .Filter(x => x.hostName.includes(filterText.toLowerCase()))
+            .Map(x => ({ key: x.hostName, displayValue: x.hostName }))
+            .ToArray();
+    }
+
     private NotifyObjectUpdate(newValue: any)
     {
         if(this.input.onObjectUpdated !== undefined)
             this.input.onObjectUpdated(newValue);
         this.Update();
+    }
+
+    private RenderString(value: any, schema: OpenAPI.StringSchema, valueChanged: (newValue: any) => void)
+    {
+        if(schema.enum !== undefined)
+        {
+            return <Select onChanged={newValue => valueChanged(newValue[0])}>
+                {schema.enum.map(x => <option selected={value === x}>{x}</option>)}
+            </Select>;
+        }
+
+        let className = "";
+        if((schema.format !== undefined) || (schema.pattern !== undefined))
+        {
+            switch(schema.format as string)
+            {
+                case "hostName":
+                    return <AutoCompleteSelectBox
+                        onChanged={newValue => valueChanged(newValue.key)}
+                        onLoadSuggestions={this.LoadHostNames.bind(this)}
+                        selection={ (value.trim().length === 0 ? null : ({ key: value, displayValue: value}))} />;
+            }
+            const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
+            className = validator.ValidateString(value, schema) ? "is-valid" : "is-invalid";
+        }
+
+        return <LineEdit className={className} value={value.toString()} onChanged={valueChanged} />;
     }
 
     private RenderValue(value: any, schema: OpenAPI.Schema | OpenAPI.Reference, valueChanged: (newValue: any) => void, fallback: string): any
@@ -103,14 +142,8 @@ export class ObjectEditorComponent extends Component<{
             }
 
             case "string":
-                if((schema.enum !== undefined) || (schema.format !== undefined) || (schema.pattern !== undefined))
-                {
-                    const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
-                    className = validator.ValidateString(value, schema) ? "is-valid" : "is-invalid";
-                }
-
                 return <FormField title={RenderTitle(schema, fallback)} description={schema.description}>
-                    <LineEdit className={className} value={value.toString()} onChanged={valueChanged} />
+                    {this.RenderString(value, schema, valueChanged)}
                 </FormField>;
         }
     }

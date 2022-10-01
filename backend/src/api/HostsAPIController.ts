@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, BodyProp, Delete, Get, NotFound, Path, Post, Query } from "acts-util-apilib";
-import { HostsController, HostStorageCreationProperties } from "../dataaccess/HostsController";
+import { APIController, BodyProp, Delete, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { HostsController } from "../data-access/HostsController";
 import { HostsManager } from "../services/HostsManager";
 
 @APIController("hosts")
@@ -66,76 +66,5 @@ class HostAPIController
             return NotFound("host does not exist");
             
         return host;
-    }
-}
-
-@APIController("hosts/{hostName}/storages")
-class HostStoragesAPIController
-{
-    constructor(private hostsController: HostsController, private hostsManager: HostsManager)
-    {
-    }
-
-    @Post()
-    public async AddStorage(
-        @Path hostName: string,
-        @BodyProp props: HostStorageCreationProperties
-    )
-    {
-        const hostId = await this.hostsController.RequestHostId(hostName);
-        if(hostId === undefined)
-            return NotFound("host does not exist");
-
-        await this.hostsManager.AddHostStorage(hostId, props);
-    }
-
-    @Get()
-    public async QueryStorages(
-        @Path hostName: string
-    )
-    {
-        const hostId = await this.hostsController.RequestHostId(hostName);
-        if(hostId === undefined)
-            return NotFound("host does not exist");
-            
-        return this.hostsController.RequestHostStorages(hostId);
-    }
-}
-
-@APIController("hosts/{hostName}/storage")
-class HostStorageAPIController
-{
-    constructor(private hostsController: HostsController)
-    {
-    }
-
-    @Delete()
-    public async DeleteStorage(
-        @Path hostName: string,
-        @BodyProp storagePath: string
-    )
-    {
-        const hostId = await this.hostsController.RequestHostId(hostName);
-        if(hostId === undefined)
-            return NotFound("host does not exist");
-
-        await this.hostsController.DeleteHostStorage(hostId, storagePath);
-    }
-
-    @Get()
-    public async QueryStorage(
-        @Path hostName: string,
-        @Query storagePath: string
-    )
-    {
-        const hostId = await this.hostsController.RequestHostId(hostName);
-        if(hostId === undefined)
-            return NotFound("host does not exist");
-
-        const hostStorage = await this.hostsController.RequestHostStorage(hostId, storagePath);
-        if(hostStorage === undefined)
-            return NotFound("host storage does not exist");
-
-        return hostStorage;
     }
 }

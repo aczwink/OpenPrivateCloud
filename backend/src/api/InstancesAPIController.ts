@@ -15,19 +15,50 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Get } from "acts-util-apilib";
+import { APIController, Body, Delete, Get, Header, NotFound, Path, Post } from "acts-util-apilib";
+import { BaseResourceProperties } from "../resource-providers/ResourceProvider";
+import { ResourceProviderManager } from "../services/ResourceProviderManager";
+import { HostsController } from "../data-access/HostsController";
+import { SessionsManager } from "../services/SessionsManager";
+import { Instance, InstancesController } from "../data-access/InstancesController";
 
-interface Instance
-{
-    name: string;
-}
+//TODO
+import { FileStorageProperties } from "../resource-providers/file-services/FileStorageProperties";
+//TODO
 
 @APIController("instances")
 class InstancesAPIController
 {
-    @Get()
-    public QueryInstances(): Instance[]
+    constructor(private resourceProviderManager: ResourceProviderManager, private hostsController: HostsController, private sessionsManager: SessionsManager,
+        private instancesController: InstancesController)
     {
-        return [];
+    }
+
+    @Delete("{fullInstanceName}")
+    public async DeleteInstance(
+        @Path fullInstanceName: string
+    )
+    {
+        await this.resourceProviderManager.DeleteInstance(fullInstanceName);
+    }
+
+    @Post()
+    public async DeployInstance(
+        //@Body @DerivativeOf instanceProperties: BaseResourceProperties
+        @Body instanceProperties: FileStorageProperties,
+        @Header Authorization: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(instanceProperties.hostName);
+        if(hostId === undefined)
+            return NotFound("host not found");
+
+        await this.resourceProviderManager.DeployInstance(instanceProperties, hostId, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
+    }
+
+    @Get()
+    public async QueryInstances(): Promise<Instance[]>
+    {
+        return await this.instancesController.QueryInstances();
     }
 }

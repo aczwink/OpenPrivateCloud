@@ -15,30 +15,19 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { Injectable } from "acts-util-node";
-import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 
-@Injectable
-export class RemoteCommandExecutor
+import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
+
+export class APISchemaService
 {
-    constructor(private remoteConnectionsManager: RemoteConnectionsManager)
+    constructor(private root: OpenAPI.Root)
     {
     }
 
     //Public methods
-    public async ExecuteCommand(command: string[], hostId: number)
+    public Validate(value: any, schemaName: string)
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.ExecuteCommand(command);
-        conn.Release();
-    }
-
-    public async ExecuteBufferedCommand(command: string[], hostId: number)
-    {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.ExecuteBufferedCommand(command);
-        conn.Release();
-
-        return result;
+        const openAPIValidator = new OpenAPISchemaValidator(this.root);
+        return openAPIValidator.Validate(value, this.root.components.schemas[schemaName]!);
     }
 }

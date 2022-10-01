@@ -28,16 +28,21 @@ interface CommandResult
 export interface SSHConnection
 {
     AppendFile(remotePath: string, content: string): Promise<void>;
+    ChangeMode(remotePath: string, mode: number): Promise<void>;
+    ChangeOwnerAndGroup(remotePath: string, ownerUserId: number, groupUserId: number): Promise<void>;
     Close(): void;
+    CreateDirectory(remotePath: string, ownerUserId: number): Promise<Error | null>;
     ExecuteBufferedCommand(command: string[]): Promise<CommandResult>;
     ExecuteCommand(command: string[]): Promise<void>;
     ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
+    ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
+    RemoveDirectory(remotePath: string): Promise<void>;
     WriteFile(remotePath: string, content: Buffer): Promise<void>;
 }
 
 class SSHConnectionImpl implements SSHConnection
 {
-    constructor(private conn: ssh2.Client, private sftp: ssh2.SFTPWrapper)
+    constructor(private conn: ssh2.Client, private sftp: ssh2.SFTPWrapper, private password: string)
     {
     }
 
@@ -56,9 +61,47 @@ class SSHConnectionImpl implements SSHConnection
         });
     }
 
+    public ChangeMode(remotePath: string, mode: number): Promise<void>
+    {
+        return new Promise<void>( (resolve, reject) => {
+            this.sftp.chmod(remotePath, mode, err => {
+                if(err)
+                    reject(err);
+                else
+                    resolve();
+            });
+        });
+    }
+
+    public ChangeOwnerAndGroup(remotePath: string, ownerUserId: number, groupUserId: number): Promise<void>
+    {
+        return new Promise<void>( (resolve, reject) => {
+            this.sftp.chown(remotePath, ownerUserId, groupUserId, err => {
+                if(err)
+                    reject(err);
+                else
+                    resolve();
+            });
+        });
+    }
+
     public Close(): void
     {
         this.conn.end();
+    }
+
+    public CreateDirectory(remotePath: string, ownerUserId: number): Promise<Error | null>
+    {
+        return new Promise<Error | null>( (resolve, reject) => {
+            this.sftp.mkdir(remotePath, {
+                uid: ownerUserId
+            }, err => {
+                if(err)
+                    resolve(err);
+                else
+                    resolve(null);
+            });
+        });
     }
 
     public async ExecuteBufferedCommand(command: string[]): Promise<CommandResult>
@@ -102,15 +145,49 @@ class SSHConnectionImpl implements SSHConnection
         });
     }
 
-    public ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>
+    public async ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>
     {
         const commandLine = command.join(" ");
-        return new Promise<ssh2.ClientChannel>( (resolve, reject) => {
-            this.conn.exec(commandLine, (err, channel) => {
+        const hasSudo = command.Contains("sudo");
+
+        const channel = await new Promise<ssh2.ClientChannel>( (resolve, reject) => {
+            this.conn.exec(commandLine, {
+                pty: hasSudo
+            }, (err, channel) => {
+
                 if(err)
                     reject(err);
                 else
                     resolve(channel);
+            });
+        });
+
+        if(hasSudo)
+            channel.stdin.write(this.password + "\n");
+
+        return channel;
+    }
+
+    public ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>
+    {
+        return new Promise<ssh2.FileEntry[]>( (resolve, reject) => {
+            this.sftp.readdir(remotePath, (err, list) => {
+                if(err)
+                    reject(err);
+                else
+                    resolve(list);
+            });
+        });
+    }
+
+    public RemoveDirectory(remotePath: string): Promise<void>
+    {
+        return new Promise<void>( (resolve, reject) => {
+            this.sftp.rmdir(remotePath, err => {
+                if(err)
+                    reject(err);
+                else
+                    resolve();
             });
         });
     }
@@ -144,7 +221,7 @@ export class SSHService
             });
         });
         const sftp = await this.GetSFTPWrapper(conn);
-        return new SSHConnectionImpl(conn, sftp);
+        return new SSHConnectionImpl(conn, sftp, password);
     }
 
     //Private methods

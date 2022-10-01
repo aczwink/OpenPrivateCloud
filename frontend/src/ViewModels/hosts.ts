@@ -18,21 +18,21 @@
 
 import { Host, HostStorage, HostStorageCreationProperties } from "../../dist/api";
 import { APIService } from "../Services/APIService";
-import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, ViewModelRoot } from "../UI/ViewModel";
+import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 
-const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storagePath: string }, APIService> = {
+const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storageId: number }, APIService> = {
     type: "object",
     actions: [
         {
             type: "delete",
             deleteResource: async (service, ids) => {
-                await service.hosts_any_storage.delete(ids.hostName, { storagePath: ids.storagePath })
+                await service.hostStorages._any_.delete(ids.storageId);
             },
         }
     ],
-    formTitle: x => x.storagePath,
+    formTitle: x => x.path,
     requestObject: async (service, ids) => {
-        const response = await service.hosts_any_storage.get(ids.hostName, { storagePath: ids.storagePath });
+        const response = await service.hostStorages._any_.get(ids.storageId);
         switch(response.statusCode)
         {
             case 404:
@@ -52,17 +52,17 @@ const storagesViewModel: CollectionViewModel<HostStorage, HostId, APIService, Ho
         {
             type: "create",
             createResource: async (service, ids, props) => {
-                await service.hosts_any_storages.post(ids.hostName, { props });
+                await service.hosts._any_.storages.post(ids.hostName, { props });
             },
             schemaName: "HostStorageCreationProperties"
         }
     ],
     child: storageViewModel,
     displayName: "Host-storage",
-    extractId: x => x.storagePath,
-    idKey: "storagePath",
+    extractId: x => x.id,
+    idKey: "storageId",
     requestObjects: async (service, ids) => {
-        const response = await service.hosts_any_storages.get(ids.hostName);
+        const response = await service.hosts._any_.storages.get(ids.hostName);
         switch(response.statusCode)
         {
             case 404:
@@ -79,7 +79,7 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId, APIService> = {
     actions: [],
     formTitle: host => host.hostName,
     requestObject: async (service, ids) => {
-        const response = await service.hosts_any_.get(ids.hostName);
+        const response = await service.hosts._any_.get(ids.hostName);
         switch(response.statusCode)
         {
             case 404:
@@ -97,7 +97,7 @@ const hostViewModel: MultiPageViewModel<HostId, APIService> = {
         {
             type: "delete",
             deleteResource: async (service, ids) => {
-                await service.hosts_any_.delete(ids.hostName);
+                await service.hosts._any_.delete(ids.hostName);
             },
         }
     ],
@@ -136,9 +136,14 @@ const hostsViewModel: CollectionViewModel<Host, {}, APIService> = {
     service: APIService,
 };
 
-const root: ViewModelRoot = {
-    key: "hosts",
-    viewModel: hostsViewModel,
+const root: RoutingViewModel = {
+    type: "routing",
+    entries: [
+        {
+            key: "hosts",
+            viewModel: hostsViewModel,
+        }
+    ]
 }
 
 export default root;

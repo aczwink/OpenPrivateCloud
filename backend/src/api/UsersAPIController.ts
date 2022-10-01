@@ -14,31 +14,35 @@
  * 
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * */
-import { Injectable } from "acts-util-node";
-import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
+* */
+import { APIController, Body, Get, Post } from "acts-util-apilib";
+import { UsersController } from "../data-access/UsersController";
+import { UsersManager } from "../services/UsersManager";
 
-@Injectable
-export class RemoteCommandExecutor
+interface UserCreationData
 {
-    constructor(private remoteConnectionsManager: RemoteConnectionsManager)
+    emailAddress: string;
+    password: string;
+}
+
+@APIController("users")
+class UsersAPIController
+{
+    constructor(private usersController: UsersController, private usersManager: UsersManager)
     {
     }
 
-    //Public methods
-    public async ExecuteCommand(command: string[], hostId: number)
+    @Post()
+    public async Create(
+        @Body userCreationData: UserCreationData
+    )
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.ExecuteCommand(command);
-        conn.Release();
+        await this.usersManager.CreateUser(userCreationData.emailAddress, userCreationData.password);
     }
 
-    public async ExecuteBufferedCommand(command: string[], hostId: number)
+    @Get()
+    public async RequestUsers()
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.ExecuteBufferedCommand(command);
-        conn.Release();
-
-        return result;
+        return await this.usersController.QueryUsers();
     }
 }

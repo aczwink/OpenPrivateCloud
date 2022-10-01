@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { Component } from "acfrontend";
 import { Instantiatable } from "acts-util-core";
 import { BoundResourceAction } from "./BoundActions";
 import { UnboundResourceAction } from "./UnboundActions";
@@ -26,12 +27,19 @@ export interface CollectionViewModel<ObjectType, IdType, ServiceType, ObjectCrea
 
     actions: UnboundResourceAction<ServiceType, ObjectType, ObjectCreationType, IdType>[];
     child: ViewModel;
+    customRouting?: (id: number | string) => string;
     displayName: string;
-    extractId: (resource: ObjectType) => string;
+    extractId: (resource: ObjectType) => number | string;
     idKey: string;
     requestObjects: (service: ServiceType, ids: IdType) => Promise<ObjectType[]>;
     schemaName: string;
     service: Instantiatable<ServiceType>;
+}
+
+export interface ComponentViewModel
+{
+    type: "component";
+    component: Instantiatable<Component<null | {}>>;
 }
 
 interface PageEntry
@@ -61,10 +69,17 @@ export interface ObjectViewModel<ObjectType, IdType, ServiceType>
     service: Instantiatable<ServiceType>;
 }
 
-export type ViewModel = CollectionViewModel<any, any, any> | MultiPageViewModel<any, any> | ObjectViewModel<any, any, any>;
-
-export interface ViewModelRoot
+interface RoutingEntry
 {
     key: string;
     viewModel: ViewModel;
 }
+
+export interface RoutingViewModel
+{
+    type: "routing";
+
+    entries: RoutingEntry[];
+}
+
+export type ViewModel = CollectionViewModel<any, any, any> | ComponentViewModel | MultiPageViewModel<any, any> | ObjectViewModel<any, any, any> | RoutingViewModel;

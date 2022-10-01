@@ -16,34 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
-import { DBConnectionsManager } from "./DBConnectionsManager";
+import { BaseResourceProperties } from "../ResourceProvider";
 
-interface User
+/**
+ * @APIModel
+ */
+export interface FileStorageProperties extends BaseResourceProperties
 {
-    pwHash: string;
-    pwSalt: string;
-}
-
-@Injectable
-export class UsersController
-{
-    constructor(private dbConnMgr: DBConnectionsManager)
-    {
-    }
-
-    //Public methods
-    public async QueryUser(emailAddress: string)
-    {
-        let query = `
-        SELECT pwHash, pwSalt
-        FROM users
-        WHERE emailAddress = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne<User>(query, emailAddress);
-
-        return row;
-    }
+    type: "file-storage";
 }

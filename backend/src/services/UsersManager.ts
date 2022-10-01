@@ -15,30 +15,28 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import crypto from "crypto";
 import { Injectable } from "acts-util-node";
-import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
+import { UsersController } from "../data-access/UsersController";
 
+ 
 @Injectable
-export class RemoteCommandExecutor
+export class UsersManager
 {
-    constructor(private remoteConnectionsManager: RemoteConnectionsManager)
+    constructor(private usersController: UsersController)
     {
     }
-
+    
     //Public methods
-    public async ExecuteCommand(command: string[], hostId: number)
+    public async CreateUser(emailAddress: string, password: string)
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.ExecuteCommand(command);
-        conn.Release();
+        const pwSalt = crypto.randomBytes(16).toString("hex");
+        const pwHash = this.HashPassword(password, pwSalt);
+        await this.usersController.CreateUser(emailAddress, pwHash, pwSalt);
     }
 
-    public async ExecuteBufferedCommand(command: string[], hostId: number)
+    public HashPassword(password: string, pwSalt: string)
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.ExecuteBufferedCommand(command);
-        conn.Release();
-
-        return result;
+        return crypto.scryptSync(password, pwSalt, 32).toString("hex");
     }
 }

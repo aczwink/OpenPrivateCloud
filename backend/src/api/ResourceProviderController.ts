@@ -15,30 +15,20 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { Injectable } from "acts-util-node";
-import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
+import { APIController, Get } from "acts-util-apilib";
+import { ResourceProviderManager } from "../services/ResourceProviderManager";
 
-@Injectable
-export class RemoteCommandExecutor
+@APIController("resourceProviders")
+class ResourceProviderAPIController
 {
-    constructor(private remoteConnectionsManager: RemoteConnectionsManager)
+    constructor(private resourceProviderManager: ResourceProviderManager)
     {
     }
 
-    //Public methods
-    public async ExecuteCommand(command: string[], hostId: number)
+    @Get()
+    public QueryResourceProviders()
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.ExecuteCommand(command);
-        conn.Release();
-    }
-
-    public async ExecuteBufferedCommand(command: string[], hostId: number)
-    {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.ExecuteBufferedCommand(command);
-        conn.Release();
-
-        return result;
+        return this.resourceProviderManager.resourceProviders.Values()
+            .Map(x => x.resourceTypeDefinitions.Values().Map(x => x.schemaName)).Flatten().ToArray();
     }
 }

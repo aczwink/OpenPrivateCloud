@@ -19,18 +19,20 @@ import crypto from "crypto";
 
 import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
-import { UsersController } from "../dataaccess/UsersController";
+import { UsersController } from "../data-access/UsersController";
+import { UsersManager } from "./UsersManager";
 
 interface Session
 {
     expiryDateTime: Date;
     timerId?: NodeJS.Timeout;
+    userId: number;
 }
 
 @Injectable
 export class SessionsManager
 {
-    constructor(private usersController: UsersController)
+    constructor(private usersController: UsersController, private usersManager: UsersManager)
     {
         this.sessions = {};
     }
@@ -40,6 +42,12 @@ export class SessionsManager
     {
         const session = this.sessions[token];
         return session;
+    }
+
+    public GetUserIdFromAuthHeader(authorization: string): number
+    {
+        const token = authorization.substring(7);
+        return this.sessions[token]!.userId;
     }
 
     public async LogOut(token: string)
@@ -53,12 +61,13 @@ export class SessionsManager
         if(user === undefined)
             return null;
 
-        const expectedHash = crypto.scryptSync(password, user.pwSalt, 32).toString("hex");
+        const expectedHash = this.usersManager.HashPassword(password, user.pwSalt);
         if(expectedHash === user.pwHash)
         {
             const token = await this.CreateToken();
             const session = this.sessions[token] = {
                 expiryDateTime: this.CreateExpiryTime(),
+                userId: user.id,
             };
             this.SetAutoLogOutTimer(token, session);
             return { expiryDateTime: session.expiryDateTime, token };
@@ -88,11 +97,6 @@ export class SessionsManager
         const t = minutes * 60 * 1000;
 
         return new Date( Date.now() + t );
-    }
-
-    private CreateSalt()
-    {
-        return crypto.randomBytes(16);
     }
 
     private CreateToken()

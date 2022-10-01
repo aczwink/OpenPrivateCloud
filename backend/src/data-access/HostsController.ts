@@ -18,6 +18,7 @@
 
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
+import { HostStorage, HostStorageCreationProperties } from "./HostStoragesController";
 
 interface Host
 {
@@ -26,16 +27,6 @@ interface Host
      * @title Hostname
      */
     hostName: string;
-}
-
-export interface HostStorageCreationProperties
-{
-    storagePath: string;
-}
-
-interface HostStorage extends HostStorageCreationProperties
-{
-    fileSystemType: string;
 }
 
 @Injectable
@@ -56,19 +47,13 @@ export class HostsController
     public async AddHostStorage(hostId: number, props: HostStorageCreationProperties, fileSystemType: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("hosts_storages", { hostId, storagePath: props.storagePath, fileSystemType });
+        await conn.InsertRow("hosts_storages", { hostId, storagePath: props.path, fileSystemType });
     }
 
     public async DeleteHost(hostName: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         await conn.DeleteRows("hosts", "hostName = ?", hostName);
-    }
-
-    public async DeleteHostStorage(hostId: number, storagePath: string)
-    {
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("hosts_storages", "hostId = ? AND storagePath = ?", hostId, storagePath);
     }
 
     public async RequestHost(hostName: string)
@@ -113,21 +98,10 @@ export class HostsController
         return conn.Select<Host>("SELECT hostName FROM hosts");
     }
 
-    public async RequestHostStorage(hostId: number, path: string)
-    {
-        const query = `
-        SELECT storagePath, fileSystemType
-        FROM hosts_storages
-        WHERE hostId = ? AND storagePath = ?
-        `;
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.SelectOne<HostStorage>(query, hostId, path);
-    }
-
     public async RequestHostStorages(hostId: number)
     {
         const query = `
-        SELECT storagePath, fileSystemType
+        SELECT id, hostId, path, fileSystemType
         FROM hosts_storages
         WHERE hostId = ?
         `;

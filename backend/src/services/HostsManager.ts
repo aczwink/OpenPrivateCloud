@@ -20,25 +20,19 @@ import fs from "fs";
 import { Injectable } from "acts-util-node";
 import { LocalCommandExecutor } from "./LocalCommandExecutor";
 import { SSHConnection, SSHService } from "./SSHService";
-import { HostsController, HostStorageCreationProperties } from "../dataaccess/HostsController";
-import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
+import { HostsController } from "../data-access/HostsController";
+import { HostStoragesManager } from "./HostStoragesManager";
 
 @Injectable
 export class HostsManager
 {
     constructor(private localCommandExecutor: LocalCommandExecutor,
         private sshService: SSHService, private hostsController: HostsController,
-        private remoteCommandExecutor: RemoteCommandExecutor)
+        private hostStoragesManager: HostStoragesManager)
     {
     }
 
     //Public methods
-    public async AddHostStorage(hostId: number, props: HostStorageCreationProperties)
-    {
-        const fsType = await this.FindFileSystemTypeFromDirectory(hostId, props.storagePath);
-        await this.hostsController.AddHostStorage(hostId, props, fsType);
-    }
-
     public async TakeOverHost(hostName: string)
     {
         const pw = crypto.randomBytes(32).toString("hex");
@@ -49,7 +43,7 @@ export class HostsManager
 
         const hostId = await this.hostsController.AddHost(hostName, pw);
 
-        await this.AddHostStorage(hostId, { storagePath: "/home/opc" });
+        await this.hostStoragesManager.AddHostStorage(hostId, { path: "/home/opc" });
 
         //await this.GenerateKeyPair(hostName);
         //await this.CopyPublicKeyToHost(hostName, hostName);
@@ -81,17 +75,6 @@ export class HostsManager
         conn.ExecuteCommand(["sudo", "passwd", "-d", "opc"]);
         conn.ExecuteCommand(["sudo", "passwd", "-l", "opc"]);
         conn.Close();
-    }
-
-    private async FindFileSystemTypeFromDirectory(hostId: number, path: string)
-    {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["df", "-T", path], hostId);
-        const lines = result.stdOut.split("\n");
-        lines.pop();
-        const line = lines.pop()!;
-        const parts = line.split(/[ \t]+/);
-
-        return parts[1];
     }
 
     private async GenerateKeyPair(keyName: string)
