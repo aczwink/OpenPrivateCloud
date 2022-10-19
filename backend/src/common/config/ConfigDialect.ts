@@ -16,17 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { resourceProviders } from "openprivatecloud-common/resourceProviders";
-import { RoutingViewModel } from "../UI/ViewModel";
-import { fileStorageViewModel } from "./file-services/file-storage";
-
- 
-export const instanceTypesRouting: RoutingViewModel = {
-    type: "routing",
-    entries: [
-        {
-            key: `${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:instanceName`,
-            viewModel: fileStorageViewModel
-        }
-    ]
-};
+export interface ConfigDialect
+{
+    commentInitiators: string[];
+    falseMapping: string;
+    trueMapping: string;
+}

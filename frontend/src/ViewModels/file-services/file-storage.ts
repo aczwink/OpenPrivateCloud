@@ -16,26 +16,106 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { InstancePermission, SMBConfig } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
-import { ComponentViewModel, MultiPageViewModel } from "../../UI/ViewModel";
+import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { FileManagerComponent } from "../../Views/file-manager/FileManagerComponent";
+import { resourceProviders } from "openprivatecloud-common";
+import { PageNotFoundComponent } from "../../PageNotFoundComponent";
+import { ListViewModel } from "../../UI/ListViewModel";
 
-export const fileManagerViewModel: ComponentViewModel = {
-    type: "component",
-    component: FileManagerComponent
+type InstanceId = { instanceName: string };
+
+function BuildFullInstanceName(instanceName: string)
+{
+    return "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.fileStorageResourceType.name + "/" + instanceName;
+}
+
+export const accessControlViewModel: ListViewModel<InstancePermission, InstanceId> = {
+    actions: [
+        {
+            type: "create",
+            createResource: async (service, ids, permission) => {
+                await service.instances.permissions.post({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
+            }
+        }
+    ],
+    boundActions: [
+        {
+            type: "delete",
+            deleteResource: async (service, ids, permission) => {
+                await service.instances.permissions.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
+            }
+        }
+    ],
+    displayName: "Access control",
+    requestObjects: async (service, ids) => (await service.instances.permissions.get({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })).data,
+    schemaName: "InstancePermission",
+    type: "list",
 };
 
-export const fileStorageViewModel: MultiPageViewModel<{ instanceName: string }, APIService> = {
-    actions: [],
+async function QuerySMBConfig(service: APIService, ids: InstanceId)
+{
+    const response = await service.resourceProviders.fileservices.filestorage._any_.smbcfg.get(ids.instanceName);
+    if(response.statusCode === 200)
+        return response.data;
+    throw new Error("NOT IMPLEMENTED");
+}
+
+export const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId, APIService>  = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "SMBConfig",
+            requestObject: QuerySMBConfig,
+            updateResource: async (service, ids, cfg) => {
+                await service.resourceProviders.fileservices.filestorage._any_.smbcfg.put(ids.instanceName, cfg);
+            }
+        }
+    ],
+    formTitle: _ => "SMB config",
+    requestObject: QuerySMBConfig,
+    schemaName: "SMBConfig",
+    service: APIService
+};
+
+export const fileStorageViewModel: MultiPageViewModel<InstanceId, APIService> = {
+    actions: [
+        {
+            type: "delete",
+            deleteResource: async (service, ids) => {
+                await service.instances.delete({
+                    fullInstanceName: BuildFullInstanceName(ids.instanceName)
+                })
+            }
+        }
+    ],
     entries: [
         {
+            key: "overview",
+            child: {
+                type: "component",
+                component: PageNotFoundComponent
+            },
+            displayName: "Overview"
+        },
+        {
+            child: accessControlViewModel,
+            displayName: "Access control",
+            key: "access"
+        },
+        {
             key: "file-manager",
-            child: fileManagerViewModel,
+            child: {
+                type: "component",
+                component: FileManagerComponent
+            },
             displayName: "File manager"
         },
         {
             key: "smb-settings",
-            child: fileManagerViewModel,
+            child: smbConfigViewModel,
             displayName: "SMB configuration"
         }
     ],

@@ -23,4 +23,4 @@ interface CreateUnboundResourceAction<ServiceType, ResourceType, IdType>
     schemaName?: string;
 }
 
-export type UnboundResourceAction<ServiceType, ResourceType, ObjectCreationType, IdType> = CreateUnboundResourceAction<ServiceType, ObjectCreationType, IdType>;
+export type UnboundResourceAction<ServiceType, ObjectCreationType, IdType> = CreateUnboundResourceAction<ServiceType, ObjectCreationType, IdType>;

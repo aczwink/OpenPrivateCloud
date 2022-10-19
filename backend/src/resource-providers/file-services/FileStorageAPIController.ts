@@ -16,24 +16,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Forbidden, Get, NotFound, Path, Query } from "acts-util-apilib";
+import { APIController, Body, Forbidden, Get, NotFound, Path, Put, Query } from "acts-util-apilib";
 import path from "path";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
+import { HostUsersManager } from "../../services/HostUsersManager";
 import { InstancesManager } from "../../services/InstancesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "./constants";
+import { SambaSharesManager } from "./SambaSharesManager";
+import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 
 interface FileEntry
 {
     fileName: string;
 }
 
+interface SMBConfig
+{
+    enabled: boolean;
+}
+
 @APIController(`resourceProviders/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{instanceName}`)
 class FileStorageAPIController
 {
     constructor(private remoteFileSystemManager: RemoteFileSystemManager, private instancesController: InstancesController,
-        private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController)
+        private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController,
+        private sambaSharesManager: SambaSharesManager, private hostUsersManager: HostUsersManager)
     {
     }
 
@@ -59,5 +67,57 @@ class FileStorageAPIController
             fileName: x.filename
         }));
         return mappedEntries;
+    }
+
+    @Get("smbcfg")
+    public async QuerySMBConfig(
+        @Path instanceName: string
+    )
+    {
+        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        if(instance === undefined)
+            return NotFound("instance not found");
+        const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
+
+        const cfg = await this.sambaSharesManager.QueryShareSettings(storage!.hostId, instanceName);
+        if(cfg === undefined)
+        {
+            const result: SMBConfig = {
+                enabled: false
+            };
+            return result;
+        }
+
+        const result: SMBConfig = {
+            enabled: true
+        };
+        return result;
+    }
+
+    @Put("smbcfg")
+    public async UpdateSMBConfig(
+        @Path instanceName: string,
+        @Body config: SMBConfig
+    )
+    {
+        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        if(instance === undefined)
+            return NotFound("instance not found");
+        const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
+        const hostId = storage!.hostId;
+
+        if(config.enabled)
+        {
+            this.hostUsersManager.EnsureSambaUserIsSyncedToHost(hostId, 1); //TODO
+
+            await this.sambaSharesManager.SetShare(hostId, {
+                shareName: instanceName,
+                sharePath: this.instancesManager.CreateInstanceStoragePath(storage!.path, fullInstanceName)
+            });
+        }
+        else
+            await this.sambaSharesManager.DeleteShare(hostId, instanceName);
     }
 }

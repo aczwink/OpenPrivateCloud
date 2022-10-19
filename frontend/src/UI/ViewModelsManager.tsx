@@ -17,12 +17,15 @@
  * */
 
 import { Injectable, JSX_CreateElement, RootInjector, Route } from "acfrontend";
-import { OpenAPI } from "acts-util-core";
+import { Dictionary, OpenAPI } from "acts-util-core";
 import { AuthGuard } from "../AuthGuard";
 import { APISchemaService } from "../Services/APISchemaService";
+import { APIService } from "../Services/APIService";
 import { AddObjectComponent } from "./AddObjectComponent";
-import { BoundResourceAction } from "./BoundActions";
+import { IdBoundResourceAction } from "./IdBoundActions";
 import { DeleteObjectComponent } from "./DeleteObjectComponent";
+import { EditObjectComponent } from "./EditObjectComponent";
+import { ListViewModel } from "./ListViewModel";
 import { ObjectListComponent } from "./ObjectListComponent";
 import { SideNavComponent } from "./SideNavComponent";
 import { UnboundResourceAction } from "./UnboundActions";
@@ -52,7 +55,7 @@ export class ViewModelsManager
     private viewModelsRoots: RoutingViewModel[];
 
     //Private methods
-    private BuildBoundActionComponent(action: BoundResourceAction<any, any>, serviceType: Instantiatable<any>, parentRoute: string)
+    private BuildBoundActionComponent(action: IdBoundResourceAction<any, any, any>, formTitle: (ids: any) => string, serviceType: Instantiatable<any>, parentRoute: string)
     {
         switch(action.type)
         {
@@ -61,13 +64,21 @@ export class ViewModelsManager
                     deleteResource={ids => action.deleteResource(RootInjector.Resolve(serviceType), ids)}
                     postDeleteUrl={parentRoute}
                     />;
+            case "edit":
+                return <EditObjectComponent
+                    formTitle={formTitle}
+                    postUpdateUrl={parentRoute}
+                    requestObject={async ids => (await action.requestObject(RootInjector.Resolve(serviceType), ids))}
+                    updateResource={(ids, obj) => action.updateResource(RootInjector.Resolve(serviceType), ids, obj)}
+                    schema={this.apiSchemaService.GetSchema(action.propertiesSchemaName) as OpenAPI.ObjectSchema}
+                    />;
         }
     }
 
-    private BuildBoundActionRoute(action: BoundResourceAction<any, any>, serviceType: Instantiatable<any>, parentRoute: string): Route
+    private BuildBoundActionRoute(action: IdBoundResourceAction<any, any, any>, formTitle: (ids: any) => string, serviceType: Instantiatable<any>, parentRoute: string): Route
     {
         return {
-            component: this.BuildBoundActionComponent(action, serviceType, parentRoute),
+            component: this.BuildBoundActionComponent(action, formTitle, serviceType, parentRoute),
             path: action.type
         };
     }
@@ -99,16 +110,18 @@ export class ViewModelsManager
 
         return {
             children: [
-                ...viewModel.actions.map(action => this.BuildUnboundResourceActionRoutes(viewModel, action, baseRoute)),
+                ...viewModel.actions.map(action => this.BuildUnboundResourceActionRoutes(viewModel.displayName, viewModel.schemaName, action, baseRoute)),
                 ...children,
                 {
                     component: <ObjectListComponent
-                        actions={this.FindActions(viewModel.child)}
+                        idBoundActions={this.FindActions(viewModel.child)}
                         baseUrl={baseRoute}
                         customRouting={viewModel.customRouting}
                         elementSchema={mappedSchema}
                         extractId={viewModel.extractId}
+                        hasChild={true}
                         heading={viewModel.displayName}
+                        objectBoundActions={[]}
                         requestObjects={ids => viewModel.requestObjects(RootInjector.Resolve(viewModel.service), ids)}
                         unboundActions={viewModel.actions}
                     />,
@@ -129,6 +142,33 @@ export class ViewModelsManager
         }
     }
 
+    private BuildListViewModelRoutes(viewModel: ListViewModel<any, any>, baseRoute: string): Route
+    {
+        const schema = this.apiSchemaService.GetSchema(viewModel.schemaName) as OpenAPI.ObjectSchema;
+
+        return {
+            children: [
+                ...viewModel.actions.map(action => this.BuildUnboundResourceActionRoutes(viewModel.displayName, viewModel.schemaName, action, baseRoute)),
+                {
+                    component: <ObjectListComponent
+                        idBoundActions={[]}
+                        baseUrl={baseRoute}
+                        elementSchema={schema}
+                        extractId={_ => 0}
+                        hasChild={false}
+                        heading={viewModel.displayName}
+                        objectBoundActions={viewModel.boundActions}
+                        requestObjects={ids => viewModel.requestObjects(RootInjector.Resolve(APIService), ids)}
+                        unboundActions={viewModel.actions}
+                        />,
+                    path: "",
+                }
+            ],
+            guards: [AuthGuard],
+            path: "",
+        };
+    }
+
     private BuildMultiPageViewModelRoutes(viewModel: MultiPageViewModel<any, any>, baseRoute: string, parentRoute: string): Route
     {
         if(viewModel.entries.length === 0)
@@ -142,7 +182,7 @@ export class ViewModelsManager
 
         return {
             children: [
-                ...viewModel.actions.map(action => this.BuildBoundActionRoute(action, viewModel.service, parentRoute)),
+                ...viewModel.actions.map(action => this.BuildBoundActionRoute(action, viewModel.formTitle, viewModel.service, parentRoute)),
                 ...viewModel.entries.map(x => {
                     const childRoute = this.BuildViewModelRoutes(x.child, baseRoute + "/" + x.key, parentRoute);
                 
@@ -169,9 +209,11 @@ export class ViewModelsManager
 
         return {
             children: [
-                ...viewModel.actions.map(action => this.BuildBoundActionRoute(action, viewModel.service, parentRoute)),
+                ...viewModel.actions.map(action => this.BuildBoundActionRoute(action, viewModel.formTitle, viewModel.service, parentRoute)),
                 {
                     component: <ViewObjectComponent
+                    actions={viewModel.actions}
+                    baseRoute={baseRoute}
                     heading={viewModel.formTitle}
                     requestObject={routeParams => viewModel.requestObject(RootInjector.Resolve(viewModel.service), routeParams)}
                     schema={schema}
@@ -184,17 +226,17 @@ export class ViewModelsManager
         };
     }
 
-    private BuildUnboundResourceActionRoutes(viewModel: CollectionViewModel<any, any, any>, action: UnboundResourceAction<any, any, any, any>, parentPath: string): Route
+    private BuildUnboundResourceActionRoutes(displayName: string, viewModelSchemaName: string, action: UnboundResourceAction<any, any, any>, parentPath: string): Route
     {
         switch(action.type)
         {
             case "create":
                 return {
                     component: <AddObjectComponent
-                        createResource={(ids, data) => action.createResource(RootInjector.Resolve(viewModel.service), ids, data)}
-                        heading={viewModel.displayName}
+                        createResource={(ids, data) => action.createResource(RootInjector.Resolve(APIService), ids, data)}
+                        heading={displayName}
                         postUpdateUrl={parentPath}
-                        schema={this.apiSchemaService.GetSchema(action.schemaName ?? viewModel.schemaName) as OpenAPI.ObjectSchema}
+                        schema={this.apiSchemaService.GetSchema(action.schemaName ?? viewModelSchemaName) as OpenAPI.ObjectSchema}
                     />,
                     path: action.type,
                 };
@@ -221,6 +263,8 @@ export class ViewModelsManager
                 return this.BuildCollectionViewModelRoutes(viewModel, baseRoute);
             case "component":
                 return this.BuildComponentViewModelRoutes(viewModel);
+            case "list":
+                return this.BuildListViewModelRoutes(viewModel, baseRoute);
             case "multiPage":
                 return this.BuildMultiPageViewModelRoutes(viewModel, baseRoute, parentRoute);
             case "object":
@@ -235,12 +279,13 @@ export class ViewModelsManager
         switch(viewModel.type)
         {
             case "collection":
-            case "component":
+            case "list":
                 throw new Error("Not implemented");
             case "multiPage":
                 return viewModel.actions;
             case "object":
                 return viewModel.actions;
+            case "component":
             case "routing":
                 return [];
         }

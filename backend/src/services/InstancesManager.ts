@@ -31,7 +31,7 @@ export class InstancesManager
     public async CreateInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string, userId: number)
     {
         const instancePath = this.CreateInstanceStoragePath(hostStoragePath, fullInstanceName);
-        const hostUserId = await this.hostUsersManager.EnsureUserIsSyncedToHost(hostId, userId);
+        const hostUserId = await this.hostUsersManager.SyncUserToHost(hostId, userId);
         await this.remoteFileSystemManager.CreateDirectory(hostId, instancePath, hostUserId);
     }
 

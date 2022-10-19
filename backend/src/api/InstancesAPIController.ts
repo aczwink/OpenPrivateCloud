@@ -15,15 +15,16 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Body, Delete, Get, Header, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Delete, Get, Header, NotFound, Post, Query } from "acts-util-apilib";
 import { BaseResourceProperties } from "../resource-providers/ResourceProvider";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { HostsController } from "../data-access/HostsController";
 import { SessionsManager } from "../services/SessionsManager";
-import { Instance, InstancesController } from "../data-access/InstancesController";
+import { Instance, InstancePermission, InstancesController } from "../data-access/InstancesController";
 
 //TODO
 import { FileStorageProperties } from "../resource-providers/file-services/FileStorageProperties";
+import { PermissionsManager } from "../services/PermissionsManager";
 //TODO
 
 @APIController("instances")
@@ -34,9 +35,9 @@ class InstancesAPIController
     {
     }
 
-    @Delete("{fullInstanceName}")
+    @Delete()
     public async DeleteInstance(
-        @Path fullInstanceName: string
+        @BodyProp fullInstanceName: string
     )
     {
         await this.resourceProviderManager.DeleteInstance(fullInstanceName);
@@ -60,5 +61,39 @@ class InstancesAPIController
     public async QueryInstances(): Promise<Instance[]>
     {
         return await this.instancesController.QueryInstances();
+    }
+}
+
+@APIController("instances/permissions")
+class InstancePermissionsAPIController
+{
+    constructor(private instancesController: InstancesController, private permissionsManager: PermissionsManager)
+    {
+    }
+
+    @Post()
+    public async Add(
+        @Query fullInstanceName: string,
+        @Body instancePermission: InstancePermission
+    )
+    {
+        await this.permissionsManager.AddInstancePermission(fullInstanceName, instancePermission);
+    }
+
+    @Delete()
+    public async Delete(
+        @Query fullInstanceName: string,
+        @Body instancePermission: InstancePermission
+    )
+    {
+        await this.permissionsManager.DeleteInstancePermission(fullInstanceName, instancePermission);
+    }
+
+    @Get()
+    public async QueryInstancePermissions(
+        @Query fullInstanceName: string
+    )
+    {
+        return await this.instancesController.QueryInstancePermissions(fullInstanceName);
     }
 }

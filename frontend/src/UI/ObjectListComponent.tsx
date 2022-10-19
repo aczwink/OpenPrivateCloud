@@ -18,26 +18,30 @@
 
 import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterButton, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
-import { BoundResourceAction } from "./BoundActions";
+import { APIService } from "../Services/APIService";
+import { IdBoundResourceAction } from "./IdBoundActions";
+import { ObjectBoundAction } from "./ObjectBoundActions";
 import { UnboundResourceAction } from "./UnboundActions";
 import { RenderReadOnlyValue, RenderTitle } from "./ValuePresentation";
 
 interface ObjectListInput
 {
-    actions: BoundResourceAction<any, any>[];
     baseUrl: string;
     customRouting?: (id: number | string) => string;
     elementSchema: OpenAPI.ObjectSchema;
     extractId: (object: any) => number | string;
+    hasChild: boolean;
     heading: string;
+    idBoundActions: IdBoundResourceAction<any, any, any>[];
+    objectBoundActions: ObjectBoundAction<any, any>[];
     requestObjects: (routeParams: Dictionary<string>) => Promise<any[]>;
-    unboundActions: UnboundResourceAction<any, any, any, any>[];
+    unboundActions: UnboundResourceAction<any, any, any>[];
 }
 
 @Injectable
 export class ObjectListComponent extends Component<ObjectListInput>
 {
-    constructor(private routerState: RouterState)
+    constructor(private routerState: RouterState, private apiService: APIService)
     {
         super();
 
@@ -55,7 +59,7 @@ export class ObjectListComponent extends Component<ObjectListInput>
                 <thead>
                     <tr>
                         {...this.RenderColumnsNames()}
-                        {this.input.actions.length == 0 ? null : <th>Actions</th>}
+                        {(this.input.idBoundActions.length + this.input.objectBoundActions.length) == 0 ? null : <th>Actions</th>}
                     </tr>
                 </thead>
                 <tbody>{this.data.map(this.RenderObjectRow.bind(this))}</tbody>
@@ -85,7 +89,12 @@ export class ObjectListComponent extends Component<ObjectListInput>
         this.data.sort((a, b) => a[firstColumnKey].localeCompare(b[firstColumnKey]));
     }
 
-    private RenderAction(object: any, action: BoundResourceAction<any, any>)
+    private RenderColumnsNames()
+    {
+        return this.input.elementSchema.properties.OwnKeys().Map(x => <th>{RenderTitle(this.input.elementSchema.properties[x]!, x.toString())}</th>).ToArray();
+    }
+
+    private RenderIdBoundAction(object: any, action: IdBoundResourceAction<any, any, any>)
     {
         const route = this.input.baseUrl + "/" + encodeURIComponent(this.ExtractId(object)) + "/" + action.type;
         switch(action.type)
@@ -96,17 +105,25 @@ export class ObjectListComponent extends Component<ObjectListInput>
         return null;
     }
 
-    private RenderActions(object: any)
+    private RenderObjectActions(object: any)
     {
-        if(this.input.actions.length == 0)
+        if((this.input.idBoundActions.length + this.input.objectBoundActions.length) == 0)
             return null;
 
-        return <td>{...this.input.actions.map(this.RenderAction.bind(this, object))}</td>;
+        return <td>
+            {...this.input.objectBoundActions.map(this.RenderObjectBoundAction.bind(this, object))}
+            {...this.input.idBoundActions.map(this.RenderIdBoundAction.bind(this, object))}
+        </td>;
     }
 
-    private RenderColumnsNames()
+    private RenderObjectBoundAction(object: any, action: ObjectBoundAction<any, any>)
     {
-        return this.input.elementSchema.properties.OwnKeys().Map(x => <th>{RenderTitle(this.input.elementSchema.properties[x]!, x.toString())}</th>).ToArray();
+        switch(action.type)
+        {
+            case "delete":
+                return <a className="link-danger" role="button" onclick={this.OnDelete.bind(this, action, object)}><MatIcon>delete_forever</MatIcon></a>;
+        }
+        return null;
     }
 
     private RenderObjectProperty(obj: any, key: string)
@@ -116,7 +133,7 @@ export class ObjectListComponent extends Component<ObjectListInput>
 
     private RenderObjectPropertyEntry(obj: any, key: string, idx: number)
     {
-        if(idx === 0)
+        if((idx === 0) && this.input.hasChild)
         {
             const id = this.ExtractId(obj);
             const route = (this.input.customRouting === undefined)
@@ -130,10 +147,10 @@ export class ObjectListComponent extends Component<ObjectListInput>
     private RenderObjectRow(obj: any)
     {
         let entries = this.input.elementSchema.properties.OwnKeys().ToArray().map( (k, i) => <td>{this.RenderObjectPropertyEntry(obj, k.toString(), i)}</td>);
-        return <tr>{...entries.concat(this.RenderActions(obj))}</tr>;
+        return <tr>{...entries.concat(this.RenderObjectActions(obj))}</tr>;
     }
 
-    private RenderUnboundAction(action: UnboundResourceAction<any, any, any, any>)
+    private RenderUnboundAction(action: UnboundResourceAction<any, any, any>)
     {
         const route = this.input.baseUrl + "/" + action.type;
         switch(action.type)
@@ -144,6 +161,16 @@ export class ObjectListComponent extends Component<ObjectListInput>
     }
 
     //Event handlers
+    private async OnDelete(action: ObjectBoundAction<any, any>, object: any)
+    {
+        if(confirm("Are you sure that you want to delete this?"))
+        {
+            this.data = null;
+            await action.deleteResource(this.apiService, this.routerState.routeParams, object);
+            this.QueryData();
+        }
+    }
+
     public override OnInitiated()
     {
         this.QueryData();

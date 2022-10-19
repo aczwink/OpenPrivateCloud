@@ -18,7 +18,7 @@
 
 import { Anchor, Component, Injectable, JSX_CreateElement, MatIcon, NavItem, ProgressSpinner, RouterComponent, RouterState } from "acfrontend";
 import { Dictionary } from "acts-util-core";
-import { BoundResourceAction } from "./BoundActions";
+import { IdBoundResourceAction, RenderBoundAction } from "./IdBoundActions";
 
 export interface ObjectType
 {
@@ -28,7 +28,7 @@ export interface ObjectType
 
 interface SideNavComponentInput
 {
-    actions: BoundResourceAction<any, any>[];
+    actions: IdBoundResourceAction<any, any, any>[];
     baseRoute: string;
     formHeading: (routeParams: Dictionary<string>) => string;
     objectTypes: ObjectType[];
@@ -53,7 +53,7 @@ export class SideNavComponent extends Component<SideNavComponentInput>
         return <fragment>
             <div className="row align-items-center">
                 <div className="col-auto"><h2>{this.title}</h2></div>
-                {...this.input.actions.map(x => <div className="col-auto">{this.RenderAction(x)}</div>)}
+                {...this.input.actions.map(x => <div className="col-auto">{RenderBoundAction(this.input.baseRoute, this.routerState.routeParams, x)}</div>)}
             </div>
             <div className="row">
                 <div className="col-1">
@@ -69,18 +69,6 @@ export class SideNavComponent extends Component<SideNavComponentInput>
     //Private members
     private baseRoute: string;
     private title: string | null;
-
-    //Private methods
-    private RenderAction(action: BoundResourceAction<any, any>)
-    {
-        const varRoute = this.input.baseRoute + "/" + action.type;
-        const route = RouterState.ReplaceRouteParams(varRoute, this.routerState.routeParams).join("/");
-        switch(action.type)
-        {
-            case "delete":
-                return <Anchor class="d-flex align-items-center text-decoration-none link-danger" route={route}><MatIcon>delete_forever</MatIcon> Delete</Anchor>;
-        }
-    }
 
     //Event handlers
     override OnInitiated(): void

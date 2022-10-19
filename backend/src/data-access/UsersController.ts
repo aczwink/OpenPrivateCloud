@@ -21,13 +21,14 @@ import { DBConnectionsManager } from "./DBConnectionsManager";
 
 interface PrivateUserData
 {
-    id: number;
     pwHash: string;
     pwSalt: string;
+    sambaPW: string;
 }
 
 interface PublicUserData
 {
+    id: number;
     emailAddress: string;
 }
 
@@ -45,16 +46,61 @@ export class UsersController
         await conn.InsertRow("users", { emailAddress, pwHash, pwSalt });
     }
 
-    public async QueryUser(emailAddress: string)
+    public async QueryMembersOfGroup(userGroupId: number)
     {
         let query = `
-        SELECT id, pwHash, pwSalt
+        SELECT u.id, u.emailAddress
+        FROM users u
+        INNER JOIN usergroups_members ugm
+            ON u.id = ugm.userId
+        WHERE ugm.groupId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select<PublicUserData>(query, userGroupId);
+
+        return rows;
+    }
+
+    public async QueryPrivateData(id: number)
+    {
+        let query = `
+        SELECT pwHash, pwSalt, sambaPW
+        FROM users
+        WHERE id = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne<PrivateUserData>(query, id);
+
+        return row;
+    }
+
+    public async QueryUserId(emailAddress: string)
+    {
+        let query = `
+        SELECT id
         FROM users
         WHERE emailAddress = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne<PrivateUserData>(query, emailAddress);
+        const row = await conn.SelectOne(query, emailAddress);
+        if(row === undefined)
+            return undefined;
+        return row.id as number;
+    }
+
+    public async QueryUser(userId: number)
+    {
+        let query = `
+        SELECT id, emailAddress
+        FROM users
+        WHERE id = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne<PublicUserData>(query, userId);
 
         return row;
     }
@@ -62,7 +108,7 @@ export class UsersController
     public async QueryUsers()
     {
         let query = `
-        SELECT emailAddress
+        SELECT id, emailAddress
         FROM users
         `;
 

@@ -16,17 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { resourceProviders } from "openprivatecloud-common/resourceProviders";
-import { RoutingViewModel } from "../UI/ViewModel";
-import { fileStorageViewModel } from "./file-services/file-storage";
+import { APIService } from "../Services/APIService";
 
- 
-export const instanceTypesRouting: RoutingViewModel = {
-    type: "routing",
-    entries: [
-        {
-            key: `${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:instanceName`,
-            viewModel: fileStorageViewModel
-        }
-    ]
-};
+interface DeleteAction<ObjectType, IdType>
+{
+    type: "delete";
+    deleteResource: (service: APIService, ids: IdType, object: ObjectType) => Promise<void>;
+}
+
+export type ObjectBoundAction<ObjectType, IdType> = DeleteAction<ObjectType, IdType>;

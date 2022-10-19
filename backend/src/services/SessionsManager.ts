@@ -57,7 +57,11 @@ export class SessionsManager
 
     public async TryCreateSession(emailAddress: string, password: string)
     {
-        const user = await this.usersController.QueryUser(emailAddress);
+        const userId = await this.usersController.QueryUserId(emailAddress);
+        if(userId === undefined)
+            return null;
+
+        const user = await this.usersController.QueryPrivateData(userId);
         if(user === undefined)
             return null;
 
@@ -67,7 +71,7 @@ export class SessionsManager
             const token = await this.CreateToken();
             const session = this.sessions[token] = {
                 expiryDateTime: this.CreateExpiryTime(),
-                userId: user.id,
+                userId: userId,
             };
             this.SetAutoLogOutTimer(token, session);
             return { expiryDateTime: session.expiryDateTime, token };

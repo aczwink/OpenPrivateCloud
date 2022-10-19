@@ -20,6 +20,8 @@ import { AutoCompleteSelectBox, CheckBox, Component, FormField, Injectable, JSX_
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../Services/APISchemaService";
 import { APIService } from "../Services/APIService";
+import { UserGroupSelectionComponent } from "./UserGroupSelectionComponent";
+import { UserSelectionComponent } from "./UserSelectionComponent";
 import { RenderTitle } from "./ValuePresentation";
 
 
@@ -58,6 +60,29 @@ export class ObjectEditorComponent extends Component<{
         if(this.input.onObjectUpdated !== undefined)
             this.input.onObjectUpdated(newValue);
         this.Update();
+    }
+
+    private RenderNumber(value: any, schema: OpenAPI.NumberSchema, valueChanged: (newValue: any) => void)
+    {
+        if(schema.format !== undefined)
+        {
+            switch(schema.format)
+            {
+                case "user":
+                    return <UserSelectionComponent userId={value} valueChanged={valueChanged} />;
+                case "usergroup":
+                    return <UserGroupSelectionComponent userGroupId={value} valueChanged={valueChanged} />;
+            }
+        }
+
+        let className = "";
+        if((schema.minimum !== undefined) || (schema.maximum !== undefined))
+        {
+            const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
+            className = validator.ValidateNumber(value, schema) ? "is-valid" : "is-invalid";
+        }
+
+        return <NumberSpinner className={className} value={value} onChanged={valueChanged} step={1} />;
     }
 
     private RenderString(value: any, schema: OpenAPI.StringSchema, valueChanged: (newValue: any) => void)
@@ -99,7 +124,6 @@ export class ObjectEditorComponent extends Component<{
         if("$ref" in schema)
             return this.RenderValue(value, this.apiSchemaService.ResolveReference(schema), valueChanged, schema.title || fallback);
 
-        let className = "";
         switch(schema.type)
         {
             case "array": //TODO: implement this
@@ -111,14 +135,8 @@ export class ObjectEditorComponent extends Component<{
                 </FormField>;
 
             case "number":
-                if((schema.minimum !== undefined) || (schema.maximum !== undefined))
-                {
-                    const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
-                    className = validator.ValidateNumber(value, schema) ? "is-valid" : "is-invalid";
-                }
-
                 return <FormField title={RenderTitle(schema, fallback)} description={schema.description}>
-                    <NumberSpinner className={className} value={value} onChanged={valueChanged} step={1} />
+                    {this.RenderNumber(value, schema, valueChanged)}
                 </FormField>;
 
             case "object":

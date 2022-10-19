@@ -16,11 +16,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-interface ManagedDeleteResourceAction<IdType, ServiceType>
-{
-    type: "delete";
-    deleteResource: (service: ServiceType, ids: IdType) => Promise<void>;
-}
+import { APIService } from "../Services/APIService";
+import { ObjectBoundAction } from "./ObjectBoundActions";
+import { UnboundResourceAction } from "./UnboundActions";
 
-export type BoundResourceAction<IdType, ServiceType> =
-    ManagedDeleteResourceAction<IdType, ServiceType>
+export interface ListViewModel<ObjectType, IdType>
+{
+    type: "list";
+    actions: UnboundResourceAction<APIService, ObjectType, IdType>[];
+    boundActions: ObjectBoundAction<ObjectType, IdType>[];
+    displayName: string;
+    requestObjects: (service: APIService, ids: IdType) => Promise<ObjectType[]>;
+    schemaName: string;
+}

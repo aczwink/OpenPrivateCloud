@@ -22,7 +22,7 @@ export interface BaseResourceProperties
     name: string;
 
     /**
-     * Hostname
+     * @title Hostname
      * @format hostName
      */
     hostName: string;

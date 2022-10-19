@@ -56,10 +56,33 @@ export class RemoteFileSystemManager
         return result;
     }
 
+    public async QueryStatus(hostId: number, filePath: string)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        const result = await conn.value.QueryStatus(filePath);
+        conn.Release();
+        return result;
+    }
+
+    public async ReadTextFile(hostId: number, filePath: string)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        const result = await conn.value.ReadTextFile(filePath);
+        conn.Release();
+        return result;
+    }
+
     public async RemoveDirectory(hostId: number, path: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
         await conn.value.RemoveDirectory(path);
+        conn.Release();
+    }
+
+    public async WriteTextFile(hostId: number, filePath: string, text: string)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        await conn.value.WriteFile(filePath, Buffer.from(text, "utf-8"));
         conn.Release();
     }
 }

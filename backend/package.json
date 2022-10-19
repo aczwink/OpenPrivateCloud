@@ -14,6 +14,7 @@
     "acts-util-apilib": "*",
     "acts-util-core": "*",
     "acts-util-node": "*",
+    "openprivatecloud-common": "*",
     "ssh2": "^1.11.0"
   },
   "devDependencies": {

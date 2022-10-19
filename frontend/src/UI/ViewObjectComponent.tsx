@@ -19,10 +19,13 @@
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
 import { APISchemaService } from "../Services/APISchemaService";
+import { IdBoundResourceAction, RenderBoundAction } from "./IdBoundActions";
 import { RenderReadOnlyValue, RenderTitle } from "./ValuePresentation";
 
 interface ObjectInput
 {
+    actions: IdBoundResourceAction<any, any, any>[];
+    baseRoute: string;
     heading: (obj: any) => string;
     requestObject: (routeParams: Dictionary<string>) => Promise<any>;
     schema: OpenAPI.ObjectSchema;
@@ -49,7 +52,10 @@ export class ViewObjectComponent extends Component<ObjectInput>
         tables.reverse();
 
         return <fragment>
-            <h1>{this.heading}</h1>
+            <div className="row align-items-center">
+                <div className="col-auto"><h2>{this.heading}</h2></div>
+                {...this.input.actions.map(x => <div className="col-auto">{RenderBoundAction(this.input.baseRoute, this.routerState.routeParams, x)}</div>)}
+            </div>
             {tables}
         </fragment>;
     }

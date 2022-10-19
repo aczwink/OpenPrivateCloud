@@ -36,6 +36,8 @@ export interface SSHConnection
     ExecuteCommand(command: string[]): Promise<void>;
     ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
     ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
+    QueryStatus(remotePath: string): Promise<ssh2.Stats>;
+    ReadTextFile(remotePath: string): Promise<string>;
     RemoveDirectory(remotePath: string): Promise<void>;
     WriteFile(remotePath: string, content: Buffer): Promise<void>;
 }
@@ -147,12 +149,19 @@ class SSHConnectionImpl implements SSHConnection
 
     public async ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>
     {
+        let writePW = false;
+        const sudoCount = command.Values().Filter(x => x === "sudo").Count();
+        if( (sudoCount === 1) && (command[0] === "sudo") )
+        {
+            command.splice(1, 0, "--stdin");
+            writePW = true;
+        }
+
         const commandLine = command.join(" ");
-        const hasSudo = command.Contains("sudo");
 
         const channel = await new Promise<ssh2.ClientChannel>( (resolve, reject) => {
             this.conn.exec(commandLine, {
-                pty: hasSudo
+                //pty: hasSudo
             }, (err, channel) => {
 
                 if(err)
@@ -162,7 +171,7 @@ class SSHConnectionImpl implements SSHConnection
             });
         });
 
-        if(hasSudo)
+        if(writePW)
             channel.stdin.write(this.password + "\n");
 
         return channel;
@@ -176,6 +185,30 @@ class SSHConnectionImpl implements SSHConnection
                     reject(err);
                 else
                     resolve(list);
+            });
+        });
+    }
+
+    public QueryStatus(remotePath: string): Promise<ssh2.Stats>
+    {
+        return new Promise<ssh2.Stats>( (resolve, reject) => {
+            this.sftp.lstat(remotePath, (err, stats) => {
+                if(err)
+                    reject(err);
+                else
+                    resolve(stats);
+            });
+        });
+    }
+
+    public ReadTextFile(remotePath: string): Promise<string>
+    {
+        return new Promise<string>( (resolve, reject) => {
+            this.sftp.readFile(remotePath, (err, buffer) => {
+                if(err)
+                    reject(err);
+                else
+                    resolve(buffer.toString("utf-8"));
             });
         });
     }

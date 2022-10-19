@@ -18,21 +18,22 @@
 
 import { Injectable } from "acts-util-node";
 import { InstancesManager } from "../../services/InstancesManager";
+import { ModulesManager } from "../../services/ModulesManager";
 import { DeploymentContext, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
-import { c_fileServicesResourceProviderName } from "./constants";
+import { resourceProviders } from "openprivatecloud-common";
 import { FileStorageProperties } from "./FileStorageProperties";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileStorageProperties>
 {
-    constructor(private instancesManager: InstancesManager)
+    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager)
     {
     }
     
     //Properties
     public get name(): string
     {
-        return c_fileServicesResourceProviderName;
+        return resourceProviders.fileServices.name;
     }
 
     public get resourceTypeDefinitions(): ResourceTypeDefinition[]
@@ -53,6 +54,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
 
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<void>
     {
+        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
         await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName, context.userId);
     }
 }

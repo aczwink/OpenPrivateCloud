@@ -18,14 +18,15 @@
 
 import { Component } from "acfrontend";
 import { Instantiatable } from "acts-util-core";
-import { BoundResourceAction } from "./BoundActions";
+import { IdBoundResourceAction } from "./IdBoundActions";
+import { ListViewModel } from "./ListViewModel";
 import { UnboundResourceAction } from "./UnboundActions";
 
 export interface CollectionViewModel<ObjectType, IdType, ServiceType, ObjectCreationType = ObjectType>
 {
     type: "collection";
 
-    actions: UnboundResourceAction<ServiceType, ObjectType, ObjectCreationType, IdType>[];
+    actions: UnboundResourceAction<ServiceType, ObjectCreationType, IdType>[];
     child: ViewModel;
     customRouting?: (id: number | string) => string;
     displayName: string;
@@ -52,7 +53,7 @@ interface PageEntry
 export interface MultiPageViewModel<IdType, ServiceType>
 {
     type: "multiPage";
-    actions: BoundResourceAction<IdType, ServiceType>[];
+    actions: IdBoundResourceAction<IdType, any, ServiceType>[];
     formTitle: (ids: IdType) => string;
     entries: PageEntry[];
     service: Instantiatable<ServiceType>;
@@ -62,7 +63,7 @@ export interface ObjectViewModel<ObjectType, IdType, ServiceType>
 {
     type: "object";
 
-    actions: BoundResourceAction<IdType, ServiceType>[];
+    actions: IdBoundResourceAction<IdType, ObjectType, ServiceType>[];
     formTitle: (object: ObjectType) => string;
     requestObject: (service: ServiceType, ids: IdType) => Promise<ObjectType | undefined>;
     schemaName: string;
@@ -82,4 +83,4 @@ export interface RoutingViewModel
     entries: RoutingEntry[];
 }
 
-export type ViewModel = CollectionViewModel<any, any, any> | ComponentViewModel | MultiPageViewModel<any, any> | ObjectViewModel<any, any, any> | RoutingViewModel;
+export type ViewModel = CollectionViewModel<any, any, any> | ComponentViewModel | ListViewModel<any, any> | MultiPageViewModel<any, any> | ObjectViewModel<any, any, any> | RoutingViewModel;

@@ -15,18 +15,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import { Injectable } from "acts-util-node";
+import DebianPackageManager from "../debian/PackageManager";
 
-import { resourceProviders } from "openprivatecloud-common/resourceProviders";
-import { RoutingViewModel } from "../UI/ViewModel";
-import { fileStorageViewModel } from "./file-services/file-storage";
+@Injectable
+class UbuntuPackageManager extends DebianPackageManager
+{
+}
 
- 
-export const instanceTypesRouting: RoutingViewModel = {
-    type: "routing",
-    entries: [
-        {
-            key: `${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:instanceName`,
-            viewModel: fileStorageViewModel
-        }
-    ]
-};
+export default UbuntuPackageManager;

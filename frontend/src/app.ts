@@ -41,7 +41,7 @@ async function LoadViewModels()
     const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
 
     const viewModelNames = [
-        "hosts", "instances", "users"
+        "hosts", "instances", "usersandgroups"
     ];
 
     for (const viewModelName of viewModelNames)

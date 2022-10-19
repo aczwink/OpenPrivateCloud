@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * */
-import { APIController, Body, Get, Post } from "acts-util-apilib";
+import { APIController, Body, Get, Path, Post } from "acts-util-apilib";
 import { UsersController } from "../data-access/UsersController";
 import { UsersManager } from "../services/UsersManager";
 
@@ -38,6 +38,14 @@ class UsersAPIController
     )
     {
         await this.usersManager.CreateUser(userCreationData.emailAddress, userCreationData.password);
+    }
+
+    @Get("{userId}")
+    public async RequestUser(
+        @Path userId: number
+    )
+    {
+        return await this.usersController.QueryUser(userId);
     }
 
     @Get()
