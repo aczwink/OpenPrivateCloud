@@ -31,6 +31,16 @@ export class RemoteRootFileSystemManager
     }
 
     //Public methods
+    public async ChangeOwnerAndGroup(hostId: number, remotePath: string, uid: number, gid: number)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", uid + ":" + gid, remotePath], hostId);
+    }
+
+    public async RemoveDirectoryRecursive(hostId: number, remotePath: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rm", "-rf", remotePath], hostId);
+    }
+
     public async WriteTextFile(hostId: number, filePath: string, text: string)
     {
         const status = await this.remoteFileSystemManager.QueryStatus(hostId, filePath);
@@ -40,7 +50,7 @@ export class RemoteRootFileSystemManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mv", "-f", tempPath, filePath], hostId);
 
         await this.remoteFileSystemManager.ChangeMode(hostId, filePath, status.mode);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", status.uid + ":" + status.gid, filePath], hostId);
+        await this.ChangeOwnerAndGroup(hostId, filePath, status.uid, status.gid);
     }
 
     //Private methods
@@ -48,7 +58,9 @@ export class RemoteRootFileSystemManager
     {
         const tempRootPath = "/tmp/opc";
         const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
-        await this.remoteFileSystemManager.CreateDirectory(hostId, tempRootPath, hostOPCUserId);
+        await this.remoteFileSystemManager.CreateDirectory(hostId, tempRootPath, {
+            uid: hostOPCUserId
+        });
 
         return path.join(tempRootPath, crypto.pseudoRandomBytes(16).toString("hex"));
     }

@@ -15,6 +15,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import path from "path";
+import ssh2 from "ssh2";
 import { Injectable } from "acts-util-node";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 
@@ -40,10 +42,10 @@ export class RemoteFileSystemManager
         conn.Release();
     }
 
-    public async CreateDirectory(hostId: number, dirPath: string, uid: number)
+    public async CreateDirectory(hostId: number, dirPath: string, attributes?: ssh2.InputAttributes)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.CreateDirectory(dirPath, uid);
+        const result = await conn.value.CreateDirectory(dirPath, attributes);
         conn.Release();
         return result;
     }
@@ -76,6 +78,30 @@ export class RemoteFileSystemManager
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
         await conn.value.RemoveDirectory(path);
+        conn.Release();
+    }
+
+    public async RemoveDirectoryRecursive(hostId: number, dirPath: string)
+    {
+        const contents = await this.ListDirectoryContents(hostId, dirPath);
+        for (const child of contents)
+        {
+            const childPath = path.join(dirPath, child.filename);
+            const status = await this.QueryStatus(hostId, childPath);
+
+            if(status.isDirectory())
+                await this.RemoveDirectoryRecursive(hostId, childPath);
+            else
+                await this.UnlinkFile(hostId, childPath);
+        }
+
+        await this.RemoveDirectory(hostId, dirPath);
+    }
+
+    public async UnlinkFile(hostId: number, path: string)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        await conn.value.UnlinkFile(path);
         conn.Release();
     }
 

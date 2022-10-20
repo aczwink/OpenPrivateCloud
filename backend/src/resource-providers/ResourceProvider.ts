@@ -48,5 +48,6 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
     readonly resourceTypeDefinitions: ResourceTypeDefinition[];
 
     DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<void>;
+    InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<void>;
 }

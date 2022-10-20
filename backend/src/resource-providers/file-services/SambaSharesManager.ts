@@ -30,6 +30,8 @@ type GlobalSettings = Dictionary<boolean | number | string | null>;
 
 interface ShareData
 {
+    readUsers: string[];
+    writeUsers: string[];
     shareName: string;
     sharePath: string;
 }
@@ -73,6 +75,8 @@ export class SambaSharesManager
         const newShare = oldShare === undefined ? this.CreateDefaultShare(data.shareName) : oldShare;
 
         newShare.properties.path = data.sharePath;
+        newShare.properties.validUsers = data.readUsers;
+        newShare.properties.writeList = data.writeUsers;
 
         if(oldShare === undefined)
             settings.shares.push(newShare);
@@ -94,7 +98,8 @@ export class SambaSharesManager
                 path: "",
                 printable: false,
                 validUsers: [],
-                writable: false
+                writable: false,
+                writeList: [],
             }
         };
     }
@@ -145,6 +150,9 @@ export class SambaSharesManager
                         break;
                     case "writable":
                         p.writable = b;
+                        break;
+                    case "write list":
+                        p.writeList = s.split(" ");
                         break;
                     default:
                         throw new Error("Unknown property: " + key);
@@ -212,6 +220,7 @@ export class SambaSharesManager
                 printable: p.printable,
                 "valid users": p.validUsers.join(" "),
                 writable: p.writable,
+                "write list": p.writeList.join(" ")
             });
 
             shareNamesToDelete.delete(share.name);

@@ -22,11 +22,12 @@ import { ModulesManager } from "../../services/ModulesManager";
 import { DeploymentContext, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { FileStorageProperties } from "./FileStorageProperties";
+import { FileStoragesManager } from "./FileStoragesManager";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileStorageProperties>
 {
-    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager)
+    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager)
     {
     }
     
@@ -49,12 +50,18 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     //Public methods
     public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<void>
     {
+        await this.fileStoragesManager.DeleteSMBConfigIfExists(hostId, fullInstanceName);
         await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+    }
+
+    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    {
+        await this.fileStoragesManager.UpdateSMBConfig(hostId, fullInstanceName);
     }
 
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<void>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
-        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName, context.userId);
+        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
     }
 }

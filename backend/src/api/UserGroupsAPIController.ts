@@ -19,6 +19,7 @@
 import { APIController, Body, Delete, Get, Path, Post } from "acts-util-apilib";
 import { UserGroupsController } from "../data-access/UserGroupsController";
 import { UsersController } from "../data-access/UsersController";
+import { UserGroupsManager } from "../services/UserGroupsManager";
 
 interface UserGroupCreationData
 {
@@ -75,7 +76,7 @@ class UserGroupAPIController
 @APIController("usergroups/{userGroupId}/members")
 class UserGroupMembersAPIController
 {
-    constructor(private userGroupsController: UserGroupsController, private usersController: UsersController)
+    constructor(private usersController: UsersController, private userGroupsManager: UserGroupsManager)
     {
     }
 
@@ -85,7 +86,7 @@ class UserGroupMembersAPIController
         @Body data: MembershipDataDto
     )
     {
-        return await this.userGroupsController.AddMember(userGroupId, data.userId);
+        return await this.userGroupsManager.AddMember(userGroupId, data.userId);
     }
 
     @Delete()
@@ -94,7 +95,7 @@ class UserGroupMembersAPIController
         @Body data: MembershipDataDto
     )
     {
-        return await this.userGroupsController.RemoveMembership(userGroupId, data.userId);
+        return await this.userGroupsManager.RemoveMembership(userGroupId, data.userId);
     }
 
     @Get()

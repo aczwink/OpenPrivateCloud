@@ -67,6 +67,8 @@ export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleR
         case "number":
             return RenderNumber(value, schema);
         case "string":
+            if(schema.format as string === "multi-line")
+                return <textarea className="form-control" cols="80" readOnly rows="12">{value}</textarea>;
             return value;
         default:
             throw new Error(schema.type);

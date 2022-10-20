@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { InstancePermission, SMBConfig } from "../../../dist/api";
+import { InstancePermission, SMBConfig, SMBConnectionInfo } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { FileManagerComponent } from "../../Views/file-manager/FileManagerComponent";
@@ -31,7 +31,7 @@ function BuildFullInstanceName(instanceName: string)
     return "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.fileStorageResourceType.name + "/" + instanceName;
 }
 
-export const accessControlViewModel: ListViewModel<InstancePermission, InstanceId> = {
+const accessControlViewModel: ListViewModel<InstancePermission, InstanceId> = {
     actions: [
         {
             type: "create",
@@ -62,7 +62,7 @@ async function QuerySMBConfig(service: APIService, ids: InstanceId)
     throw new Error("NOT IMPLEMENTED");
 }
 
-export const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId, APIService>  = {
+const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId, APIService>  = {
     type: "object",
     actions: [
         {
@@ -77,6 +77,20 @@ export const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId, APIServi
     formTitle: _ => "SMB config",
     requestObject: QuerySMBConfig,
     schemaName: "SMBConfig",
+    service: APIService
+};
+
+const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId, APIService>  = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "SMB connection information",
+    requestObject: async (service, ids) => {
+        const response = await service.resourceProviders.fileservices.filestorage._any_.smbconnect.get(ids.instanceName);
+        if(response.statusCode === 200)
+            return response.data;
+        throw new Error("NOT IMPLEMENTED");
+    },
+    schemaName: "SMBConnectionInfo",
     service: APIService
 };
 
@@ -117,6 +131,11 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId, APIService> = 
             key: "smb-settings",
             child: smbConfigViewModel,
             displayName: "SMB configuration"
+        },
+        {
+            key: "smb-connection",
+            child: smbConnectionViewModel,
+            displayName: "SMB connection"
         }
     ],
     formTitle: ids => ids.instanceName,

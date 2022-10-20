@@ -81,6 +81,11 @@ export interface ShareProperties
      * @title Is Writable?
      */
     writable: boolean;
+
+    /**
+     * The users that can write to the share although writable is false
+     */
+    writeList: string[];
 }
 
 export interface Share

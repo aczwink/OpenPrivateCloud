@@ -17,27 +17,29 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { HostUsersManager } from "./HostUsersManager";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
+import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
  
 @Injectable
 export class InstancesManager
 {
-    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private hostUsersManager: HostUsersManager)
+    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager)
     {
     }
     
     //Public methods
-    public async CreateInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string, userId: number)
-    {
-        const instancePath = this.CreateInstanceStoragePath(hostStoragePath, fullInstanceName);
-        const hostUserId = await this.hostUsersManager.SyncUserToHost(hostId, userId);
-        await this.remoteFileSystemManager.CreateDirectory(hostId, instancePath, hostUserId);
-    }
-
-    public CreateInstanceStoragePath(hostStoragePath: string, fullInstanceName: string)
+    public BuildInstanceStoragePath(hostStoragePath: string, fullInstanceName: string)
     {
         return path.join(hostStoragePath, this.DerviceInstancePathFromUniqueInstanceName(fullInstanceName));
+    }
+    
+    public async CreateInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string)
+    {
+        const instancePath = this.BuildInstanceStoragePath(hostStoragePath, fullInstanceName);
+        await this.remoteFileSystemManager.CreateDirectory(hostId, instancePath, {
+            mode: 0o770 //bug in ssh2? attributes does not seem to be set
+        });
+        await this.remoteFileSystemManager.ChangeMode(hostId, instancePath, 0o770);
     }
 
     public CreateUniqueInstanceName(resourceProviderName: string, instanceType: string, instanceName: string)
@@ -57,8 +59,8 @@ export class InstancesManager
 
     public async RemoveInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string)
     {
-        const instancePath = this.CreateInstanceStoragePath(hostStoragePath, fullInstanceName);
-        await this.remoteFileSystemManager.RemoveDirectory(hostId, instancePath);
+        const instancePath = this.BuildInstanceStoragePath(hostStoragePath, fullInstanceName);
+        await this.remoteRootFileSystemManager.RemoveDirectoryRecursive(hostId, instancePath);
     }
 
     //Private methods

@@ -17,12 +17,12 @@
  * */
 
 
-import { FileStorageProperties, Instance } from "../../dist/api";
+import { FileStorageProperties, InstanceDto } from "../../dist/api";
 import { APIService } from "../Services/APIService";
 import { CollectionViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { instanceTypesRouting } from "./instancetypes";
 
-const instancesViewModel: CollectionViewModel<Instance, {}, APIService, FileStorageProperties> = {
+const instancesViewModel: CollectionViewModel<InstanceDto, {}, APIService, FileStorageProperties> = {
     actions: [
         {
             type: "create",
@@ -38,7 +38,7 @@ const instancesViewModel: CollectionViewModel<Instance, {}, APIService, FileStor
     extractId: instance => instance.fullName,
     idKey: "instanceFullName",
     requestObjects: async service => (await service.instances.get()).data,
-    schemaName: "Instance",
+    schemaName: "InstanceDto",
     service: APIService,
     type: "collection"
 };

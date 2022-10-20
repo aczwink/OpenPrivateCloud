@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Forbidden, Get, NotFound, Path, Put, Query } from "acts-util-apilib";
+import { APIController, Body, Forbidden, Get, Header, NotFound, Path, Put, Query } from "acts-util-apilib";
 import path from "path";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
@@ -25,10 +25,21 @@ import { InstancesManager } from "../../services/InstancesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { SambaSharesManager } from "./SambaSharesManager";
 import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
+import { HostsController } from "../../data-access/HostsController";
+import { SessionsManager } from "../../services/SessionsManager";
+import { FileStoragesManager } from "./FileStoragesManager";
 
 interface FileEntry
 {
     fileName: string;
+}
+
+interface SMBConnectionInfo
+{
+    /**
+     * @format multi-line
+     */
+    fstab: string;
 }
 
 interface SMBConfig
@@ -41,7 +52,8 @@ class FileStorageAPIController
 {
     constructor(private remoteFileSystemManager: RemoteFileSystemManager, private instancesController: InstancesController,
         private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController,
-        private sambaSharesManager: SambaSharesManager, private hostUsersManager: HostUsersManager)
+        private sambaSharesManager: SambaSharesManager, private hostUsersManager: HostUsersManager, private hostsController: HostsController,
+        private sessionsManager: SessionsManager, private fileStoragesManager: FileStoragesManager)
     {
     }
 
@@ -58,7 +70,7 @@ class FileStorageAPIController
 
         const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
 
-        const remotePath = path.join(this.instancesManager.CreateInstanceStoragePath(storage!.path, fullInstanceName), dirPath);
+        const remotePath = path.join(this.instancesManager.BuildInstanceStoragePath(storage!.path, fullInstanceName), dirPath);
         if(remotePath.length < storage!.path.length)
             return Forbidden("access denied");
 
@@ -67,6 +79,39 @@ class FileStorageAPIController
             fileName: x.filename
         }));
         return mappedEntries;
+    }
+
+    @Get("smbconnect")
+    public async QuerySMBConnectionInfo(
+        @Path instanceName: string,
+        @Header Authorization: string
+    )
+    {
+        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        if(instance === undefined)
+            return NotFound("instance not found");
+        const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
+        const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
+        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+        const userName = this.hostUsersManager.MapUserToLinuxUserName(userId);
+        
+        const result: SMBConnectionInfo = {
+            fstab: `
+for /etc/fstab:
+//${host!.hostName}/${instanceName} /<some/local/path> cifs noauto,user,_netdev,credentials=/home/<your user>/.smbcredentials/${host!.hostName} 0 0
+
+for /home/<your user>/.smbcredentials/${host!.hostName}:
+username=${userName}
+password=<your samba pw>
+domain=WORKGROUP
+
+protect /home/<your user>/.smbcredentials/${host!.hostName} appropriatly!:
+chmod 600 /home/<your user>/.smbcredentials/${host!.hostName}
+            `.trim()
+        };
+
+        return result;
     }
 
     @Get("smbcfg")
@@ -109,14 +154,7 @@ class FileStorageAPIController
         const hostId = storage!.hostId;
 
         if(config.enabled)
-        {
-            this.hostUsersManager.EnsureSambaUserIsSyncedToHost(hostId, 1); //TODO
-
-            await this.sambaSharesManager.SetShare(hostId, {
-                shareName: instanceName,
-                sharePath: this.instancesManager.CreateInstanceStoragePath(storage!.path, fullInstanceName)
-            });
-        }
+            await this.fileStoragesManager.UpdateSMBConfig(hostId, fullInstanceName);
         else
             await this.sambaSharesManager.DeleteShare(hostId, instanceName);
     }

@@ -31,7 +31,7 @@ export interface SSHConnection
     ChangeMode(remotePath: string, mode: number): Promise<void>;
     ChangeOwnerAndGroup(remotePath: string, ownerUserId: number, groupUserId: number): Promise<void>;
     Close(): void;
-    CreateDirectory(remotePath: string, ownerUserId: number): Promise<Error | null>;
+    CreateDirectory(remotePath: string, attributes?: ssh2.InputAttributes): Promise<Error | null>;
     ExecuteBufferedCommand(command: string[]): Promise<CommandResult>;
     ExecuteCommand(command: string[]): Promise<void>;
     ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
@@ -39,6 +39,7 @@ export interface SSHConnection
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
     ReadTextFile(remotePath: string): Promise<string>;
     RemoveDirectory(remotePath: string): Promise<void>;
+    UnlinkFile(remotePath: string): Promise<void>;
     WriteFile(remotePath: string, content: Buffer): Promise<void>;
 }
 
@@ -92,12 +93,11 @@ class SSHConnectionImpl implements SSHConnection
         this.conn.end();
     }
 
-    public CreateDirectory(remotePath: string, ownerUserId: number): Promise<Error | null>
+    public CreateDirectory(remotePath: string, attributes?: ssh2.InputAttributes): Promise<Error | null>
     {
+        const attr = attributes === undefined ? {} : attributes;
         return new Promise<Error | null>( (resolve, reject) => {
-            this.sftp.mkdir(remotePath, {
-                uid: ownerUserId
-            }, err => {
+            this.sftp.mkdir(remotePath, attr, err => {
                 if(err)
                     resolve(err);
                 else
@@ -217,6 +217,18 @@ class SSHConnectionImpl implements SSHConnection
     {
         return new Promise<void>( (resolve, reject) => {
             this.sftp.rmdir(remotePath, err => {
+                if(err)
+                    reject(err);
+                else
+                    resolve();
+            });
+        });
+    }
+
+    public UnlinkFile(remotePath: string): Promise<void>
+    {
+        return new Promise<void>( (resolve, reject) => {
+            this.sftp.unlink(remotePath, err => {
                 if(err)
                     reject(err);
                 else

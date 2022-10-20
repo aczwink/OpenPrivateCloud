@@ -20,16 +20,17 @@ import { Instantiatable } from "acts-util-core";
 import { GlobalInjector, Injectable } from "acts-util-node";
 import { HostStoragesController } from "../data-access/HostStoragesController";
 import { InstancesController } from "../data-access/InstancesController";
-import { BaseResourceProperties, DeploymentContext, ResourceProvider } from "../resource-providers/ResourceProvider";
+import { BaseResourceProperties, ResourceProvider } from "../resource-providers/ResourceProvider";
 import { APISchemaService } from "./APISchemaService";
 import { HostStoragesManager } from "./HostStoragesManager";
 import { InstancesManager } from "./InstancesManager";
+import { PermissionsManager } from "./PermissionsManager";
 
 @Injectable
 export class ResourceProviderManager
 {
     constructor(private apiSchemaService: APISchemaService, private instancesController: InstancesController, private hostStoragesManager: HostStoragesManager,
-        private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController)
+        private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController, private permissionsManager: PermissionsManager)
     {
         this._resourceProviders = [];
     }
@@ -43,8 +44,11 @@ export class ResourceProviderManager
     //Public methods
     public async DeleteInstance(fullInstanceName: string)
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
-        const resourceProvider = this.resourceProviders.Values().Filter(x => x.name === parts.resourceProviderName).First();
+        const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+
+        const permissions = await this.instancesController.QueryInstancePermissions(fullInstanceName);
+        for (const instancePermission of permissions)
+            await this.permissionsManager.DeleteInstancePermission(fullInstanceName, instancePermission);
 
         const instance = await this.instancesController.QueryInstance(fullInstanceName);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
@@ -73,6 +77,16 @@ export class ResourceProviderManager
         await this.instancesController.AddInstance(storageId, fullInstanceName);
     }
 
+    public async InstancePermissionsChanged(fullInstanceName: string)
+    {
+        const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+
+        await resourceProvider.InstancePermissionsChanged(storage!.hostId, fullInstanceName);
+    }
+
     public Register(resourceProviderClass: Instantiatable<ResourceProvider<any>>)
     {
         this._resourceProviders.push(GlobalInjector.Resolve(resourceProviderClass));
@@ -82,6 +96,14 @@ export class ResourceProviderManager
     private _resourceProviders: ResourceProvider<any>[];
 
     //Private methods
+    private FindInstanceProviderFromFullInstanceName(fullInstanceName: string)
+    {
+        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
+        const resourceProvider = this.resourceProviders.Values().Filter(x => x.name === parts.resourceProviderName).First();
+
+        return resourceProvider;
+    }
+
     private MatchPropertiesWithResourceProviderResourceTypes(instanceProperties: BaseResourceProperties, resourceProvider: ResourceProvider<any>)
     {
         const result = resourceProvider.resourceTypeDefinitions.Values().Filter(def => this.apiSchemaService.Validate(instanceProperties, def.schemaName)).FirstOrUndefined();

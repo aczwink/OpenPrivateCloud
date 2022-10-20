@@ -26,12 +26,52 @@ export class PermissionsController
     {
     }
 
-    //Public methods 
+    //Public methods
+    public async IsUserRequiredOnHost(hostId: number, userId: number)
+    {
+        let query = `
+        SELECT TRUE
+        FROM usergroups_members ugm
+        INNER JOIN instances_permissions ip
+            ON ugm.groupId = ip.userGroupId
+        INNER JOIN instances i
+            ON i.id = ip.instanceId
+        INNER JOIN hosts_storages hs
+            ON hs.id = i.storageId
+        WHERE hs.hostId = ? AND ugm.userId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne(query, hostId, userId);
+
+        return row !== undefined;
+    }
+
+    public async QueryAllUsersRequiredOnHost(hostId: number)
+    {
+        let query = `
+        SELECT ugm.userId
+        FROM usergroups_members ugm
+        INNER JOIN instances_permissions ip
+            ON ugm.groupId = ip.userGroupId
+        INNER JOIN instances i
+            ON i.id = ip.instanceId
+        INNER JOIN hosts_storages hs
+            ON hs.id = i.storageId
+        WHERE hs.hostId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, hostId);
+
+        return rows.Values().Map(x => x.userId as number).ToSet();
+    }
+
     public async QueryGroupsAssociatedWithHost(hostId: number)
     {
         let query = `
         SELECT ip.userGroupId
-        FROM instance_permissions ip
+        FROM instances_permissions ip
         INNER JOIN instances i
             ON ip.instanceId = i.id
         INNER JOIN hosts_storages hs
@@ -45,23 +85,51 @@ export class PermissionsController
         return rows.Values().Map(x => x.userGroupId as number).ToSet();
     }
 
-    public async QueryAllUsersRequiredOnHost(hostId: number)
+    public async QueryGroupsWithPermission(instanceId: number, permission: string)
     {
         let query = `
-        SELECT ugm.userId
-        FROM usergroups_members ugm
-        INNER JOIN instance_permissions ip
-            ON ugm.groupId = ip.userGroupId
-        INNER JOIN instances i
-            ON i.id = ip.instanceId
-        INNER JOIN hosts_storages hs
-            ON hs.id = i.storageId
-        WHERE hs.hostId = ?
+        SELECT userGroupId
+        FROM instances_permissions
+        WHERE instanceId = ? AND permission = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, hostId);
+        const rows = await conn.Select(query, instanceId, permission);
 
-        return rows.Values().Map(x => x.userId as number).ToSet();
+        return rows.Values().Map(x => x.userGroupId as number);
+    }
+
+    public async QueryHostsAssociatedWithGroup(userGroupId: number)
+    {
+        let query = `
+        SELECT DISTINCT hs.hostId
+        FROM hosts_storages hs
+        INNER JOIN instances i
+            ON i.storageId = hs.id
+        INNER JOIN instances_permissions ip
+            ON ip.instanceId = i.id
+        WHERE ip.userGroupId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, userGroupId);
+
+        return rows.Values().Map(x => x.hostId as number);
+    }
+
+    public async QueryInstancesAssociatedWithGroup(userGroupId: number)
+    {
+        let query = `
+        SELECT DISTINCT i.fullName
+        FROM instances i
+        INNER JOIN instances_permissions ip
+            ON ip.instanceId = i.id
+        WHERE ip.userGroupId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, userGroupId);
+
+        return rows.Values().Map(x => x.fullName as string);
     }
 }

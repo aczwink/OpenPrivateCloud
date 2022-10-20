@@ -21,11 +21,16 @@ import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { HostsController } from "../data-access/HostsController";
 import { SessionsManager } from "../services/SessionsManager";
 import { Instance, InstancePermission, InstancesController } from "../data-access/InstancesController";
+import { PermissionsManager } from "../services/PermissionsManager";
 
 //TODO
 import { FileStorageProperties } from "../resource-providers/file-services/FileStorageProperties";
-import { PermissionsManager } from "../services/PermissionsManager";
 //TODO
+
+interface InstanceDto
+{
+    fullName: string;
+}
 
 @APIController("instances")
 class InstancesAPIController
@@ -58,16 +63,19 @@ class InstancesAPIController
     }
 
     @Get()
-    public async QueryInstances(): Promise<Instance[]>
+    public async QueryInstances(): Promise<InstanceDto[]>
     {
-        return await this.instancesController.QueryInstances();
+        const instances = await this.instancesController.QueryInstances();
+        return instances.map(x => ({
+            fullName: x.fullName
+        }));
     }
 }
 
 @APIController("instances/permissions")
 class InstancePermissionsAPIController
 {
-    constructor(private instancesController: InstancesController, private permissionsManager: PermissionsManager)
+    constructor(private instancesController: InstancesController, private permissionsManager: PermissionsManager, private resourceProviderManager: ResourceProviderManager)
     {
     }
 
@@ -78,6 +86,7 @@ class InstancePermissionsAPIController
     )
     {
         await this.permissionsManager.AddInstancePermission(fullInstanceName, instancePermission);
+        await this.resourceProviderManager.InstancePermissionsChanged(fullInstanceName);
     }
 
     @Delete()
@@ -87,6 +96,7 @@ class InstancePermissionsAPIController
     )
     {
         await this.permissionsManager.DeleteInstancePermission(fullInstanceName, instancePermission);
+        await this.resourceProviderManager.InstancePermissionsChanged(fullInstanceName);
     }
 
     @Get()

@@ -22,12 +22,14 @@ import { HostStorage, HostStorageCreationProperties } from "../data-access/HostS
 import { HostUsersManager } from "./HostUsersManager";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
+import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
 
 @Injectable
 export class HostStoragesManager
 {
     constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor,
-        private remoteFileSystemManager: RemoteFileSystemManager, private hostUsersManager: HostUsersManager)
+        private remoteFileSystemManager: RemoteFileSystemManager, private hostUsersManager: HostUsersManager,
+        private remoteRootFileSystemManager: RemoteRootFileSystemManager)
     {
     }
     
@@ -38,9 +40,9 @@ export class HostStoragesManager
 
         const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
         const hostNoGroupId = await this.hostUsersManager.ResolveHostGroupId(hostId, "nogroup");
-        await this.remoteFileSystemManager.ChangeOwnerAndGroup(hostId, props.path, hostOPCUserId, hostNoGroupId);
+        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, props.path, hostOPCUserId, hostNoGroupId);
 
-        await this.remoteFileSystemManager.ChangeMode(hostId, props.path, 0o700);
+        await this.remoteFileSystemManager.ChangeMode(hostId, props.path, 0o770);
 
         await this.hostsController.AddHostStorage(hostId, props, fsType.type);
     }

@@ -47,7 +47,7 @@ export class HostsController
     public async AddHostStorage(hostId: number, props: HostStorageCreationProperties, fileSystemType: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("hosts_storages", { hostId, storagePath: props.path, fileSystemType });
+        await conn.InsertRow("hosts_storages", { hostId, path: props.path, fileSystemType });
     }
 
     public async DeleteHost(hostName: string)

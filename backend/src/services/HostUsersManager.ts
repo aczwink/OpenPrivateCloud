@@ -38,17 +38,14 @@ export class HostUsersManager
     }
 
     //Public methods
-    public async EnsureSambaUserIsSyncedToHost(hostId: number, userId: number)
+    public MapGroupToLinuxGroupName(userGroupId: number)
     {
-        const linuxUserName = this.MapUserToLinuxUserName(userId);
-        const sambaUsers = await this.QuerySambaUsers(hostId);
+        return "opc-g" + userGroupId;
+    }
 
-        const user = sambaUsers.find(x => x.unixUserName === linuxUserName);
-        if(user === undefined)
-        {
-            const privateData = await this.usersController.QueryPrivateData(userId);
-            await this.AddSambaUser(hostId, linuxUserName, privateData!.sambaPW);
-        }
+    public MapUserToLinuxUserName(userId: number)
+    {
+        return "opc-u" + userId;
     }
 
     public async RemoveGroupFromHost(hostId: number, userGroupId: number)
@@ -91,6 +88,34 @@ export class HostUsersManager
         await this.SyncGroupMembersToHost(hostId, linuxGroupName, members.Values().Map(x => x.id).Map(this.MapUserToLinuxUserName.bind(this)).ToSet());
     }
 
+    public async SyncSambaGroupMembers(hostId: number, userGroupId: number)
+    {
+        const members = await this.usersController.QueryMembersOfGroup(userGroupId);
+        for (const member of members)
+            await this.SyncSambaUserToHost(hostId, member.id);
+    }
+
+    public async SyncSambaGroupsMembers(hostId: number, userGroupIds: number[])
+    {
+        for (const userGroupId of userGroupIds)
+        {
+            await this.SyncSambaGroupMembers(hostId, userGroupId);
+        }
+    }
+
+    public async SyncSambaUserToHost(hostId: number, userId: number)
+    {
+        const linuxUserName = this.MapUserToLinuxUserName(userId);
+        const sambaUsers = await this.QuerySambaUsers(hostId);
+
+        const user = sambaUsers.find(x => x.unixUserName === linuxUserName);
+        if(user === undefined)
+        {
+            const privateData = await this.usersController.QueryPrivateData(userId);
+            await this.AddSambaUser(hostId, linuxUserName, privateData!.sambaPW);
+        }
+    }
+
     /**
      * @returns The host user id
      */
@@ -110,30 +135,22 @@ export class HostUsersManager
     private async AddSambaUser(hostId: number, userName: string, password: string)
     {
         const host = await this.hostsController.RequestHostCredentials(hostId);
-        console.log("conn go");
         const conn = await this.sshService.ConnectWithCredentials(host!.hostName, "opc", host!.password);
 
-        console.log("command go");
         const channel = await conn.ExecuteInteractiveCommand(["sudo", "smbpasswd", "-s", "-a", userName]);
-        console.log("command ok");
 
         channel.stdout.setEncoding("utf-8");
         channel.stderr.setEncoding("utf-8");
         channel.stdout.on("data", console.log);
         channel.stderr.on("data", console.error);
 
-        console.log("command write pw");
-
         channel.stdin.write(password + "\n");
         channel.stdin.write(password + "\n");
 
-        console.log("command close");
-
-        const res = await new Promise<boolean>( (resolve, reject) => {
+        await new Promise<boolean>( (resolve, reject) => {
             channel.on("exit", code => resolve(code === "0"));
             channel.on("error", reject);
         });
-        console.log("res", res);
 
         conn.Close();
     }
@@ -151,18 +168,21 @@ export class HostUsersManager
     private async DeleteUserFromHost(hostId: number, userId: number)
     {
         const linuxUserName = this.MapUserToLinuxUserName(userId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-x", linuxUserName], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-x", linuxUserName], hostId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "userdel", linuxUserName], hostId);
     }
 
-    private MapGroupToLinuxGroupName(userGroupId: number)
+    private async DeleteUserFromHostIfNotUsed(hostId: number, userId: number)
     {
-        return "opc-g" + userGroupId;
+        const isRequired = await this.permissionsController.IsUserRequiredOnHost(hostId, userId);
+        if(!isRequired)
+            await this.DeleteUserFromHost(hostId, userId);
     }
-    
-    private MapUserToLinuxUserName(userId: number)
+
+    private MapLinuxUserNameToUserId(linuxUserName: string)
     {
-        return "opc-u" + userId;
+        const idPart = linuxUserName.substring("opc-u".length);
+        return parseInt(idPart);
     }
 
     private async QuerySambaUsers(hostId: number)
@@ -195,7 +215,10 @@ export class HostUsersManager
         const toAdd = desiredLinuxUserNames.Without(currentLinuxUserNames);
 
         for (const linuxUserName of toRemove)
+        {
             await this.remoteCommandExecutor.ExecuteCommand(["sudo", "deluser", linuxUserName, linuxGroupName], hostId);
+            await this.DeleteUserFromHostIfNotUsed(hostId, this.MapLinuxUserNameToUserId(linuxUserName));
+        }
         for (const linuxUserName of toAdd)
             await this.remoteCommandExecutor.ExecuteCommand(["sudo", "usermod", "-a", "-G", linuxGroupName, linuxUserName], hostId);
     }

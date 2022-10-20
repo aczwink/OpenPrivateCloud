@@ -21,6 +21,7 @@ import { DBConnectionsManager } from "./DBConnectionsManager";
 
 export interface Instance
 {
+    id: number;
     fullName: string;
     storageId: number;
 }
@@ -54,7 +55,7 @@ export class InstancesController
         const instanceId = await this.QueryInstanceId(fullInstanceName);
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("instance_permissions", { instanceId, userGroupId: instancePermission.userGroupId, permission: instancePermission.permission });
+        await conn.InsertRow("instances_permissions", { instanceId, userGroupId: instancePermission.userGroupId, permission: instancePermission.permission });
     }
 
     public async DeleteInstance(fullInstanceName: string)
@@ -68,7 +69,7 @@ export class InstancesController
         const instanceId = await this.QueryInstanceId(fullInstanceName);
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("instance_permissions", "instanceId = ? AND userGroupId = ? AND permission = ?", instanceId!, instancePermission.userGroupId, instancePermission.permission)
+        await conn.DeleteRows("instances_permissions", "instanceId = ? AND userGroupId = ? AND permission = ?", instanceId!, instancePermission.userGroupId, instancePermission.permission)
     }
 
     public async QueryHostIdOfInstance(fullInstanceName: string)
@@ -91,7 +92,7 @@ export class InstancesController
     public async QueryInstance(fullInstanceName: string)
     {
         const query = `
-        SELECT fullName, storageId
+        SELECT id, fullName, storageId
         FROM instances
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
@@ -102,7 +103,7 @@ export class InstancesController
     {
         const query = `
         SELECT ip.userGroupId, ip.permission
-        FROM instance_permissions ip
+        FROM instances_permissions ip
         INNER JOIN instances i
             ON i.id = ip.instanceId
         `;
