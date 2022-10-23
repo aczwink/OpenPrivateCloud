@@ -18,11 +18,11 @@
 
 import { AutoCompleteSelectBox, CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select, SingleSelect } from "acfrontend";
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
-import { APISchemaService } from "../Services/APISchemaService";
-import { APIService } from "../Services/APIService";
-import { UserGroupSelectionComponent } from "./UserGroupSelectionComponent";
-import { UserSelectionComponent } from "./UserSelectionComponent";
-import { RenderTitle } from "./ValuePresentation";
+import { APISchemaService } from "../../Services/APISchemaService";
+import { APIService } from "../../Services/APIService";
+import { UserGroupSelectionComponent } from "../ValueEditors/UserGroupSelectionComponent";
+import { UserSelectionComponent } from "../ValueEditors/UserSelectionComponent";
+import { RenderTitle } from "../ValuePresentation";
 
 
 @Injectable

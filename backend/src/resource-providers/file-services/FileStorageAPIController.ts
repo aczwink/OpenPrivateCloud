@@ -18,6 +18,7 @@
 
 import { APIController, Body, Forbidden, Get, Header, NotFound, Path, Put, Query } from "acts-util-apilib";
 import path from "path";
+import ssh2 from "ssh2";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
@@ -31,7 +32,14 @@ import { FileStoragesManager } from "./FileStoragesManager";
 
 interface FileEntry
 {
+    type: "directory" | "file";
     fileName: string;
+    size: number;
+
+    /**
+     * @format user
+     */
+    userId: number;
 }
 
 interface SMBConnectionInfo
@@ -75,10 +83,21 @@ class FileStorageAPIController
             return Forbidden("access denied");
 
         const entries = await this.remoteFileSystemManager.ListDirectoryContents(storage!.hostId, remotePath);
-        const mappedEntries: FileEntry[] = entries.map(x => ({
-            fileName: x.filename
-        }));
+        const mappedEntries = await entries.Values().Map(this.MapEntry.bind(this, storage!.hostId, remotePath)).PromiseAll();
         return mappedEntries;
+    }
+
+    private async MapEntry(hostId: number, remoteDirPath: string, sshEntry: ssh2.FileEntry): Promise<FileEntry>
+    {
+        const status = await this.remoteFileSystemManager.QueryStatus(hostId, path.join(remoteDirPath, sshEntry.filename));
+        const linuxUserName = await this.hostUsersManager.MapHostUserIdToLinuxUserName(hostId, status.uid);
+
+        return {
+            fileName: sshEntry.filename,
+            type: status.isDirectory() ? "directory" : "file",
+            size: status.size,
+            userId: this.hostUsersManager.MapLinuxUserNameToUserId(linuxUserName)
+        };
     }
 
     @Get("smbconnect")

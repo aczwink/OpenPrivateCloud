@@ -18,7 +18,7 @@
 
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
-import { APISchemaService } from "../Services/APISchemaService";
+import { APISchemaService } from "../../Services/APISchemaService";
 import { ObjectEditorComponent } from "./ObjectEditorComponent";
 
 interface AddObjectInput

@@ -43,6 +43,18 @@ export class HostUsersManager
         return "opc-g" + userGroupId;
     }
 
+    public async MapHostUserIdToLinuxUserName(hostId: number, hostUserId: number)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["id", "-nu", hostUserId.toString()], hostId);
+        return result.stdOut.trim();
+    }
+
+    public MapLinuxUserNameToUserId(linuxUserName: string)
+    {
+        const idPart = linuxUserName.substring("opc-u".length);
+        return parseInt(idPart);
+    }
+
     public MapUserToLinuxUserName(userId: number)
     {
         return "opc-u" + userId;
@@ -177,12 +189,6 @@ export class HostUsersManager
         const isRequired = await this.permissionsController.IsUserRequiredOnHost(hostId, userId);
         if(!isRequired)
             await this.DeleteUserFromHost(hostId, userId);
-    }
-
-    private MapLinuxUserNameToUserId(linuxUserName: string)
-    {
-        const idPart = linuxUserName.substring("opc-u".length);
-        return parseInt(idPart);
     }
 
     private async QuerySambaUsers(hostId: number)

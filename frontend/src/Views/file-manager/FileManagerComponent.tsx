@@ -40,8 +40,8 @@ export class FileManagerComponent extends Component
             </div>
 
             <div className="row evenly-spaced">
-                <div className="column"><DirectoryViewComponent instanceName={this.routerState.routeParams.instanceName!} /></div>
-                {this.showTwoColumns ? <div className="column"><DirectoryViewComponent instanceName={this.routerState.routeParams.instanceName!} /></div> : null}
+                <div className="col"><DirectoryViewComponent instanceName={this.routerState.routeParams.instanceName!} /></div>
+                {this.showTwoColumns ? <div className="col"><DirectoryViewComponent instanceName={this.routerState.routeParams.instanceName!} /></div> : null}
             </div>
         </fragment>;
     }

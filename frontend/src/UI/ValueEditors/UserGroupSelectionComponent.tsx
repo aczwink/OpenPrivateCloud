@@ -16,55 +16,61 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { AutoCompleteSelectBox, Component, Injectable, JSX_CreateElement, KeyDisplayValuePair, ProgressSpinner } from "acfrontend";
-import { APIService } from "../Services/APIService";
+import { APIService } from "../../Services/APIService";
 
-interface UserSelectionInput
+interface UserGroupSelectionInput
 {
-    userId: number | null;
+    userGroupId: number | null;
     valueChanged: (newValue: number | null) => void;
 }
- 
+
 @Injectable
-export class UserSelectionComponent extends Component<UserSelectionInput>
+export class UserGroupSelectionComponent extends Component<UserGroupSelectionInput>
 {
     constructor(private apiService: APIService)
     {
         super();
 
-        this.selectedUserName = null;
+        this.selection = null;
     }
     
     protected Render(): RenderValue
     {
-        console.log(this.selectedUserName, this.input.userId);
-        if( (this.input.userId !== null) && (this.selectedUserName === null) )
+        if( (this.input.userGroupId !== null) && (this.selection === null) )
             return <ProgressSpinner />;
 
         return <AutoCompleteSelectBox<number>
             onChanged={newValue => this.input.valueChanged(newValue.key)}
-            onLoadSuggestions={this.LoadUsers.bind(this)}
-            selection={ this.input.userId === null ? null : { displayValue: this.selectedUserName!, key: this.input.userId } } />;
+            onLoadSuggestions={this.LoadUserGroups.bind(this)}
+            selection={ this.selection } />;
     }
 
     //Private variables
-    private selectedUserName: string | null;
+    private selection: KeyDisplayValuePair<number> | null;
 
     //Private methods
-    private async LoadUsers(searchText: string)
+    private async LoadUserGroups(searchText: string)
     {
-        const users = (await this.apiService.users.get()).data;
+        const users = (await this.apiService.usergroups.get()).data;
 
-        return users.Values().Filter(x => x.emailAddress.includes(searchText)).Map(x => ({ key: x.id, displayValue: x.emailAddress })).ToArray();
+        searchText = searchText.toLowerCase();
+        return users.Values().Filter(x => x.name.toLowerCase().includes(searchText)).Map(x => ({ key: x.id, displayValue: x.name })).ToArray();
     }
 
-    private async ReloadUserName()
+    private async ReloadGroupName()
     {
-        this.selectedUserName = null;
-        if(this.input.userId !== null)
+        if(this.input.userGroupId === null)
+            this.selection = null;
+        else if(this.input.userGroupId !== this.selection?.key)
         {
-            const response = await this.apiService.users._any_.get(this.input.userId);
+            const response = await this.apiService.usergroups._any_.get(this.input.userGroupId);
             if(response.statusCode === 200)
-                this.selectedUserName = response.data.emailAddress;
+            {
+                this.selection = {
+                    displayValue: response.data.name,
+                    key: this.input.userGroupId
+                };
+            }
             else
                 this.input.valueChanged(null);
         }
@@ -73,12 +79,12 @@ export class UserSelectionComponent extends Component<UserSelectionInput>
     //Event handlers
     override OnInitiated(): void
     {
-        this.ReloadUserName();
+        this.ReloadGroupName();
     }
 
     override OnInputChanged(): void
     {
-        this.ReloadUserName();
+        this.ReloadGroupName();
         this.Update();
     }
 }

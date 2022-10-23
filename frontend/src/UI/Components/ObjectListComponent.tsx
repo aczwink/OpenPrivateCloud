@@ -18,11 +18,11 @@
 
 import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterButton, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
-import { APIService } from "../Services/APIService";
-import { IdBoundResourceAction } from "./IdBoundActions";
-import { ObjectBoundAction } from "./ObjectBoundActions";
-import { UnboundResourceAction } from "./UnboundActions";
-import { RenderReadOnlyValue, RenderTitle } from "./ValuePresentation";
+import { APIService } from "../../Services/APIService";
+import { IdBoundResourceAction } from "../IdBoundActions";
+import { ObjectBoundAction } from "../ObjectBoundActions";
+import { UnboundResourceAction } from "../UnboundActions";
+import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
 
 interface ObjectListInput
 {

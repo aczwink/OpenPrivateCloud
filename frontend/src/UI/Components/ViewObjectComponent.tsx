@@ -18,9 +18,9 @@
 
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
-import { APISchemaService } from "../Services/APISchemaService";
-import { IdBoundResourceAction, RenderBoundAction } from "./IdBoundActions";
-import { RenderReadOnlyValue, RenderTitle } from "./ValuePresentation";
+import { APISchemaService } from "../../Services/APISchemaService";
+import { IdBoundResourceAction, RenderBoundAction } from "../IdBoundActions";
+import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
 
 interface ObjectInput
 {

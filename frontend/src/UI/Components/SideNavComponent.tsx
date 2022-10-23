@@ -18,7 +18,7 @@
 
 import { Anchor, Component, Injectable, JSX_CreateElement, MatIcon, NavItem, ProgressSpinner, RouterComponent, RouterState } from "acfrontend";
 import { Dictionary } from "acts-util-core";
-import { IdBoundResourceAction, RenderBoundAction } from "./IdBoundActions";
+import { IdBoundResourceAction, RenderBoundAction } from "../IdBoundActions";
 
 export interface ObjectType
 {

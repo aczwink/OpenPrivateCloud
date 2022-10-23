@@ -18,7 +18,38 @@
 
 import { JSX_CreateElement } from "acfrontend";
 import { OpenAPI } from "acts-util-core";
+import { UserValuePresenter } from "./ValuePresenters/UserValuePresenter";
 
+/*
+private RenderPermissions(permissions: number, isDir: boolean)
+    {
+        if(permissions == 0)
+            return "no access";
+
+        const parts = [];
+
+        if(isDir)
+        {
+            if(permissions & 4)
+                parts.push("list");
+            if(permissions & 2)
+                parts.push("modify");
+            if(permissions & 1)
+                parts.push("access");
+        }
+        else
+        {
+            if(permissions & 4)
+                parts.push("read");
+            if(permissions & 2)
+                parts.push("write");
+            if(permissions & 1)
+                parts.push("execute");
+        }
+
+        return parts.join("-");
+    }
+*/
 function RenderPermissions(permissions: number)
 {
     let perms = "";
@@ -47,6 +78,8 @@ function RenderNumber(value: number, schema: OpenAPI.NumberSchema)
     {
         case "permissions":
             return value.toString(8) + " " + RenderPermissions((value >> 6) & 7) + RenderPermissions((value >> 3) & 7) + RenderPermissions(value & 7);
+        case "user":
+            return <UserValuePresenter userId={value} />;
     }
     return value;
 }

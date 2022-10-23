@@ -21,16 +21,16 @@ import { Dictionary, OpenAPI } from "acts-util-core";
 import { AuthGuard } from "../AuthGuard";
 import { APISchemaService } from "../Services/APISchemaService";
 import { APIService } from "../Services/APIService";
-import { AddObjectComponent } from "./AddObjectComponent";
+import { AddObjectComponent } from "./Components/AddObjectComponent";
 import { IdBoundResourceAction } from "./IdBoundActions";
-import { DeleteObjectComponent } from "./DeleteObjectComponent";
-import { EditObjectComponent } from "./EditObjectComponent";
+import { DeleteObjectComponent } from "./Components/DeleteObjectComponent";
+import { EditObjectComponent } from "./Components/EditObjectComponent";
 import { ListViewModel } from "./ListViewModel";
-import { ObjectListComponent } from "./ObjectListComponent";
-import { SideNavComponent } from "./SideNavComponent";
+import { ObjectListComponent } from "./Components/ObjectListComponent";
+import { SideNavComponent } from "./Components/SideNavComponent";
 import { UnboundResourceAction } from "./UnboundActions";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, ViewModel, RoutingViewModel, ComponentViewModel } from "./ViewModel";
-import { ViewObjectComponent } from "./ViewObjectComponent";
+import { ViewObjectComponent } from "./Components/ViewObjectComponent";
 
 @Injectable
 export class ViewModelsManager

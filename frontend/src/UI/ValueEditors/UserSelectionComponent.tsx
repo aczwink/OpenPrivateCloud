@@ -15,62 +15,56 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { AutoCompleteSelectBox, Component, Injectable, JSX_CreateElement, KeyDisplayValuePair, ProgressSpinner } from "acfrontend";
-import { APIService } from "../Services/APIService";
+import { AutoCompleteSelectBox, Component, Injectable, JSX_CreateElement, ProgressSpinner } from "acfrontend";
+import { APIService } from "../../Services/APIService";
 
-interface UserGroupSelectionInput
+interface UserSelectionInput
 {
-    userGroupId: number | null;
+    userId: number | null;
     valueChanged: (newValue: number | null) => void;
 }
-
+ 
 @Injectable
-export class UserGroupSelectionComponent extends Component<UserGroupSelectionInput>
+export class UserSelectionComponent extends Component<UserSelectionInput>
 {
     constructor(private apiService: APIService)
     {
         super();
 
-        this.selection = null;
+        this.selectedUserName = null;
     }
     
     protected Render(): RenderValue
     {
-        if( (this.input.userGroupId !== null) && (this.selection === null) )
+        console.log(this.selectedUserName, this.input.userId);
+        if( (this.input.userId !== null) && (this.selectedUserName === null) )
             return <ProgressSpinner />;
 
         return <AutoCompleteSelectBox<number>
             onChanged={newValue => this.input.valueChanged(newValue.key)}
-            onLoadSuggestions={this.LoadUserGroups.bind(this)}
-            selection={ this.selection } />;
+            onLoadSuggestions={this.LoadUsers.bind(this)}
+            selection={ this.input.userId === null ? null : { displayValue: this.selectedUserName!, key: this.input.userId } } />;
     }
 
     //Private variables
-    private selection: KeyDisplayValuePair<number> | null;
+    private selectedUserName: string | null;
 
     //Private methods
-    private async LoadUserGroups(searchText: string)
+    private async LoadUsers(searchText: string)
     {
-        const users = (await this.apiService.usergroups.get()).data;
+        const users = (await this.apiService.users.get()).data;
 
-        searchText = searchText.toLowerCase();
-        return users.Values().Filter(x => x.name.toLowerCase().includes(searchText)).Map(x => ({ key: x.id, displayValue: x.name })).ToArray();
+        return users.Values().Filter(x => x.emailAddress.includes(searchText)).Map(x => ({ key: x.id, displayValue: x.emailAddress })).ToArray();
     }
 
-    private async ReloadGroupName()
+    private async ReloadUserName()
     {
-        if(this.input.userGroupId === null)
-            this.selection = null;
-        else if(this.input.userGroupId !== this.selection?.key)
+        this.selectedUserName = null;
+        if(this.input.userId !== null)
         {
-            const response = await this.apiService.usergroups._any_.get(this.input.userGroupId);
+            const response = await this.apiService.users._any_.get(this.input.userId);
             if(response.statusCode === 200)
-            {
-                this.selection = {
-                    displayValue: response.data.name,
-                    key: this.input.userGroupId
-                };
-            }
+                this.selectedUserName = response.data.emailAddress;
             else
                 this.input.valueChanged(null);
         }
@@ -79,12 +73,12 @@ export class UserGroupSelectionComponent extends Component<UserGroupSelectionInp
     //Event handlers
     override OnInitiated(): void
     {
-        this.ReloadGroupName();
+        this.ReloadUserName();
     }
 
     override OnInputChanged(): void
     {
-        this.ReloadGroupName();
+        this.ReloadUserName();
         this.Update();
     }
 }
