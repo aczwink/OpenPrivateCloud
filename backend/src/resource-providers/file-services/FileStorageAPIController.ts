@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Forbidden, Get, Header, NotFound, Path, Put, Query } from "acts-util-apilib";
+import { APIController, Common, Body, Forbidden, Get, Header, NotFound, Path, Put, Query, Post } from "acts-util-apilib";
 import path from "path";
 import ssh2 from "ssh2";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
@@ -24,11 +24,23 @@ import { InstancesController } from "../../data-access/InstancesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { InstancesManager } from "../../services/InstancesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { SambaSharesManager } from "./SambaSharesManager";
 import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { HostsController } from "../../data-access/HostsController";
 import { SessionsManager } from "../../services/SessionsManager";
 import { FileStoragesManager } from "./FileStoragesManager";
+
+interface CommonAPIData
+{
+    fullInstanceName: string;
+    hostId: number;
+    storagePath: string;
+}
+
+interface DeploymentDataDto
+{
+    hostName: string;
+    storagePath: string;
+}
 
 interface FileEntry
 {
@@ -55,20 +67,33 @@ interface SMBConfig
     enabled: boolean;
 }
 
+interface SnapshotDto
+{
+    date: Date;
+}
+
 @APIController(`resourceProviders/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{instanceName}`)
 class FileStorageAPIController
 {
     constructor(private remoteFileSystemManager: RemoteFileSystemManager, private instancesController: InstancesController,
         private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController,
-        private sambaSharesManager: SambaSharesManager, private hostUsersManager: HostUsersManager, private hostsController: HostsController,
+        private hostUsersManager: HostUsersManager, private hostsController: HostsController,
         private sessionsManager: SessionsManager, private fileStoragesManager: FileStoragesManager)
     {
     }
 
-    @Get()
-    public async ListDirectoryContents(
-        @Path instanceName: string,
-        @Query dirPath: string
+    //Public methods
+    @Post("snapshots")
+    public async AddSnapshot(
+        @Common data: CommonAPIData
+    )
+    {
+        await this.fileStoragesManager.CreateSnapshot(data.hostId, data.storagePath, data.fullInstanceName);
+    }
+
+    @Common()
+    public async ExtractCommonAPIData(
+        @Path instanceName: string
     )
     {
         const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
@@ -78,40 +103,52 @@ class FileStorageAPIController
 
         const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
 
-        const remotePath = path.join(this.instancesManager.BuildInstanceStoragePath(storage!.path, fullInstanceName), dirPath);
-        if(remotePath.length < storage!.path.length)
+        const data: CommonAPIData = {
+            fullInstanceName,
+            hostId: storage!.hostId,
+            storagePath: storage!.path
+        };
+
+        return data;
+    }
+
+    @Get("contents")
+    public async ListDirectoryContents(
+        @Common data: CommonAPIData,
+        @Query dirPath: string
+    )
+    {
+        const remotePath = path.join(this.instancesManager.BuildInstanceStoragePath(data.storagePath, data.fullInstanceName), "data", dirPath);
+        if(remotePath.length < data.storagePath.length)
             return Forbidden("access denied");
 
-        const entries = await this.remoteFileSystemManager.ListDirectoryContents(storage!.hostId, remotePath);
-        const mappedEntries = await entries.Values().Map(this.MapEntry.bind(this, storage!.hostId, remotePath)).PromiseAll();
+        const entries = await this.remoteFileSystemManager.ListDirectoryContents(data.hostId, remotePath);
+        const mappedEntries = await entries.Values().Map(this.MapEntry.bind(this, data.hostId, remotePath)).PromiseAll();
         return mappedEntries;
     }
 
-    private async MapEntry(hostId: number, remoteDirPath: string, sshEntry: ssh2.FileEntry): Promise<FileEntry>
+    @Get("deploymentdata")
+    public async QueryDeploymentData(
+        @Common data: CommonAPIData
+    )
     {
-        const status = await this.remoteFileSystemManager.QueryStatus(hostId, path.join(remoteDirPath, sshEntry.filename));
-        const linuxUserName = await this.hostUsersManager.MapHostUserIdToLinuxUserName(hostId, status.uid);
+        const host = await this.hostsController.RequestHostCredentials(data.hostId);
 
-        return {
-            fileName: sshEntry.filename,
-            type: status.isDirectory() ? "directory" : "file",
-            size: status.size,
-            userId: this.hostUsersManager.MapLinuxUserNameToUserId(linuxUserName)
+        const result: DeploymentDataDto = {
+            hostName: host!.hostName,
+            storagePath: data.storagePath
         };
+        return result;
     }
 
     @Get("smbconnect")
     public async QuerySMBConnectionInfo(
+        @Common data: CommonAPIData,
         @Path instanceName: string,
         @Header Authorization: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        if(instance === undefined)
-            return NotFound("instance not found");
-        const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
-        const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
+        const host = await this.hostsController.RequestHostCredentials(data.hostId);
         const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
         const userName = this.hostUsersManager.MapUserToLinuxUserName(userId);
         
@@ -135,16 +172,10 @@ chmod 600 /home/<your user>/.smbcredentials/${host!.hostName}
 
     @Get("smbcfg")
     public async QuerySMBConfig(
-        @Path instanceName: string
+        @Common data: CommonAPIData
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        if(instance === undefined)
-            return NotFound("instance not found");
-        const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
-
-        const cfg = await this.sambaSharesManager.QueryShareSettings(storage!.hostId, instanceName);
+        const cfg = await this.fileStoragesManager.QuerySMBConfig(data.hostId, data.fullInstanceName);
         if(cfg === undefined)
         {
             const result: SMBConfig = {
@@ -159,22 +190,42 @@ chmod 600 /home/<your user>/.smbcredentials/${host!.hostName}
         return result;
     }
 
+    @Get("snapshots")
+    public async QuerySnapshots(
+        @Common data: CommonAPIData
+    )
+    {
+        const snaps = await this.fileStoragesManager.QuerySnapshots(data.hostId, data.storagePath, data.fullInstanceName);
+        return snaps.map(x => {
+            const res: SnapshotDto = { date: x };
+            return res;
+        });
+    }
+
     @Put("smbcfg")
     public async UpdateSMBConfig(
+        @Common data: CommonAPIData,
         @Path instanceName: string,
         @Body config: SMBConfig
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        if(instance === undefined)
-            return NotFound("instance not found");
-        const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
-        const hostId = storage!.hostId;
-
         if(config.enabled)
-            await this.fileStoragesManager.UpdateSMBConfig(hostId, fullInstanceName);
+            await this.fileStoragesManager.UpdateSMBConfig(data.hostId, data.fullInstanceName);
         else
-            await this.sambaSharesManager.DeleteShare(hostId, instanceName);
+            await this.fileStoragesManager.DeleteSMBConfigIfExists(data.hostId, instanceName);
+    }
+
+    //Private methods
+    private async MapEntry(hostId: number, remoteDirPath: string, sshEntry: ssh2.FileEntry): Promise<FileEntry>
+    {
+        const status = await this.remoteFileSystemManager.QueryStatus(hostId, path.join(remoteDirPath, sshEntry.filename));
+        const linuxUserName = await this.hostUsersManager.MapHostUserIdToLinuxUserName(hostId, status.uid);
+
+        return {
+            fileName: sshEntry.filename,
+            type: status.isDirectory() ? "directory" : "file",
+            size: status.size,
+            userId: this.hostUsersManager.MapLinuxUserNameToUserId(linuxUserName)
+        };
     }
 }

@@ -40,6 +40,8 @@ export class InstancesManager
             mode: 0o770 //bug in ssh2? attributes does not seem to be set
         });
         await this.remoteFileSystemManager.ChangeMode(hostId, instancePath, 0o770);
+
+        return instancePath;
     }
 
     public CreateUniqueInstanceName(resourceProviderName: string, instanceType: string, instanceName: string)

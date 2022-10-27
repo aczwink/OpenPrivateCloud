@@ -16,9 +16,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Host, HostStorage, HostStorageCreationProperties } from "../../dist/api";
+import { Host, HostStorage, HostStorageCreationProperties, Partition, StorageDeviceDto } from "../../dist/api";
 import { APIService } from "../Services/APIService";
+import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
+
+const hostOverviewViewModel: ObjectViewModel<Host, HostId, APIService> = {
+    type: "object",
+    actions: [],
+    formTitle: host => host.hostName,
+    requestObject: async (service, ids) => {
+        const response = await service.hosts._any_.get(ids.hostName);
+        switch(response.statusCode)
+        {
+            case 404:
+                throw new Error("not found");
+        }
+        return response.data;
+    },
+    schemaName: "Host",
+    service: APIService,
+};
 
 const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storageId: number }, APIService> = {
     type: "object",
@@ -74,12 +92,30 @@ const storagesViewModel: CollectionViewModel<HostStorage, HostId, APIService, Ho
     service: APIService,
 };
 
-const hostOverviewViewModel: ObjectViewModel<Host, HostId, APIService> = {
-    type: "object",
+const partitionsViewModel: ListViewModel<Partition, Host & { storageDevicePath: string }> =
+{
+    type: "list",
     actions: [],
-    formTitle: host => host.hostName,
-    requestObject: async (service, ids) => {
-        const response = await service.hosts._any_.get(ids.hostName);
+    boundActions: [],
+    displayName: "Partitions",
+    requestObjects: async (service, ids) => {
+        const response = await service.hosts._any_.storageDevices.partitions.get(ids.hostName, { devicePath: ids.storageDevicePath })
+        if(response.statusCode != 200)
+            throw new Error("not implemented");
+        return response.data;
+    },
+    schemaName: "Partition"
+}
+
+const storageDevicesViewModel: CollectionViewModel<StorageDeviceDto, HostId, APIService> = {
+    type: "collection",
+    actions: [],
+    child: partitionsViewModel,
+    displayName: "Host-storage devices",
+    extractId: x => x.devicePath,
+    idKey: "storageDevicePath",
+    requestObjects: async (service, ids) => {
+        const response = await service.hosts._any_.storageDevices.get(ids.hostName);
         switch(response.statusCode)
         {
             case 404:
@@ -87,7 +123,7 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId, APIService> = {
         }
         return response.data;
     },
-    schemaName: "Host",
+    schemaName: "StorageDeviceDto",
     service: APIService,
 };
 
@@ -112,6 +148,11 @@ const hostViewModel: MultiPageViewModel<HostId, APIService> = {
             child: storagesViewModel,
             displayName: "Storages",
             key: "storages"
+        },
+        {
+            child: storageDevicesViewModel,
+            displayName: "Storage devices",
+            key: "storage-devices"
         }
     ],
     service: APIService,

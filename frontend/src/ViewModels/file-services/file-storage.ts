@@ -16,12 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { InstancePermission, SMBConfig, SMBConnectionInfo } from "../../../dist/api";
+import { DeploymentDataDto, InstancePermission, SMBConfig, SMBConnectionInfo, SnapshotDto } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { FileManagerComponent } from "../../Views/file-manager/FileManagerComponent";
 import { resourceProviders } from "openprivatecloud-common";
-import { PageNotFoundComponent } from "../../PageNotFoundComponent";
 import { ListViewModel } from "../../UI/ListViewModel";
 
 type InstanceId = { instanceName: string };
@@ -30,6 +29,20 @@ function BuildFullInstanceName(instanceName: string)
 {
     return "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.fileStorageResourceType.name + "/" + instanceName;
 }
+
+const overviewViewModel: ObjectViewModel<DeploymentDataDto, InstanceId, APIService>  = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "Overview",
+    requestObject: async (service, ids) => {
+        const response = await service.resourceProviders.fileservices.filestorage._any_.deploymentdata.get(ids.instanceName);
+        if(response.statusCode !== 200)
+            throw new Error("TODO IMPLEMENT ME");
+        return response.data;
+    },
+    schemaName: "DeploymentDataDto",
+    service: APIService
+};
 
 const accessControlViewModel: ListViewModel<InstancePermission, InstanceId> = {
     actions: [
@@ -94,6 +107,28 @@ const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId, API
     service: APIService
 };
 
+
+const snapshotsViewModel: ListViewModel<SnapshotDto, InstanceId> = {
+    actions: [
+        {
+            type: "create",
+            createResource: async (service, ids, _) => {
+                await service.resourceProviders.fileservices.filestorage._any_.snapshots.post(ids.instanceName);
+            }
+        }
+    ],
+    boundActions: [],
+    displayName: "Snapshots",
+    requestObjects: async (service, ids) => {
+        const response = await service.resourceProviders.fileservices.filestorage._any_.snapshots.get(ids.instanceName);
+        if(response.statusCode !== 200)
+            throw new Error("TODO IMPLEMENT ME");
+        return response.data;
+    },
+    schemaName: "SnapshotDto",
+    type: "list",
+};
+
 export const fileStorageViewModel: MultiPageViewModel<InstanceId, APIService> = {
     actions: [
         {
@@ -108,10 +143,7 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId, APIService> = 
     entries: [
         {
             key: "overview",
-            child: {
-                type: "component",
-                component: PageNotFoundComponent
-            },
+            child: overviewViewModel,
             displayName: "Overview"
         },
         {
@@ -136,6 +168,11 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId, APIService> = 
             key: "smb-connection",
             child: smbConnectionViewModel,
             displayName: "SMB connection"
+        },
+        {
+            key: "snapshots",
+            child: snapshotsViewModel,
+            displayName: "Snapshots"
         }
     ],
     formTitle: ids => ids.instanceName,

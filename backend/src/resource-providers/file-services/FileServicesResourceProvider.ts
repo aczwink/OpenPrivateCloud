@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
 import { Injectable } from "acts-util-node";
 import { InstancesManager } from "../../services/InstancesManager";
 import { ModulesManager } from "../../services/ModulesManager";
@@ -23,11 +22,14 @@ import { DeploymentContext, ResourceProvider, ResourceTypeDefinition } from "../
 import { resourceProviders } from "openprivatecloud-common";
 import { FileStorageProperties } from "./FileStorageProperties";
 import { FileStoragesManager } from "./FileStoragesManager";
+import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileStorageProperties>
 {
-    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager)
+    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager,
+        private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
     
@@ -62,6 +64,13 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<void>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
-        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instancePath = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+
+        const dataPath = this.fileStoragesManager.GetDataPath(context.storagePath, context.fullInstanceName);
+        const snapshotsPath = this.fileStoragesManager.GetSnapshotsPath(context.storagePath, context.fullInstanceName);
+
+        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "create", dataPath], context.hostId);
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, snapshotsPath);
+        this.remoteFileSystemManager.ChangeMode(context.hostId, dataPath, 0o770);
     }
 }

@@ -65,7 +65,7 @@ export class DirectoryViewComponent extends Component<{ instanceName: string }>
 
     private async QueryEntries(path: string)
     {
-        const result = await this.apiService.resourceProviders.fileservices.filestorage._any_.get(this.input.instanceName, { dirPath: path });
+        const result = await this.apiService.resourceProviders.fileservices.filestorage._any_.contents.get(this.input.instanceName, { dirPath: path });
         if(result.statusCode === 200)
         {
             this.dirPath = path;

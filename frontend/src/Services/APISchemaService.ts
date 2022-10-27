@@ -52,6 +52,13 @@ export class APISchemaService
         return this.GetSchema(last!);
     }
 
+    public ResolveSchemaOrReference(schemaOrRef: OpenAPI.Schema | OpenAPI.Reference): OpenAPI.Schema
+    {
+        if("$ref" in schemaOrRef)
+            return this.ResolveSchemaOrReference(this.ResolveReference(schemaOrRef));
+        return schemaOrRef;
+    }
+
     //Private variables
     private _root: OpenAPI.Root;
 }

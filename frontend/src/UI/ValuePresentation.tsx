@@ -16,8 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { JSX_CreateElement } from "acfrontend";
+import { JSX_CreateElement, RootInjector } from "acfrontend";
 import { OpenAPI } from "acts-util-core";
+import { APISchemaService } from "../Services/APISchemaService";
 import { UserValuePresenter } from "./ValuePresenters/UserValuePresenter";
 
 /*
@@ -93,6 +94,9 @@ export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleR
         
     switch(schema.type)
     {
+        case "array":
+            const childSchema = RootInjector.Resolve(APISchemaService).ResolveSchemaOrReference(schema.items);
+            return <ol>{value.map( (x: any) => <li>{RenderReadOnlyValue(x, childSchema)}</li>)}</ol>;
         case "boolean":
             return <div className="form-check">
                 <input className="form-check-input" type="checkbox" value="" checked={value} disabled />
@@ -100,11 +104,25 @@ export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleR
         case "number":
             return RenderNumber(value, schema);
         case "string":
+            switch(schema.format)
+            {
+                case "date-time":
+                    return new Date(value).toLocaleString();
+            }
             if(schema.format as string === "multi-line")
                 return <textarea className="form-control" cols="80" readOnly rows="12">{value}</textarea>;
             return value;
-        default:
-            throw new Error(schema.type);
+        case "object":
+            return <table>
+                <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                </tr>
+                {value.Entries().Map( (kv: any) => <tr>
+                    <td>{kv.key}</td>
+                    <td>{RenderReadOnlyValue(kv.value, RootInjector.Resolve(APISchemaService).ResolveSchemaOrReference(schema.properties[kv.key]!))}</td>
+                </tr>).ToArray()}
+            </table>;
     }
 }
 

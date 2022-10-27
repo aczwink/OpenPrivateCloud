@@ -74,6 +74,8 @@ export class SambaSharesManager
         const oldShare = settings.shares.find(share => share.name === data.shareName);
         const newShare = oldShare === undefined ? this.CreateDefaultShare(data.shareName) : oldShare;
 
+        newShare.properties.createMask = 0o770;
+        newShare.properties.directoryMask = 0o750;
         newShare.properties.path = data.sharePath;
         newShare.properties.validUsers = data.readUsers;
         newShare.properties.writeList = data.writeUsers;

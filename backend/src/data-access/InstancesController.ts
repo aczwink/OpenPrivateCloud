@@ -94,6 +94,7 @@ export class InstancesController
         const query = `
         SELECT id, fullName, storageId
         FROM instances
+        WHERE fullName = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         return await conn.SelectOne<Instance>(query, fullInstanceName);

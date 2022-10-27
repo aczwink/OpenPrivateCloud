@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
+import path from "path";
 import { Injectable } from "acts-util-node";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
@@ -23,36 +23,75 @@ import { PermissionsController } from "../../data-access/PermissionsController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { InstancesManager } from "../../services/InstancesManager";
 import { SambaSharesManager } from "./SambaSharesManager";
+import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 
 @Injectable
 export class FileStoragesManager
 {
     constructor(private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
         private sambaSharesManager: SambaSharesManager, private instancesManager: InstancesManager, private instancesController: InstancesController,
-        private hostStoragesController: HostStoragesController)
+        private hostStoragesController: HostStoragesController, private remoteFileSystemManager: RemoteFileSystemManager,
+        private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
     
     //Public methods
+    public async CreateSnapshot(hostId: number, storagePath: string, fullInstanceName: string)
+    {
+        const dataPath = this.GetDataPath(storagePath, fullInstanceName);
+        const snapsPath = this.GetSnapshotsPath(storagePath, fullInstanceName);
+        const snapName = new Date().toISOString();
+        const fullSnapPath = path.join(snapsPath, snapName);
+        
+        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "snapshot", "-r", dataPath, fullSnapPath], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sync"], hostId);
+    }
+
     public async DeleteSMBConfigIfExists(hostId: number, fullInstanceName: string)
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
-        const share = await this.sambaSharesManager.QueryShareSettings(hostId, parts.instanceName);
+        const share = await this.QuerySMBConfig(hostId, fullInstanceName);
         if(share !== undefined)
-            await this.sambaSharesManager.DeleteShare(hostId, parts.instanceName);
+            await this.sambaSharesManager.DeleteShare(hostId, share.name);
+    }
+
+    public GetDataPath(storagePath: string, fullInstanceName: string)
+    {
+        const instancePath = this.instancesManager.BuildInstanceStoragePath(storagePath, fullInstanceName);
+        return path.join(instancePath, "data");
+    }
+
+    public GetSnapshotsPath(storagePath: string, fullInstanceName: string)
+    {
+        const instancePath = this.instancesManager.BuildInstanceStoragePath(storagePath, fullInstanceName);
+        return path.join(instancePath, "snapshots");
+    }
+
+    public async QuerySMBConfig(hostId: number, fullInstanceName: string)
+    {
+        const shareName = this.MapToSMBShareName(fullInstanceName);
+        const cfg = await this.sambaSharesManager.QueryShareSettings(hostId, shareName);
+
+        return cfg;
+    }
+
+    public async QuerySnapshots(hostId: number, storagePath: string, fullInstanceName: string)
+    {
+        const snapsPath = this.GetSnapshotsPath(storagePath, fullInstanceName);
+
+        const snapshots = await this.remoteFileSystemManager.ListDirectoryContents(hostId, snapsPath);
+        return snapshots.Values().Map(x => x.filename).OrderBy(x => x).Map(x => new Date(x)).ToArray();
     }
 
     public async UpdateSMBConfigIfExists(hostId: number, fullInstanceName: string)
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
-        const share = await this.sambaSharesManager.QueryShareSettings(hostId, parts.instanceName);
+        const share = await this.QuerySMBConfig(hostId, fullInstanceName);
         if(share !== undefined)
             await this.UpdateSMBConfig(hostId, fullInstanceName);
     }
     
     public async UpdateSMBConfig(hostId: number, fullInstanceName: string)
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
         const instance = await this.instancesController.QueryInstance(fullInstanceName);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
@@ -67,8 +106,14 @@ export class FileStoragesManager
         await this.sambaSharesManager.SetShare(hostId, {
             readUsers: readGroupsLinux,
             writeUsers: writeGroupsLinux,
-            shareName: parts.instanceName,
-            sharePath: this.instancesManager.BuildInstanceStoragePath(storage!.path, fullInstanceName)
+            shareName: this.MapToSMBShareName(fullInstanceName),
+            sharePath: this.GetDataPath(storage!.path, fullInstanceName)
         });
+    }
+
+    //Private methods
+    private MapToSMBShareName(fullInstanceName: string)
+    {
+        return fullInstanceName.substring(1).ReplaceAll("/", "_");
     }
 }

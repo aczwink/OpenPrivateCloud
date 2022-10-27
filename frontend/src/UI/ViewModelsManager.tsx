@@ -280,7 +280,7 @@ export class ViewModelsManager
         {
             case "collection":
             case "list":
-                throw new Error("Not implemented");
+                return [];
             case "multiPage":
                 return viewModel.actions;
             case "object":
