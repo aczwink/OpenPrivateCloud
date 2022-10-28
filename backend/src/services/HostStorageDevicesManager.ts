@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 
@@ -23,6 +24,58 @@ interface Partition
 {
     path: string;
     mountPoint: string;
+}
+
+export interface SMART_Attribute
+{
+    id: number;
+    name: string;
+    value: number;
+    worst: number;
+    thresh: number;
+
+    raw: {
+        value: number;
+    };
+}
+
+interface ATA_SMART_Info
+{
+    ata_smart_attributes: {
+        table: SMART_Attribute[];
+    };
+
+    ata_smart_data: {
+        self_test: {
+            polling_minutes: Dictionary<number>;
+        };
+    };
+
+    ata_smart_error_log: {
+        summary: {
+            count: number;
+        };
+    };
+
+    ata_smart_self_test_log: {
+        standard: {
+            count: number;
+        };
+    };
+}
+
+interface SMART_Message
+{
+    string: string;
+    severity: string;
+}
+
+interface SMART_Result extends ATA_SMART_Info
+{
+    smartctl: {
+        messages?: SMART_Message[];
+        exit_status: number;
+    };
 }
 
 interface StorageDevice
@@ -42,6 +95,12 @@ export class HostStorageDevicesManager
     }
 
     //Public methods
+    public async QuerySMARTInfo(hostId: number, devicePath: string)
+    {
+        const { stdOut } = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "smartctl", "-a", devicePath, "-j"], hostId);
+        return JSON.parse(stdOut) as SMART_Result;
+    }
+
     public async QueryStorageDevices(hostId: number): Promise<StorageDevice[]>
     {
         const json = await this.QueryData(hostId);

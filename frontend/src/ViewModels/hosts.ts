@@ -20,7 +20,8 @@ import { Host, HostStorage, HostStorageCreationProperties, Partition, StorageDev
 import { APIService } from "../Services/APIService";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
-import { HostUpdateComponent } from "../Views/HostUpdateComponent";
+import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
+import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
 
 const hostOverviewViewModel: ObjectViewModel<Host, HostId, APIService> = {
     type: "object",
@@ -93,7 +94,9 @@ const storagesViewModel: CollectionViewModel<HostStorage, HostId, APIService, Ho
     service: APIService,
 };
 
-const partitionsViewModel: ListViewModel<Partition, Host & { storageDevicePath: string }> =
+type StorageDeviceId = Host & { storageDevicePath: string };
+
+const partitionsViewModel: ListViewModel<Partition, StorageDeviceId> =
 {
     type: "list",
     actions: [],
@@ -108,10 +111,32 @@ const partitionsViewModel: ListViewModel<Partition, Host & { storageDevicePath: 
     schemaName: "Partition"
 }
 
+const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId, APIService> = {
+    actions: [],
+    entries: [
+        {
+            key: "partitions",
+            displayName: "Partitions",
+            child: partitionsViewModel,
+        },
+        {
+            key: "health",
+            displayName: "Health",
+            child: {
+                type: "component",
+                component: ShowSMARTInfoComponent
+            }
+        }
+    ],
+    formTitle: x => x.storageDevicePath,
+    service: APIService,
+    type: "multiPage"
+};
+
 const storageDevicesViewModel: CollectionViewModel<StorageDeviceDto, HostId, APIService> = {
     type: "collection",
     actions: [],
-    child: partitionsViewModel,
+    child: storageDeviceViewModel,
     displayName: "Host-storage devices",
     extractId: x => x.devicePath,
     idKey: "storageDevicePath",
@@ -160,12 +185,20 @@ const hostViewModel: MultiPageViewModel<HostId, APIService> = {
         {
             child: storagesViewModel,
             displayName: "Storages",
-            key: "storages"
+            key: "storages",
+            icon: {
+                type: "material",
+                name: "album"
+            }
         },
         {
             child: storageDevicesViewModel,
             displayName: "Storage devices",
-            key: "storage-devices"
+            key: "storage-devices",
+            icon: {
+                type: "material",
+                name: "storage"
+            }
         }
     ],
     service: APIService,

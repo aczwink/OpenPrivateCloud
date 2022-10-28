@@ -56,6 +56,15 @@ class HostStorageDevicesAPIController
         return device.partitions;
     }
     
+    @Get("smart")
+    public async QuerySMARTInfo(
+        @Common hostId: number,
+        @Query devicePath: string
+    )
+    {
+        return await this.hostStorageDevicesManager.QuerySMARTInfo(hostId, devicePath);
+    }
+    
     @Get()
     public async QueryStorageDevices(
         @Common hostId: number

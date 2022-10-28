@@ -17,13 +17,13 @@
  * */
 
 import { Component, FormField, Injectable, JSX_CreateElement, ProgressSpinner, RouterState, Switch } from "acfrontend";
-import { UpdateInfoDto } from "../../dist/api";
-import { APIService } from "../Services/APIService";
+import { UpdateInfoDto } from "../../../dist/api";
+import { APIService } from "../../Services/APIService";
 
 @Injectable
 export class HostUpdateComponent extends Component
 {
-    constructor(private apiService: APIService, private routerState: RouterState)
+    constructor(private apiService: APIService, routerState: RouterState)
     {
         super();
 
