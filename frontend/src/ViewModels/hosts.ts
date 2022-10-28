@@ -20,6 +20,7 @@ import { Host, HostStorage, HostStorageCreationProperties, Partition, StorageDev
 import { APIService } from "../Services/APIService";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
+import { HostUpdateComponent } from "../Views/HostUpdateComponent";
 
 const hostOverviewViewModel: ObjectViewModel<Host, HostId, APIService> = {
     type: "object",
@@ -143,6 +144,18 @@ const hostViewModel: MultiPageViewModel<HostId, APIService> = {
             child: hostOverviewViewModel,
             displayName: "Overview",
             key: "overview"
+        },
+        {
+            key: "update",
+            displayName: "Update",
+            child: {
+                type: "component",
+                component: HostUpdateComponent
+            },
+            icon: {
+                type: "material",
+                name: "update"
+            }
         },
         {
             child: storagesViewModel,

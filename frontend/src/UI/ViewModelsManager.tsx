@@ -17,7 +17,7 @@
  * */
 
 import { Injectable, JSX_CreateElement, RootInjector, Route } from "acfrontend";
-import { Dictionary, OpenAPI } from "acts-util-core";
+import { OpenAPI } from "acts-util-core";
 import { AuthGuard } from "../AuthGuard";
 import { APISchemaService } from "../Services/APISchemaService";
 import { APIService } from "../Services/APIService";
@@ -178,7 +178,7 @@ export class ViewModelsManager
             };
         }
 
-        const objectTypes = viewModel.entries.map(x => ({ key: x.key, displayName: x.displayName }));
+        const objectTypes = viewModel.entries.map(x => ({ key: x.key, displayName: x.displayName, icon: x.icon }));
 
         return {
             children: [

@@ -38,8 +38,10 @@ interface ShareData
 
 const smbConfDialect: ConfigDialect = {
     commentInitiators: ["#", ";"],
-    falseMapping: "no",
-    trueMapping: "yes"
+    boolMapping: {
+        falseMapping: "no",
+        trueMapping: "yes"
+    }
 };
 
 @Injectable

@@ -48,6 +48,10 @@ interface PageEntry
     child: ViewModel;
     displayName: string;
     key: string;
+    icon?: {
+        type: "bootstrap" | "material";
+        name: string;
+    }
 }
 
 export interface MultiPageViewModel<IdType, ServiceType>

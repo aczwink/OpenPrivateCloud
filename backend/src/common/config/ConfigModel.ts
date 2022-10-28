@@ -132,6 +132,11 @@ export class ConfigModel
             entry.value = value;
     }
 
+    public WithoutSectionAsDictionary()
+    {
+        return this.SectionAsDictionary("");
+    }
+
     //Private variables
     private sections: Dictionary<Section>;
     private sectionInsertPositions: Dictionary<SectionInsertPosition>;

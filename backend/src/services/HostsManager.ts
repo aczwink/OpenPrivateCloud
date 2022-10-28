@@ -27,8 +27,7 @@ import { HostStoragesManager } from "./HostStoragesManager";
 export class HostsManager
 {
     constructor(private localCommandExecutor: LocalCommandExecutor,
-        private sshService: SSHService, private hostsController: HostsController,
-        private hostStoragesManager: HostStoragesManager)
+        private sshService: SSHService, private hostsController: HostsController, private hostStoragesManager: HostStoragesManager)
     {
     }
 

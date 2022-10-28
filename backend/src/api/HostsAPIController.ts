@@ -15,9 +15,25 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, BodyProp, Delete, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { HostsController } from "../data-access/HostsController";
+import { DistroInfoService } from "../services/DistroInfoService";
+import { HostHealthManager } from "../services/HostHealthManager";
 import { HostsManager } from "../services/HostsManager";
+import { HostUpdateManager } from "../services/HostUpdateManager";
+
+interface UnattendedUpgradeConfigDto
+{
+    unattendedUpgrades: boolean;
+    updatePackageLists: boolean;
+}
+
+interface UpdateInfoDto
+{
+    distributionName: string;
+    unattendedUpgradeConfig: UnattendedUpgradeConfigDto;
+    updatablePackagesCount: number;
+}
 
 @APIController("hosts")
 class HostsAPIController
@@ -66,5 +82,62 @@ class HostAPIController
             return NotFound("host does not exist");
             
         return host;
+    }
+}
+
+@APIController("hosts/{hostName}/update")
+class HostUpdateAPIController
+{
+    constructor(private hostsController: HostsController, private hostUpdateManager: HostUpdateManager, private distroInfoService: DistroInfoService,
+        private hostHealthManager: HostHealthManager)
+    {
+    }
+
+    @Common()
+    public async QueryHostId(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+        return hostId;
+    }
+
+    @Get()
+    public async QueryUpdateInfo(
+        @Common hostId: number
+    )
+    {
+        const distroName = await this.distroInfoService.FetchDisplayName(hostId);            
+        const updateInfo = await this.hostUpdateManager.QueryUpdateInfo(hostId);
+
+        const result: UpdateInfoDto = {
+            distributionName: distroName,
+            unattendedUpgradeConfig: {
+                unattendedUpgrades: updateInfo.config.unattendedUpgrades,
+                updatePackageLists: updateInfo.config.updatePackageLists
+            },
+            updatablePackagesCount: updateInfo.updatablePackagesCount,
+        };
+        return result;
+    }
+
+    @Put()
+    public async SetUpdateConfig(
+        @Common hostId: number,
+        @Body config: UnattendedUpgradeConfigDto
+    )
+    {
+        await this.hostUpdateManager.SetUnattendedUpgradeConfig(hostId, config.unattendedUpgrades, config.updatePackageLists);
+    }
+
+    @Post()
+    public async UpdateSystem(
+        @Common hostId: number
+    )
+    {
+        await this.hostUpdateManager.UpdateSystem(hostId);
+        await this.hostHealthManager.EnsureHostIsConfiguredAppropriatly(hostId);
     }
 }

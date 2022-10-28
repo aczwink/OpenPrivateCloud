@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Anchor, Component, Injectable, JSX_CreateElement, MatIcon, NavItem, ProgressSpinner, RouterComponent, RouterState } from "acfrontend";
+import { BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, NavItem, ProgressSpinner, RouterComponent, RouterState } from "acfrontend";
 import { Dictionary } from "acts-util-core";
 import { IdBoundResourceAction, RenderBoundAction } from "../IdBoundActions";
 
@@ -24,6 +24,10 @@ export interface ObjectType
 {
     key: string;
     displayName: string;
+    icon?: {
+        type: "bootstrap" | "material";
+        name: string;
+    };
 }
 
 interface SideNavComponentInput
@@ -58,7 +62,7 @@ export class SideNavComponent extends Component<SideNavComponentInput>
             <div className="row">
                 <div className="col-1">
                     <ul className="nav nav-pills flex-column">
-                        {...this.input.objectTypes.map(x => <NavItem route={this.baseRoute + "/" + x.key}>{x.displayName}</NavItem>)}
+                        {...this.input.objectTypes.map(x => <NavItem route={this.baseRoute + "/" + x.key}>{this.RenderIcon(x)}{x.displayName}</NavItem>)}
                     </ul>
                 </div>
                 <div className="col"><RouterComponent /></div>
@@ -66,9 +70,26 @@ export class SideNavComponent extends Component<SideNavComponentInput>
         </fragment>;
     }
 
-    //Private members
+    //Private variables
     private baseRoute: string;
     private title: string | null;
+
+    //Private methods
+    private RenderIcon(objectType: ObjectType)
+    {
+        const icon = objectType.icon;
+        
+        if(icon === undefined)
+            return undefined;
+
+        switch(icon.type)
+        {
+            case "bootstrap":
+                return <BootstrapIcon>{icon.name}</BootstrapIcon>;
+            case "material":
+                return <MatIcon>{icon.name}</MatIcon>;
+        }
+    }
 
     //Event handlers
     override OnInitiated(): void

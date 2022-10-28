@@ -16,7 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import * as path from "path";
-import { Dictionary } from "acts-util-core";
 import { GlobalInjector } from "acts-util-node";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { ConfigDialect } from "./ConfigDialect";
@@ -120,9 +119,9 @@ export class ConfigParser
         if( !isNaN(asNum) && (asNum.toString() === value))
             value = asNum;
 
-        if(value === this.dialect.falseMapping)
+        if(value === this.dialect.boolMapping?.falseMapping)
             value = false;
-        else if(value === this.dialect.trueMapping)
+        else if(value === this.dialect.boolMapping?.trueMapping)
             value = true;
 
         return {

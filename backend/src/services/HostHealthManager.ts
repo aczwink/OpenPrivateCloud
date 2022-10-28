@@ -16,11 +16,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-export interface ConfigDialect
+import { Injectable } from "acts-util-node";
+import { ModulesManager } from "./ModulesManager";
+
+ 
+@Injectable
+export class HostHealthManager
 {
-    commentInitiators: string[];
-    boolMapping?: {
-        falseMapping: string;
-        trueMapping: string;
+    constructor(private modulesManager: ModulesManager)
+    {
+    }
+
+    //Public methods
+    public async EnsureHostIsConfiguredAppropriatly(hostId: number)
+    {
+        await this.modulesManager.EnsureModuleIsInstalled(hostId, "core");
     }
 }

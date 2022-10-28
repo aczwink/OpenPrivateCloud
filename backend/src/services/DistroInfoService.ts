@@ -29,7 +29,20 @@ export class DistroInfoService
     }
 
     //Public methods
-    public async FetchFields(hostId: number)
+    public async FetchDisplayName(hostId: number)
+    {
+        const result = await this.FetchFields(hostId);
+        return result.PRETTY_NAME!;
+    }
+
+    public async FetchId(hostId: number)
+    {
+        const result = await this.FetchFields(hostId);
+        return result.ID;
+    }
+
+    //Private methods
+    private async FetchFields(hostId: number)
     {
         const fields = await this.remoteCommandExecutor.ExecuteBufferedCommand(["cat", "/etc/*release"], hostId);
         const lines = fields.stdOut.split("\n");
@@ -49,11 +62,5 @@ export class DistroInfoService
         }
 
         return result;
-    }
-
-    public async FetchId(hostId: number)
-    {
-        const result = await this.FetchFields(hostId);
-        return result.ID;
     }
 }

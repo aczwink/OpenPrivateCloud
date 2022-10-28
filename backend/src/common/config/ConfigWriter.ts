@@ -53,11 +53,14 @@ export class ConfigWriter
             return entry.key;
 
         let value = entry.value;
-        
-        if(value === false)
-            value = this.dialect.falseMapping;
-        else if(value === true)
-            value = this.dialect.trueMapping;
+
+        if(this.dialect.boolMapping !== undefined)
+        {
+            if( value === false)
+                value = this.dialect.boolMapping.falseMapping;
+            else if(value === true)
+                value = this.dialect.boolMapping.trueMapping;
+        }
 
         if(typeof value === "number")
             value = value.toString();

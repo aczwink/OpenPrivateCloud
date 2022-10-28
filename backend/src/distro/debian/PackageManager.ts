@@ -110,14 +110,14 @@ class DebianPackageManager implements DistroPackageManager
     {
         switch(moduleName)
         {
+            case "core":
+                return ["smartmontools", "unattended-upgrades"];
             case "samba":
                 return ["samba"];
             /*case "apache":
                 return ["apache2"];
             case "cifs":
                 return ["cifs-utils"];
-            case "core":
-                return ["smartmontools"];
             case "jdownloader":
                 return ["openjdk-11-jre-headless"];
             case "letsencrypt":
@@ -130,8 +130,6 @@ class DebianPackageManager implements DistroPackageManager
                 return ["openvpn", "easy-rsa"];
             case "phpmyadmin":
                 return ["phpmyadmin", "libapache2-mod-php"];
-            case "unattended-upgrades":
-                return ["unattended-upgrades"];
             case "virtualization":
                 return ["libvirt-daemon-system", "qemu-kvm"];*/
             default:
