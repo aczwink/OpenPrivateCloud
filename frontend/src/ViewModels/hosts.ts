@@ -17,63 +17,55 @@
  * */
 
 import { Host, HostStorage, HostStorageCreationProperties, Partition, StorageDeviceDto } from "../../dist/api";
-import { APIService } from "../Services/APIService";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
 
-const hostOverviewViewModel: ObjectViewModel<Host, HostId, APIService> = {
+const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
     type: "object",
-    actions: [],
-    formTitle: host => host.hostName,
-    requestObject: async (service, ids) => {
-        const response = await service.hosts._any_.get(ids.hostName);
-        switch(response.statusCode)
+    actions: [
         {
-            case 404:
-                throw new Error("not found");
+            type: "confirm",
+            execute: (service, ids) => service.hosts._any_.reboot.post(ids.hostName),
+            confirmText: "Are you sure that you want to reboot?",
+            matIcon: "autorenew",
+            title: "Reboot"
+        },
+        {
+            type: "confirm",
+            execute: (service, ids) => service.hosts._any_.shutdown.post(ids.hostName),
+            confirmText: "Are you sure that you want to shutdown?",
+            matIcon: "power_settings_new",
+            title: "Shutdown"
         }
-        return response.data;
-    },
+    ],
+    formTitle: host => host.hostName,
+    requestObject: async (service, ids) => service.hosts._any_.get(ids.hostName),
     schemaName: "Host",
-    service: APIService,
 };
 
-const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storageId: number }, APIService> = {
+const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storageId: number }> = {
     type: "object",
     actions: [
         {
             type: "delete",
-            deleteResource: async (service, ids) => {
-                await service.hostStorages._any_.delete(ids.storageId);
-            },
+            deleteResource: (service, ids) => service.hostStorages._any_.delete(ids.storageId),
         }
     ],
     formTitle: x => x.path,
-    requestObject: async (service, ids) => {
-        const response = await service.hostStorages._any_.get(ids.storageId);
-        switch(response.statusCode)
-        {
-            case 404:
-                throw new Error("not found");
-        }
-        return response.data;
-    },
+    requestObject: (service, ids) => service.hostStorages._any_.get(ids.storageId),
     schemaName: "HostStorage",
-    service: APIService
 };
 
 type HostId = { hostName: string };
 
-const storagesViewModel: CollectionViewModel<HostStorage, HostId, APIService, HostStorageCreationProperties> = {
+const storagesViewModel: CollectionViewModel<HostStorage, HostId, HostStorageCreationProperties> = {
     type: "collection",
     actions: [
         {
             type: "create",
-            createResource: async (service, ids, props) => {
-                await service.hosts._any_.storages.post(ids.hostName, { props });
-            },
+            createResource: (service, ids, props) => service.hosts._any_.storages.post(ids.hostName, { props }),
             schemaName: "HostStorageCreationProperties"
         }
     ],
@@ -81,17 +73,8 @@ const storagesViewModel: CollectionViewModel<HostStorage, HostId, APIService, Ho
     displayName: "Host-storage",
     extractId: x => x.id,
     idKey: "storageId",
-    requestObjects: async (service, ids) => {
-        const response = await service.hosts._any_.storages.get(ids.hostName);
-        switch(response.statusCode)
-        {
-            case 404:
-                throw new Error("not found");
-        }
-        return response.data;
-    },
+    requestObjects: (service, ids) => service.hosts._any_.storages.get(ids.hostName),
     schemaName: "HostStorage",
-    service: APIService,
 };
 
 type StorageDeviceId = Host & { storageDevicePath: string };
@@ -102,16 +85,11 @@ const partitionsViewModel: ListViewModel<Partition, StorageDeviceId> =
     actions: [],
     boundActions: [],
     displayName: "Partitions",
-    requestObjects: async (service, ids) => {
-        const response = await service.hosts._any_.storageDevices.partitions.get(ids.hostName, { devicePath: ids.storageDevicePath })
-        if(response.statusCode != 200)
-            throw new Error("not implemented");
-        return response.data;
-    },
+    requestObjects: (service, ids) => service.hosts._any_.storageDevices.partitions.get(ids.hostName, { devicePath: ids.storageDevicePath }),
     schemaName: "Partition"
 }
 
-const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId, APIService> = {
+const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId> = {
     actions: [],
     entries: [
         {
@@ -129,38 +107,26 @@ const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId, APIService> = 
         }
     ],
     formTitle: x => x.storageDevicePath,
-    service: APIService,
     type: "multiPage"
 };
 
-const storageDevicesViewModel: CollectionViewModel<StorageDeviceDto, HostId, APIService> = {
+const storageDevicesViewModel: CollectionViewModel<StorageDeviceDto, HostId> = {
     type: "collection",
     actions: [],
     child: storageDeviceViewModel,
     displayName: "Host-storage devices",
     extractId: x => x.devicePath,
     idKey: "storageDevicePath",
-    requestObjects: async (service, ids) => {
-        const response = await service.hosts._any_.storageDevices.get(ids.hostName);
-        switch(response.statusCode)
-        {
-            case 404:
-                throw new Error("not found");
-        }
-        return response.data;
-    },
+    requestObjects: (service, ids) => service.hosts._any_.storageDevices.get(ids.hostName),
     schemaName: "StorageDeviceDto",
-    service: APIService,
 };
 
-const hostViewModel: MultiPageViewModel<HostId, APIService> = {
+const hostViewModel: MultiPageViewModel<HostId> = {
     type: "multiPage",
     actions: [
         {
             type: "delete",
-            deleteResource: async (service, ids) => {
-                await service.hosts._any_.delete(ids.hostName);
-            },
+            deleteResource: (service, ids) => service.hosts._any_.delete(ids.hostName),
         }
     ],
     formTitle: ids => ids.hostName,
@@ -201,26 +167,22 @@ const hostViewModel: MultiPageViewModel<HostId, APIService> = {
             }
         }
     ],
-    service: APIService,
 };
 
-const hostsViewModel: CollectionViewModel<Host, {}, APIService> = {
+const hostsViewModel: CollectionViewModel<Host, {}> = {
     type: "collection",
     actions: [
         {
             type: "create",
-            createResource: async (service, _, host) => {
-                await service.hosts.post(host);
-            },
+            createResource: (service, _, host) => service.hosts.post(host),
         }
     ],
     child: hostViewModel,
     displayName: "Hosts",
     extractId: host => host.hostName,
     idKey: "hostName",
-    requestObjects: async service => (await service.hosts.get()).data,
+    requestObjects: service => service.hosts.get(),
     schemaName: "Host",
-    service: APIService,
 };
 
 const root: RoutingViewModel = {

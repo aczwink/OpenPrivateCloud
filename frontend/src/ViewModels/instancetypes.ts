@@ -18,12 +18,22 @@
 
 import { resourceProviders } from "openprivatecloud-common/resourceProviders";
 import { RoutingViewModel } from "../UI/ViewModel";
+import { backupVaultViewModel } from "./backup-services/backup-vault";
+import { virtualMachineViewModel } from "./compute-services/virtual-machine";
 import { fileStorageViewModel } from "./file-services/file-storage";
 
  
 export const instanceTypesRouting: RoutingViewModel = {
     type: "routing",
     entries: [
+        {
+            key: `${resourceProviders.backupServices.name}/${resourceProviders.backupServices.backupVaultResourceType.name}/:instanceName`,
+            viewModel: backupVaultViewModel
+        },
+        {
+            key: `${resourceProviders.computeServices.name}/${resourceProviders.computeServices.virtualMachineResourceType.name}/:instanceName`,
+            viewModel: virtualMachineViewModel
+        },
         {
             key: `${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:instanceName`,
             viewModel: fileStorageViewModel

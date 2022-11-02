@@ -17,32 +17,23 @@
  * */
 
 import { MembershipDataDto, PublicUserData, UserCreationData, UserGroup, UserGroupCreationData } from "../../dist/api";
-import { APIService } from "../Services/APIService";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 
 type UserIdRouteParams = { userId: number };
 
-const userViewModel: ObjectViewModel<PublicUserData, UserIdRouteParams, APIService> = {
+const userViewModel: ObjectViewModel<PublicUserData, UserIdRouteParams> = {
     actions: [],
     formTitle: user => user.emailAddress,
-    requestObject: async (service, ids) => {
-        const response = await service.users._any_.get(ids.userId);
-        if(response.statusCode !== 200)
-            throw new Error("todo implement me");
-        return response.data;
-    },
+    requestObject: (service, ids) => service.users._any_.get(ids.userId),
     schemaName: "PublicUserData",
-    service: APIService,
     type: "object"
 };
 
-const usersViewModel: CollectionViewModel<PublicUserData, {}, APIService, UserCreationData> = {
+const usersViewModel: CollectionViewModel<PublicUserData, {}, UserCreationData> = {
     actions: [
         {
             type: "create",
-            createResource: async (service, _ids, props) => {
-                await service.users.post(props);
-            },
+            createResource: (service, _ids, props) => service.users.post(props),
             schemaName: "UserCreationData"
         }
     ],
@@ -50,56 +41,39 @@ const usersViewModel: CollectionViewModel<PublicUserData, {}, APIService, UserCr
     displayName: "Users",
     extractId: user => user.id,
     idKey: "userId",
-    requestObjects: async service => (await service.users.get()).data,
+    requestObjects: service => service.users.get(),
     schemaName: "PublicUserData",
-    service: APIService,
     type: "collection"
 };
 
 type GroupIdRouteParams = { groupId: number };
 
-const userGroupOverviewViewModel: ObjectViewModel<UserGroup, GroupIdRouteParams, APIService> = {
+const userGroupOverviewViewModel: ObjectViewModel<UserGroup, GroupIdRouteParams> = {
     actions: [],
     formTitle: x => x.name,
-    requestObject: async (service, ids) => {
-        const result = await service.usergroups._any_.get(ids.groupId)
-        if(result.statusCode !== 200)
-            throw new Error("TODO: implement me");
-        return result.data;
-    },
+    requestObject: (service, ids) => service.usergroups._any_.get(ids.groupId),
     schemaName: "UserGroup",
-    service: APIService,
     type: "object"
 };
 
-const userGroupMemberViewModel: ObjectViewModel<PublicUserData, GroupIdRouteParams & UserIdRouteParams, APIService> = {
+const userGroupMemberViewModel: ObjectViewModel<PublicUserData, GroupIdRouteParams & UserIdRouteParams> = {
     actions: [
         {
             type: "delete",
-            deleteResource: async (service, ids) => {
-                await service.usergroups._any_.members.delete(ids.groupId, { userId: ids.userId })
-            },
+            deleteResource: (service, ids) => service.usergroups._any_.members.delete(ids.groupId, { userId: ids.userId }),
         }
     ],
     formTitle: user => user.emailAddress,
-    requestObject: async (service, ids) => {
-        const response = await service.users._any_.get(ids.userId);
-        if(response.statusCode !== 200)
-            throw new Error("todo implement me");
-        return response.data;
-    },
+    requestObject: (service, ids) => service.users._any_.get(ids.userId),
     schemaName: "PublicUserData",
-    service: APIService,
     type: "object"
 };
 
-const userGroupMembersViewModel: CollectionViewModel<PublicUserData, GroupIdRouteParams, APIService, MembershipDataDto> = {
+const userGroupMembersViewModel: CollectionViewModel<PublicUserData, GroupIdRouteParams, MembershipDataDto> = {
     actions: [
         {
             type: "create",
-            createResource: async (service, ids, member) => {
-                await service.usergroups._any_.members.post(ids.groupId, member)
-            },
+            createResource: async (service, ids, member) => service.usergroups._any_.members.post(ids.groupId, member),
             schemaName: "MembershipDataDto",
         }
     ],
@@ -107,13 +81,12 @@ const userGroupMembersViewModel: CollectionViewModel<PublicUserData, GroupIdRout
     displayName: "Members",
     extractId: x => x.id,
     idKey: "userId",
-    requestObjects: async (service, ids) => (await service.usergroups._any_.members.get(ids.groupId)).data,
+    requestObjects: (service, ids) => service.usergroups._any_.members.get(ids.groupId),
     schemaName: "PublicUserData",
-    service: APIService,
     type: "collection",
 };
 
-const userGroupViewModel: MultiPageViewModel<GroupIdRouteParams, APIService> = {
+const userGroupViewModel: MultiPageViewModel<GroupIdRouteParams> = {
     actions: [],
     entries: [
         {
@@ -128,17 +101,14 @@ const userGroupViewModel: MultiPageViewModel<GroupIdRouteParams, APIService> = {
         }
     ],
     formTitle: ids => "Group " + ids.groupId,
-    service: APIService,
     type: "multiPage"
 };
 
-const userGroupsViewModel: CollectionViewModel<UserGroup, {}, APIService, UserGroupCreationData> = {
+const userGroupsViewModel: CollectionViewModel<UserGroup, {}, UserGroupCreationData> = {
     actions: [
         {
             type: "create",
-            createResource: async (service, _, group) => {
-                await service.usergroups.post(group);
-            },
+            createResource: (service, _, group) => service.usergroups.post(group),
             schemaName: "UserGroupCreationData"
         }
     ],
@@ -146,13 +116,12 @@ const userGroupsViewModel: CollectionViewModel<UserGroup, {}, APIService, UserGr
     displayName: "User groups",
     extractId: x => x.id,
     idKey: "groupId",
-    requestObjects: async (service, _) => (await service.usergroups.get()).data,
+    requestObjects: (service, _) => service.usergroups.get(),
     schemaName: "UserGroup",
-    service: APIService,
     type: "collection",
 };
 
-const usersAndGroupsViewModel: MultiPageViewModel<{}, APIService> = {
+const usersAndGroupsViewModel: MultiPageViewModel<{}> = {
     type: "multiPage",
     actions: [],
     entries: [
@@ -168,7 +137,6 @@ const usersAndGroupsViewModel: MultiPageViewModel<{}, APIService> = {
         }
     ],
     formTitle: _ => "Users and groups management",
-    service: APIService,
 };
 
 const root: RoutingViewModel = {

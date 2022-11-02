@@ -42,12 +42,12 @@ export class HostStoragesManager
         const hostNoGroupId = await this.hostUsersManager.ResolveHostGroupId(hostId, "nogroup");
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, props.path, hostOPCUserId, hostNoGroupId);
 
-        await this.remoteFileSystemManager.ChangeMode(hostId, props.path, 0o770);
+        await this.remoteFileSystemManager.ChangeMode(hostId, props.path, 0o775);
 
         await this.hostsController.AddHostStorage(hostId, props, fsType.type);
     }
 
-    public async FindOptimalStorage(hostId: number, desiredFileSystem: "btrfs")
+    public async FindOptimalStorage(hostId: number, desiredFileSystem: "btrfs" | "ext4")
     {
         const hostStorages = await this.hostsController.RequestHostStorages(hostId);
         const filtered = hostStorages.filter(x => x.fileSystemType === desiredFileSystem);

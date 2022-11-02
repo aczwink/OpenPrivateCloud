@@ -15,17 +15,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Body, BodyProp, Delete, Get, Header, NotFound, Post, Query } from "acts-util-apilib";
-import { BaseResourceProperties } from "../resource-providers/ResourceProvider";
+import { APIController, Body, BodyProp, Conflict, Delete, Get, Header, NotFound, Path, Post, Query } from "acts-util-apilib";
+import { AnyResourceProperties } from "../resource-providers/ResourceProperties";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { HostsController } from "../data-access/HostsController";
 import { SessionsManager } from "../services/SessionsManager";
-import { Instance, InstancePermission, InstancesController } from "../data-access/InstancesController";
+import { InstancePermission, InstancesController } from "../data-access/InstancesController";
 import { PermissionsManager } from "../services/PermissionsManager";
-
-//TODO
-import { FileStorageProperties } from "../resource-providers/file-services/FileStorageProperties";
-//TODO
+import { InstanceLogsController } from "../data-access/InstanceLogsController";
 
 interface InstanceDto
 {
@@ -36,7 +33,7 @@ interface InstanceDto
 class InstancesAPIController
 {
     constructor(private resourceProviderManager: ResourceProviderManager, private hostsController: HostsController, private sessionsManager: SessionsManager,
-        private instancesController: InstancesController)
+        private instancesController: InstancesController, private instanceLogsController: InstanceLogsController)
     {
     }
 
@@ -45,13 +42,20 @@ class InstancesAPIController
         @BodyProp fullInstanceName: string
     )
     {
-        await this.resourceProviderManager.DeleteInstance(fullInstanceName);
+        const result = await this.resourceProviderManager.DeleteInstance(fullInstanceName);
+        if(result !== null)
+        {
+            switch(result.type)
+            {
+                case "ConflictingState":
+                    return Conflict(result.message);
+            }
+        }
     }
 
     @Post()
     public async DeployInstance(
-        //@Body @DerivativeOf instanceProperties: BaseResourceProperties
-        @Body instanceProperties: FileStorageProperties,
+        @Body instanceProperties: AnyResourceProperties,
         @Header Authorization: string
     )
     {
@@ -69,6 +73,37 @@ class InstancesAPIController
         return instances.map(x => ({
             fullName: x.fullName
         }));
+    }
+
+    @Get("logs/{logId}")
+    public async QueryInstanceLog(
+        @Path logId: number
+    )
+    {
+        const log = await this.instanceLogsController.QueryInstanceLog(logId);
+        if(log === undefined)
+            return NotFound("instance or log not found");
+
+        return log;
+    }
+
+    @Get("logs")
+    public async QueryInstanceLogs(
+        @Query fullInstanceName: string
+    )
+    {
+        const logs = await this.instanceLogsController.QueryInstanceLogs(fullInstanceName);
+        return logs;
+    }
+
+    @Get("search")
+    public async SearchForInstance(
+        @Query hostName: string,
+        @Query type: string,
+        @Query instanceNameFilter: string
+    )
+    {
+        return await this.instancesController.Search(hostName, "/" + type + "%" + instanceNameFilter + "%");
     }
 }
 

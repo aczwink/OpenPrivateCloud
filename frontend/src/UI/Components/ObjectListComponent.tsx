@@ -18,13 +18,16 @@
 
 import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterButton, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
+import { ResponseData } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
 import { IdBoundResourceAction } from "../IdBoundActions";
 import { ObjectBoundAction } from "../ObjectBoundActions";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
+import { ReplaceRouteParams } from "../Shared";
 import { UnboundResourceAction } from "../UnboundActions";
 import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
 
-interface ObjectListInput
+interface ObjectListInput<ObjectType>
 {
     baseUrl: string;
     customRouting?: (id: number | string) => string;
@@ -34,12 +37,12 @@ interface ObjectListInput
     heading: string;
     idBoundActions: IdBoundResourceAction<any, any, any>[];
     objectBoundActions: ObjectBoundAction<any, any>[];
-    requestObjects: (routeParams: Dictionary<string>) => Promise<any[]>;
-    unboundActions: UnboundResourceAction<any, any, any>[];
+    requestObjects: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType[]>>;
+    unboundActions: UnboundResourceAction<any, any>[];
 }
 
 @Injectable
-export class ObjectListComponent extends Component<ObjectListInput>
+export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<ObjectType>>
 {
     constructor(private routerState: RouterState, private apiService: APIService)
     {
@@ -69,7 +72,7 @@ export class ObjectListComponent extends Component<ObjectListInput>
     }
 
     //Private variables
-    private data: any[] | null;
+    private data: ObjectType[] | null;
 
     //Private methods
     private ExtractId(object: any)
@@ -77,16 +80,19 @@ export class ObjectListComponent extends Component<ObjectListInput>
         return this.input.extractId(object);
     }
 
-    private ReplaceRouteParams(route: string)
+    private Order(v1: any, v2: any)
     {
-        return RouterState.ReplaceRouteParams(route, this.routerState.routeParams).join("/");
+        return v1.toString().localeCompare();
     }
 
     private async QueryData()
     {
-        this.data = await this.input.requestObjects(this.routerState.routeParams);
+        const response = await this.input.requestObjects(this.routerState.routeParams);
+        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
+            this.data = result.value;
         const firstColumnKey = this.input.elementSchema.properties.OwnKeys().First();
-        this.data.sort((a, b) => a[firstColumnKey].localeCompare(b[firstColumnKey]));
+        this.Sort(firstColumnKey, true);
     }
 
     private RenderColumnsNames()
@@ -150,7 +156,7 @@ export class ObjectListComponent extends Component<ObjectListInput>
         return <tr>{...entries.concat(this.RenderObjectActions(obj))}</tr>;
     }
 
-    private RenderUnboundAction(action: UnboundResourceAction<any, any, any>)
+    private RenderUnboundAction(action: UnboundResourceAction<any, any>)
     {
         const route = this.input.baseUrl + "/" + action.type;
         switch(action.type)
@@ -158,6 +164,16 @@ export class ObjectListComponent extends Component<ObjectListInput>
             case "create":
                 return <RouterButton className="btn btn-primary" route={this.ReplaceRouteParams(route)}><BootstrapIcon>plus</BootstrapIcon></RouterButton>;
         }
+    }
+
+    private ReplaceRouteParams(route: string)
+    {
+        return ReplaceRouteParams(route, this.routerState.routeParams);
+    }
+
+    private Sort(columnKey: string | number, ascending: boolean)
+    {
+        this.data!.sort((a, b) => this.Order((a as any)[columnKey], (b as any)[columnKey]));
     }
 
     //Event handlers

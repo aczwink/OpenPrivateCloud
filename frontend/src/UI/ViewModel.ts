@@ -18,23 +18,24 @@
 
 import { Component } from "acfrontend";
 import { Instantiatable } from "acts-util-core";
+import { ResponseData } from "../../dist/api";
+import { APIService } from "../Services/APIService";
 import { IdBoundResourceAction } from "./IdBoundActions";
 import { ListViewModel } from "./ListViewModel";
 import { UnboundResourceAction } from "./UnboundActions";
 
-export interface CollectionViewModel<ObjectType, IdType, ServiceType, ObjectCreationType = ObjectType>
+export interface CollectionViewModel<ObjectType, IdType, ObjectCreationType = ObjectType>
 {
     type: "collection";
 
-    actions: UnboundResourceAction<ServiceType, ObjectCreationType, IdType>[];
+    actions: UnboundResourceAction<ObjectCreationType, IdType>[];
     child: ViewModel;
     customRouting?: (id: number | string) => string;
     displayName: string;
     extractId: (resource: ObjectType) => number | string;
     idKey: string;
-    requestObjects: (service: ServiceType, ids: IdType) => Promise<ObjectType[]>;
+    requestObjects: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType[]>>;
     schemaName: string;
-    service: Instantiatable<ServiceType>;
 }
 
 export interface ComponentViewModel
@@ -54,24 +55,22 @@ interface PageEntry
     }
 }
 
-export interface MultiPageViewModel<IdType, ServiceType>
+export interface MultiPageViewModel<IdType>
 {
     type: "multiPage";
-    actions: IdBoundResourceAction<IdType, any, ServiceType>[];
+    actions: IdBoundResourceAction<IdType, any, APIService>[];
     formTitle: (ids: IdType) => string;
     entries: PageEntry[];
-    service: Instantiatable<ServiceType>;
 }
 
-export interface ObjectViewModel<ObjectType, IdType, ServiceType>
+export interface ObjectViewModel<ObjectType, IdType>
 {
     type: "object";
 
-    actions: IdBoundResourceAction<IdType, ObjectType, ServiceType>[];
+    actions: IdBoundResourceAction<IdType, ObjectType, APIService>[];
     formTitle: (object: ObjectType) => string;
-    requestObject: (service: ServiceType, ids: IdType) => Promise<ObjectType | undefined>;
+    requestObject: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType>>;
     schemaName: string;
-    service: Instantiatable<ServiceType>;
 }
 
 interface RoutingEntry
@@ -87,4 +86,4 @@ export interface RoutingViewModel
     entries: RoutingEntry[];
 }
 
-export type ViewModel = CollectionViewModel<any, any, any> | ComponentViewModel | ListViewModel<any, any> | MultiPageViewModel<any, any> | ObjectViewModel<any, any, any> | RoutingViewModel;
+export type ViewModel = CollectionViewModel<any, any, any> | ComponentViewModel | ListViewModel<any, any> | MultiPageViewModel<any> | ObjectViewModel<any, any> | RoutingViewModel;

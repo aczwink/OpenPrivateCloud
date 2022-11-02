@@ -238,6 +238,6 @@ export class SambaSharesManager
         const writer = new ConfigWriter(smbConfDialect, (filePath, content) => this.remoteRootFileSystemManager.WriteTextFile(hostId, filePath, content));
         await writer.Write("/etc/samba/smb.conf", cfgEntries);
 
-        await this.remoteCommandExecutor.ExecuteCommand(["smbcontrol", "smbd", "reload-config"], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbcontrol", "smbd", "reload-config"], hostId);
     }
 }

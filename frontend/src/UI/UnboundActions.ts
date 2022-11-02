@@ -16,11 +16,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-interface CreateUnboundResourceAction<ServiceType, ResourceType, IdType>
+import { ResponseData } from "../../dist/api";
+import { APIService } from "../Services/APIService";
+import { ObjectEditorContext } from "./Components/ObjectEditorComponent";
+
+interface CreateUnboundResourceAction<ResourceType, IdType>
 {
     type: "create";
-    createResource: (service: ServiceType, ids: IdType, resource: ResourceType) => Promise<void>;
+    createResource: (service: APIService, ids: IdType, resource: ResourceType) => Promise<ResponseData<number, number, void>>;
+    loadContext?: (service: APIService, ids: IdType) => Promise<ObjectEditorContext>;
     schemaName?: string;
 }
 
-export type UnboundResourceAction<ServiceType, ObjectCreationType, IdType> = CreateUnboundResourceAction<ServiceType, ObjectCreationType, IdType>;
+export type UnboundResourceAction<ObjectCreationType, IdType> = CreateUnboundResourceAction<ObjectCreationType, IdType>;

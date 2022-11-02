@@ -18,18 +18,15 @@
 
 
 import { FileStorageProperties, InstanceDto } from "../../dist/api";
-import { APIService } from "../Services/APIService";
 import { CollectionViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { instanceTypesRouting } from "./instancetypes";
 
-const instancesViewModel: CollectionViewModel<InstanceDto, {}, APIService, FileStorageProperties> = {
+const instancesViewModel: CollectionViewModel<InstanceDto, {}, FileStorageProperties> = {
     actions: [
         {
             type: "create",
-            createResource: async (service, _ids, props) => {
-                await service.instances.post(props);
-            },
-            schemaName: "FileStorageProperties"
+            createResource: (service, _ids, props) => service.instances.post(props),
+            schemaName: "AnyResourceProperties"
         }
     ],
     customRouting: instanceFullName => "/instances" + instanceFullName,
@@ -37,9 +34,8 @@ const instancesViewModel: CollectionViewModel<InstanceDto, {}, APIService, FileS
     displayName: "Instances",
     extractId: instance => instance.fullName,
     idKey: "instanceFullName",
-    requestObjects: async service => (await service.instances.get()).data,
+    requestObjects: async service => service.instances.get(),
     schemaName: "InstanceDto",
-    service: APIService,
     type: "collection"
 };
 

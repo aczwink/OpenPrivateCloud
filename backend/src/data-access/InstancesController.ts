@@ -100,6 +100,17 @@ export class InstancesController
         return await conn.SelectOne<Instance>(query, fullInstanceName);
     }
 
+    public async QueryInstanceById(instanceId: number)
+    {
+        const query = `
+        SELECT id, fullName, storageId
+        FROM instances
+        WHERE id = ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        return await conn.SelectOne<Instance>(query, instanceId);
+    }
+
     public async QueryInstancePermissions(fullInstanceName: string)
     {
         const query = `
@@ -120,6 +131,21 @@ export class InstancesController
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         return await conn.Select<Instance>(query);
+    }
+
+    public async Search(hostName: string, fullNamePattern: string)
+    {
+        const query = `
+        SELECT i.fullName, i.storageId
+        FROM instances i
+        INNER JOIN hosts_storages hs
+            ON hs.id = i.storageId
+        INNER JOIN hosts h
+            ON h.id = hs.hostId
+        WHERE h.hostName = ? AND i.fullName LIKE ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        return await conn.Select<Instance>(query, hostName, fullNamePattern);
     }
 
     //Private methods

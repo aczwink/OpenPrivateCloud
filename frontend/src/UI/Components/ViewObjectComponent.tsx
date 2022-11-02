@@ -18,21 +18,23 @@
 
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
+import { ResponseData } from "../../../dist/api";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { IdBoundResourceAction, RenderBoundAction } from "../IdBoundActions";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
 import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
 
-interface ObjectInput
+interface ObjectInput<ObjectType>
 {
     actions: IdBoundResourceAction<any, any, any>[];
     baseRoute: string;
     heading: (obj: any) => string;
-    requestObject: (routeParams: Dictionary<string>) => Promise<any>;
+    requestObject: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType>>;
     schema: OpenAPI.ObjectSchema;
 }
 
 @Injectable
-export class ViewObjectComponent extends Component<ObjectInput>
+export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<ObjectType>>
 {
     constructor(private routerState: RouterState, private apiSchemaService: APISchemaService)
     {
@@ -61,7 +63,7 @@ export class ViewObjectComponent extends Component<ObjectInput>
     }
 
     //Private variables
-    private data: any | null;
+    private data: ObjectType | null;
     private heading: string;
 
     //Private methods
@@ -127,7 +129,10 @@ export class ViewObjectComponent extends Component<ObjectInput>
     //Event handlers
     public override async OnInitiated()
     {
-        this.data = await this.input.requestObject(this.routerState.routeParams);
+        const response = await this.input.requestObject(this.routerState.routeParams);
+        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
+            this.data = result.value;
         this.heading = this.input.heading(this.data);
     }
 }

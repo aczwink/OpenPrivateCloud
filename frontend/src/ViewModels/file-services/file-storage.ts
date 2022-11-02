@@ -30,81 +30,56 @@ function BuildFullInstanceName(instanceName: string)
     return "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.fileStorageResourceType.name + "/" + instanceName;
 }
 
-const overviewViewModel: ObjectViewModel<DeploymentDataDto, InstanceId, APIService>  = {
+const overviewViewModel: ObjectViewModel<DeploymentDataDto, InstanceId>  = {
     type: "object",
     actions: [],
     formTitle: _ => "Overview",
-    requestObject: async (service, ids) => {
-        const response = await service.resourceProviders.fileservices.filestorage._any_.deploymentdata.get(ids.instanceName);
-        if(response.statusCode !== 200)
-            throw new Error("TODO IMPLEMENT ME");
-        return response.data;
-    },
+    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.deploymentdata.get(ids.instanceName),
     schemaName: "DeploymentDataDto",
-    service: APIService
 };
 
 const accessControlViewModel: ListViewModel<InstancePermission, InstanceId> = {
     actions: [
         {
             type: "create",
-            createResource: async (service, ids, permission) => {
-                await service.instances.permissions.post({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
-            }
+            createResource: (service, ids, permission) => service.instances.permissions.post({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
         }
     ],
     boundActions: [
         {
             type: "delete",
-            deleteResource: async (service, ids, permission) => {
-                await service.instances.permissions.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
-            }
+            deleteResource: (service, ids, permission) => service.instances.permissions.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
         }
     ],
     displayName: "Access control",
-    requestObjects: async (service, ids) => (await service.instances.permissions.get({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })).data,
+    requestObjects: (service, ids) => service.instances.permissions.get({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }),
     schemaName: "InstancePermission",
     type: "list",
 };
 
-async function QuerySMBConfig(service: APIService, ids: InstanceId)
-{
-    const response = await service.resourceProviders.fileservices.filestorage._any_.smbcfg.get(ids.instanceName);
-    if(response.statusCode === 200)
-        return response.data;
-    throw new Error("NOT IMPLEMENTED");
-}
-
-const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId, APIService>  = {
+const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId>  = {
     type: "object",
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "SMBConfig",
-            requestObject: QuerySMBConfig,
+            requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.smbcfg.get(ids.instanceName),
             updateResource: async (service, ids, cfg) => {
                 await service.resourceProviders.fileservices.filestorage._any_.smbcfg.put(ids.instanceName, cfg);
             }
         }
     ],
     formTitle: _ => "SMB config",
-    requestObject: QuerySMBConfig,
+    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.smbcfg.get(ids.instanceName),
     schemaName: "SMBConfig",
-    service: APIService
 };
 
-const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId, APIService>  = {
+const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId>  = {
     type: "object",
     actions: [],
     formTitle: _ => "SMB connection information",
-    requestObject: async (service, ids) => {
-        const response = await service.resourceProviders.fileservices.filestorage._any_.smbconnect.get(ids.instanceName);
-        if(response.statusCode === 200)
-            return response.data;
-        throw new Error("NOT IMPLEMENTED");
-    },
+    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.smbconnect.get(ids.instanceName),
     schemaName: "SMBConnectionInfo",
-    service: APIService
 };
 
 
@@ -112,32 +87,21 @@ const snapshotsViewModel: ListViewModel<SnapshotDto, InstanceId> = {
     actions: [
         {
             type: "create",
-            createResource: async (service, ids, _) => {
-                await service.resourceProviders.fileservices.filestorage._any_.snapshots.post(ids.instanceName);
-            }
+            createResource: (service, ids, _) => service.resourceProviders.fileservices.filestorage._any_.snapshots.post(ids.instanceName)
         }
     ],
     boundActions: [],
     displayName: "Snapshots",
-    requestObjects: async (service, ids) => {
-        const response = await service.resourceProviders.fileservices.filestorage._any_.snapshots.get(ids.instanceName);
-        if(response.statusCode !== 200)
-            throw new Error("TODO IMPLEMENT ME");
-        return response.data;
-    },
+    requestObjects: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.snapshots.get(ids.instanceName),
     schemaName: "SnapshotDto",
     type: "list",
 };
 
-export const fileStorageViewModel: MultiPageViewModel<InstanceId, APIService> = {
+export const fileStorageViewModel: MultiPageViewModel<InstanceId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: async (service, ids) => {
-                await service.instances.delete({
-                    fullInstanceName: BuildFullInstanceName(ids.instanceName)
-                })
-            }
+            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
         }
     ],
     entries: [
@@ -176,6 +140,5 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId, APIService> = 
         }
     ],
     formTitle: ids => ids.instanceName,
-    service: APIService,
     type: "multiPage"
 };

@@ -16,10 +16,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "./constants";
+import { c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "./constants";
 
 export const resourceProviders =
 {
+    backupServices: {
+        name: c_backupServicesResourceProviderName,
+        backupVaultResourceType: {
+            name: c_backupVaultResourceTypeName
+        }
+    },
+
+    computeServices: {
+        name: c_computeServicesResourceProviderName,
+        virtualMachineResourceType: {
+            name: c_virtualMachineResourceTypeName
+        }
+    },
+
     fileServices: {
         name: c_fileServicesResourceProviderName,
         fileStorageResourceType: {

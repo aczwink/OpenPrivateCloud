@@ -112,6 +112,8 @@ class DebianPackageManager implements DistroPackageManager
         {
             case "core":
                 return ["smartmontools", "unattended-upgrades"];
+            case "libvirt":
+                return ["libosinfo-bin", "libvirt-daemon-system", "qemu-kvm"];
             case "samba":
                 return ["samba"];
             /*case "apache":
@@ -130,8 +132,7 @@ class DebianPackageManager implements DistroPackageManager
                 return ["openvpn", "easy-rsa"];
             case "phpmyadmin":
                 return ["phpmyadmin", "libapache2-mod-php"];
-            case "virtualization":
-                return ["libvirt-daemon-system", "qemu-kvm"];*/
+            */
             default:
                 throw new Error("Unknown module: " + moduleName);
         }

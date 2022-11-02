@@ -30,8 +30,14 @@ export interface BaseResourceProperties
 
 export interface ResourceTypeDefinition
 {
-    fileSystemType: "btrfs";
+    fileSystemType: "btrfs" | "ext4";
     schemaName: string;
+}
+
+export interface ResourceDeletionError
+{
+    type: "ConflictingState";
+    message: string;
 }
 
 export interface DeploymentContext
@@ -47,7 +53,7 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
     readonly name: string;
     readonly resourceTypeDefinitions: ResourceTypeDefinition[];
 
-    DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<void>;
+    DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>;
     InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<void>;
 }

@@ -18,24 +18,28 @@
 
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
+import { ResponseData } from "../../../dist/api";
 import { APISchemaService } from "../../Services/APISchemaService";
-import { ObjectEditorComponent } from "./ObjectEditorComponent";
+import { ReplaceRouteParams } from "../Shared";
+import { ObjectEditorComponent, ObjectEditorContext } from "./ObjectEditorComponent";
 
 interface AddObjectInput
 {
-    createResource: (routeParams: Dictionary<string>, data: any) => Promise<void>;
+    createResource: (routeParams: Dictionary<string>, data: any) => Promise<ResponseData<number, number, void>>;
     heading: string;
+    loadContext?: (routeParams: Dictionary<string>) => Promise<ObjectEditorContext>;
     postUpdateUrl: string;
     schema: OpenAPI.ObjectSchema;
 }
 
 @Injectable
-export class AddObjectComponent extends Component<AddObjectInput>
+export class AddObjectComponent<ObjectType> extends Component<AddObjectInput>
 {
     constructor(private router: Router, private routerState: RouterState, private apiSchemaService: APISchemaService)
     {
         super();
 
+        this.data = null;
         this.isValid = false;
         this.loading = false;
     }
@@ -53,26 +57,34 @@ export class AddObjectComponent extends Component<AddObjectInput>
         return <fragment>
             <h1>{this.input.heading + " | Create"}</h1>
             <form onsubmit={this.OnSave.bind(this)}>
-                <ObjectEditorComponent object={this.data} schema={this.input.schema} onObjectUpdated={this.OnObjectUpdated.bind(this)} />
+                <ObjectEditorComponent context={this.context} object={this.data} schema={this.input.schema} onObjectUpdated={this.OnObjectUpdated.bind(this)} />
                 <button disabled={!this.isValid} className="btn btn-primary" type="submit">Save</button>
             </form>
         </fragment>;
     }
 
     //Private members
-    private data: any;
+    private context?: ObjectEditorContext;
+    private data: ObjectType | null;
     private isValid: boolean;
     private loading: boolean;
 
     //Event handlers
-    override OnInitiated(): void
+    override async OnInitiated(): Promise<void>
     {
-        this.data = this.apiSchemaService.CreateDefault(this.input.schema);
-        this.OnObjectUpdated();
+        this.loading = true;
+
+        this.context = await this.input.loadContext?.call(undefined, this.routerState.routeParams);
+        const newData = this.apiSchemaService.CreateDefault(this.input.schema);
+        this.OnObjectUpdated(newData);
+
+        this.loading = false;
     }
 
-    private OnObjectUpdated()
+    private OnObjectUpdated(newValue: ObjectType)
     {
+        this.data = newValue;
+        
         const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
         this.isValid = validator.Validate(this.data, this.input.schema);
     }
@@ -83,7 +95,7 @@ export class AddObjectComponent extends Component<AddObjectInput>
         this.loading = true;
 
         await this.input.createResource(this.routerState.routeParams, this.data);
-        const route = RouterState.ReplaceRouteParams(this.input.postUpdateUrl, this.routerState.routeParams).join("/");
+        const route = ReplaceRouteParams(this.input.postUpdateUrl, this.routerState.routeParams);
         this.router.RouteTo(route);
     }
 }

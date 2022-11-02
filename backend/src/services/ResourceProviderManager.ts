@@ -18,6 +18,7 @@
 
 import { Instantiatable } from "acts-util-core";
 import { GlobalInjector, Injectable } from "acts-util-node";
+import { InstanceConfigController } from "../data-access/InstanceConfigController";
 import { HostStoragesController } from "../data-access/HostStoragesController";
 import { InstancesController } from "../data-access/InstancesController";
 import { BaseResourceProperties, ResourceProvider } from "../resource-providers/ResourceProvider";
@@ -30,7 +31,8 @@ import { PermissionsManager } from "./PermissionsManager";
 export class ResourceProviderManager
 {
     constructor(private apiSchemaService: APISchemaService, private instancesController: InstancesController, private hostStoragesManager: HostStoragesManager,
-        private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController, private permissionsManager: PermissionsManager)
+        private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController, private permissionsManager: PermissionsManager,
+        private instanceConfigController: InstanceConfigController)
     {
         this._resourceProviders = [];
     }
@@ -46,16 +48,22 @@ export class ResourceProviderManager
     {
         const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
 
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+
+        const result = await resourceProvider.DeleteResource(storage!.hostId, storage!.path, fullInstanceName);
+        if(result !== null)
+            return result;
+
+        await this.instanceConfigController.DeleteConfig(instance!.id);
+
         const permissions = await this.instancesController.QueryInstancePermissions(fullInstanceName);
         for (const instancePermission of permissions)
             await this.permissionsManager.DeleteInstancePermission(fullInstanceName, instancePermission);
 
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-
-        await resourceProvider.DeleteResource(storage!.hostId, storage!.path, fullInstanceName);
-
         await this.instancesController.DeleteInstance(fullInstanceName);
+        
+        return null;
     }
 
     public async DeployInstance(instanceProperties: BaseResourceProperties, hostId: number, userId: number)

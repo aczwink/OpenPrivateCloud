@@ -18,10 +18,12 @@
 
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterButton, RouterState } from "acfrontend";
 import { Dictionary } from "acts-util-core";
+import { ResponseData } from "../../../dist/api";
+import { ShowErrorMessageOnErrorFromResponse } from "../ResponseHandler";
 
 interface DeleteObjectComponentInput
 {
-    deleteResource: (routeParams: Dictionary<string>) => Promise<void>;
+    deleteResource: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, void>>;
     postDeleteUrl: string;
 }
 
@@ -57,7 +59,8 @@ export class DeleteObjectComponent extends Component<DeleteObjectComponentInput>
     private async OnDelete()
     {
         this.loading = true;
-        await this.input.deleteResource(this.routerState.routeParams);
+        const response = await this.input.deleteResource(this.routerState.routeParams);
+        ShowErrorMessageOnErrorFromResponse(response);
 
         const replaced = RouterState.ReplaceRouteParams(this.input.postDeleteUrl, this.routerState.routeParams);
         this.router.RouteTo(replaced.join("/"));

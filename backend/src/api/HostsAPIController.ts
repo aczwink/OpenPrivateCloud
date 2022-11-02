@@ -21,6 +21,7 @@ import { DistroInfoService } from "../services/DistroInfoService";
 import { HostHealthManager } from "../services/HostHealthManager";
 import { HostsManager } from "../services/HostsManager";
 import { HostUpdateManager } from "../services/HostUpdateManager";
+import { RemoteCommandExecutor } from "../services/RemoteCommandExecutor";
 
 interface UnattendedUpgradeConfigDto
 {
@@ -60,7 +61,7 @@ class HostsAPIController
 @APIController("hosts/{hostName}")
 class HostAPIController
 {
-    constructor(private hostsController: HostsController)
+    constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
 
@@ -82,6 +83,36 @@ class HostAPIController
             return NotFound("host does not exist");
             
         return host;
+    }
+
+    @Post("reboot")
+    public async Reboot(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+            
+        this.IssueShutdown(hostId, ["-r"]);
+    }
+
+    @Post("shutdown")
+    public async Shutdown(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+            
+        this.IssueShutdown(hostId, []);
+    }
+
+    //Private methods
+    private IssueShutdown(hostId: number, additionalArgs: string[])
+    {
+        setTimeout(() => this.remoteCommandExecutor.ExecuteCommand(["sudo", "shutdown"].concat(additionalArgs).concat(["0"]), hostId), 5000);
     }
 }
 

@@ -19,6 +19,13 @@
 import ssh2 from "ssh2";
 import { Injectable } from "acts-util-node";
 
+export type Command = string[] | {
+    type: "pipe",
+    sudo?: boolean;
+    source: Command;
+    target: Command;
+};
+
 interface CommandResult
 {
     stdErr: string;
@@ -33,7 +40,7 @@ export interface SSHConnection
     Close(): void;
     CreateDirectory(remotePath: string, attributes?: ssh2.InputAttributes): Promise<Error | null>;
     ExecuteBufferedCommand(command: string[]): Promise<CommandResult>;
-    ExecuteCommand(command: string[]): Promise<void>;
+    ExecuteCommand(command: Command): Promise<string>;
     ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
     ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
@@ -131,10 +138,10 @@ class SSHConnectionImpl implements SSHConnection
         };
     }
 
-    public async ExecuteCommand(command: string[]): Promise<void>
+    public async ExecuteCommand(command: Command): Promise<string>
     {
         const channel = await this.ExecuteInteractiveCommand(command);
-        return new Promise<void>( (resolve, reject) => {
+        return new Promise<string>( (resolve, reject) => {
             channel.stdout.setEncoding("utf-8");
             channel.stderr.setEncoding("utf-8");
 
@@ -142,22 +149,14 @@ class SSHConnectionImpl implements SSHConnection
             channel.stderr.on("data", console.error);
             
             channel.on("exit", code => {
-                resolve();
+                resolve(code);
             });
         });
     }
 
-    public async ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>
+    public async ExecuteInteractiveCommand(command: Command): Promise<ssh2.ClientChannel>
     {
-        let writePW = false;
-        const sudoCount = command.Values().Filter(x => x === "sudo").Count();
-        if( (sudoCount === 1) && (command[0] === "sudo") )
-        {
-            command.splice(1, 0, "--stdin");
-            writePW = true;
-        }
-
-        const commandLine = command.join(" ");
+        const { commandLine, sudo } = this.CommandToString(command);
 
         const channel = await new Promise<ssh2.ClientChannel>( (resolve, reject) => {
             this.conn.exec(commandLine, {
@@ -171,7 +170,7 @@ class SSHConnectionImpl implements SSHConnection
             });
         });
 
-        if(writePW)
+        if(sudo)
             channel.stdin.write(this.password + "\n");
 
         return channel;
@@ -247,6 +246,29 @@ class SSHConnectionImpl implements SSHConnection
                     resolve();
             });
         });
+    }
+
+    //Private methods
+    private CommandToString(command: Command): { commandLine: string; sudo: boolean }
+    {
+        if(Array.isArray(command))
+        {
+            if(command[0] === "sudo")
+            {
+                command.splice(1, 0, "--stdin");
+            }
+            return {
+                commandLine: command.join(" "),
+                sudo: command[0] === "sudo"
+            };
+        }
+
+        const nested = this.CommandToString(command.source).commandLine + " | " + this.CommandToString(command.target).commandLine;
+
+        return {
+            commandLine: (command.sudo === true ? "sudo --stdin sh -c '" + nested + "'" : nested),
+            sudo: command.sudo === true
+        }
     }
 }
 

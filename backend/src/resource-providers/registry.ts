@@ -18,11 +18,19 @@
 
 import { GlobalInjector } from "acts-util-node";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
+import { BackupServicesResourceProvider } from "./backup-services/BackupServicesResourceProvider";
+import { ComputeServicesResourceProvider } from "./compute-services/ComputeServicesResourceProvider";
 import { FileServicesResourceProvider } from "./file-services/FileServicesResourceProvider";
 
 export function RegisterResourceProviders()
 {
-    const rpm = GlobalInjector.Resolve(ResourceProviderManager);
+    const resourceProviders = [
+        BackupServicesResourceProvider,
+        ComputeServicesResourceProvider,
+        FileServicesResourceProvider
+    ];
 
-    rpm.Register(FileServicesResourceProvider);
+    const rpm = GlobalInjector.Resolve(ResourceProviderManager);
+    for (const resourceProvider of resourceProviders)
+        rpm.Register(resourceProvider);
 }

@@ -18,19 +18,22 @@
 
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
+import { ResponseData } from "../../../dist/api";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
+import { ReplaceRouteParams } from "../Shared";
 import { ObjectEditorComponent } from "./ObjectEditorComponent";
 
-interface ObjectInput
+interface ObjectInput<ObjectType>
 {
     formTitle: (obj: any) => string;
     postUpdateUrl: string;
-    requestObject: (routeParams: Dictionary<string>) => Promise<any>;
+    requestObject: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType>>;
     schema: OpenAPI.ObjectSchema;
     updateResource: (routeParams: Dictionary<string>, object: any) => Promise<void>;
 }
 
 @Injectable
-export class EditObjectComponent extends Component<ObjectInput>
+export class EditObjectComponent<ObjectType> extends Component<ObjectInput<ObjectType>>
 {
     constructor(private routerState: RouterState, private router: Router)
     {
@@ -61,7 +64,10 @@ export class EditObjectComponent extends Component<ObjectInput>
     //Event handlers
     override async OnInitiated(): Promise<void>
     {
-        this.data = await this.input.requestObject(this.routerState.routeParams);
+        const response = await this.input.requestObject(this.routerState.routeParams);
+        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
+            this.data = result.value;
         this.heading = this.input.formTitle(this.data);
     }
 
@@ -70,6 +76,8 @@ export class EditObjectComponent extends Component<ObjectInput>
         event.preventDefault();
 
         await this.input.updateResource(this.routerState.routeParams, this.data);
-        this.router.RouteTo(this.input.postUpdateUrl);
+
+        const updateUrl = ReplaceRouteParams(this.input.postUpdateUrl, this.routerState.routeParams)
+        this.router.RouteTo(updateUrl);
     }
 }

@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { ResponseData } from "../../dist/api";
 import { APIService } from "../Services/APIService";
 import { ObjectBoundAction } from "./ObjectBoundActions";
 import { UnboundResourceAction } from "./UnboundActions";
@@ -23,9 +24,9 @@ import { UnboundResourceAction } from "./UnboundActions";
 export interface ListViewModel<ObjectType, IdType>
 {
     type: "list";
-    actions: UnboundResourceAction<APIService, ObjectType, IdType>[];
+    actions: UnboundResourceAction<ObjectType, IdType>[];
     boundActions: ObjectBoundAction<ObjectType, IdType>[];
     displayName: string;
-    requestObjects: (service: APIService, ids: IdType) => Promise<ObjectType[]>;
+    requestObjects: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType[]>>;
     schemaName: string;
 }

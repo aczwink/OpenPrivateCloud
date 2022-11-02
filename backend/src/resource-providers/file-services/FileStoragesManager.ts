@@ -77,10 +77,16 @@ export class FileStoragesManager
 
     public async QuerySnapshots(hostId: number, storagePath: string, fullInstanceName: string)
     {
+        const snaps = await this.QuerySnapshotsRawOrdered(hostId, storagePath, fullInstanceName);
+        return snaps.Map(x => new Date(x)).ToArray();
+    }
+
+    public async QuerySnapshotsRawOrdered(hostId: number, storagePath: string, fullInstanceName: string)
+    {
         const snapsPath = this.GetSnapshotsPath(storagePath, fullInstanceName);
 
         const snapshots = await this.remoteFileSystemManager.ListDirectoryContents(hostId, snapsPath);
-        return snapshots.Values().Map(x => x.filename).OrderBy(x => x).Map(x => new Date(x)).ToArray();
+        return snapshots.Values().Map(x => x.filename).OrderBy(x => x);
     }
 
     public async UpdateSMBConfigIfExists(hostId: number, fullInstanceName: string)

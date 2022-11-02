@@ -18,9 +18,6 @@
 
 import { BaseResourceProperties } from "../ResourceProvider";
 
-/**
- * @APIModel
- */
 export interface FileStorageProperties extends BaseResourceProperties
 {
     type: "file-storage";

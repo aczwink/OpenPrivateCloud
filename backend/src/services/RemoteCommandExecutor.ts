@@ -17,6 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
+import { Command } from "./SSHService";
 
 @Injectable
 export class RemoteCommandExecutor
@@ -26,11 +27,11 @@ export class RemoteCommandExecutor
     }
 
     //Public methods
-    public async ExecuteCommand(command: string[], hostId: number)
+    public async ExecuteCommand(command: Command, hostId: number)
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.ExecuteCommand(command);
-        conn.Release();
+        const exitCode = await this.ExecuteCommandWithExitCode(command, hostId);
+        if(exitCode !== 0)
+            throw new Error("Command failed with exitCode: " + exitCode + ". Command: " + JSON.stringify(command));
     }
 
     public async ExecuteBufferedCommand(command: string[], hostId: number)
@@ -40,5 +41,15 @@ export class RemoteCommandExecutor
         conn.Release();
 
         return result;
+    }
+
+    public async ExecuteCommandWithExitCode(command: Command, hostId: number)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        const exitCodeString = await conn.value.ExecuteCommand(command);
+        conn.Release();
+
+        const exitCode = parseInt(exitCodeString);
+        return exitCode;
     }
 }

@@ -61,9 +61,15 @@ export class RemoteFileSystemManager
     public async QueryStatus(hostId: number, filePath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.QueryStatus(filePath);
-        conn.Release();
-        return result;
+        try
+        {
+            const result = await conn.value.QueryStatus(filePath);
+            return result;
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 
     public async ReadTextFile(hostId: number, filePath: string)

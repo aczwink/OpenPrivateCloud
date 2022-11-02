@@ -36,6 +36,17 @@ export class RemoteRootFileSystemManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", uid + ":" + gid, remotePath], hostId);
     }
 
+    public async CreateDirectory(hostId: number, remotePath: string)
+    {
+        const exitCode = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["sudo", "mkdir", remotePath], hostId);
+        return exitCode === 0;
+    }
+
+    public async RemoveDirectory(hostId: number, remotePath: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rmdir", remotePath], hostId);
+    }
+
     public async RemoveDirectoryRecursive(hostId: number, remotePath: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rm", "-rf", remotePath], hostId);

@@ -16,5 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+export const c_backupServicesResourceProviderName = "backup-services";
+export const c_backupVaultResourceTypeName = "backup-vault";
+
+export const c_computeServicesResourceProviderName = "compute-services";
+export const c_virtualMachineResourceTypeName = "virtual-machine";
+
 export const c_fileServicesResourceProviderName = "file-services";
 export const c_fileStorageResourceTypeName = "file-storage";

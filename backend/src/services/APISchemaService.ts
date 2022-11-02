@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
+import { OpenAPI, OpenAPIDefaultObjectCreator, OpenAPISchemaValidator } from "acts-util-core";
 
 export class APISchemaService
 {
@@ -25,6 +25,17 @@ export class APISchemaService
     }
 
     //Public methods
+    public CreateDefault(schema: OpenAPI.Schema)
+    {
+        const creator = new OpenAPIDefaultObjectCreator(this.root);
+        return creator.Create(schema);
+    }
+    
+    public GetSchema(name: string)
+    {
+        return this.root.components.schemas[name]!;
+    }
+    
     public Validate(value: any, schemaName: string)
     {
         const openAPIValidator = new OpenAPISchemaValidator(this.root);

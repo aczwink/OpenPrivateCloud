@@ -16,21 +16,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { AutoCompleteSelectBox, CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select, SingleSelect } from "acfrontend";
+import { AutoCompleteSelectBox, CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select } from "acfrontend";
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { APIService } from "../../Services/APIService";
+import { HostInstanceSelectionComponent } from "../ValueEditors/HostInstanceSelectionComponent";
 import { UserGroupSelectionComponent } from "../ValueEditors/UserGroupSelectionComponent";
 import { UserSelectionComponent } from "../ValueEditors/UserSelectionComponent";
 import { RenderTitle } from "../ValuePresentation";
 
+export interface ObjectEditorContext
+{
+    hostName: string;
+}
 
-@Injectable
-export class ObjectEditorComponent extends Component<{
+interface ObjectEditorInput
+{
+    context?: ObjectEditorContext;
     object: any;
     schema: OpenAPI.Schema;
     onObjectUpdated?: (newValue: any) => void;
-}>
+}
+
+@Injectable
+export class ObjectEditorComponent extends Component<ObjectEditorInput>
 {
     constructor(private apiSchemaService: APISchemaService, private apiService: APIService)
     {
@@ -85,6 +94,78 @@ export class ObjectEditorComponent extends Component<{
         return <NumberSpinner className={className} value={value} onChanged={valueChanged} step={1} />;
     }
 
+    private RenderObject(value: any, schema: OpenAPI.ObjectSchema, valueChanged: (newValue: any) => void, fallback: string)
+    {
+        const keys = Object.keys(schema.properties);
+        const children = [];
+        for (const key of keys)
+        {
+            const prop = value[key];
+            const renderValue = this.RenderValue(prop, schema.properties[key]!, newValue => {
+                value[key] = newValue;
+                valueChanged(value);
+            }, key);
+            children.push(renderValue);
+        }
+
+        return <fragment>
+            <h2>{RenderTitle(schema, fallback)}</h2>
+            {...children}
+        </fragment>;
+    }
+
+    private RenderOneOf(value: any, oneOfSchema: OpenAPI.OneOfSchema, valueChanged: (newValue: any) => void, fallback: string)
+    {
+        if(oneOfSchema.discriminator === undefined)
+            throw new Error("NOT IMPLEMENTED. NEEED A DISCRIMINATOR");
+        const discriminatorPropName = oneOfSchema.discriminator.propertyName;
+
+        function ExtractKey(schema: OpenAPI.ObjectSchema)
+        {
+            const x = schema.properties[discriminatorPropName] as OpenAPI.StringSchema;
+            return x.enum![0];
+        }
+
+        const schemasMap = oneOfSchema.oneOf.Values()
+            .Map(x => this.apiSchemaService.ResolveSchemaOrReference(x) as OpenAPI.ObjectSchema)
+            .ToDictionary(x => ExtractKey(x), x => x);
+        const context = this;
+
+        function GetSelectedSchema(selectedDiscriminator: string)
+        {
+            return schemasMap[selectedDiscriminator]!;
+        }
+        function OnSelectionChanged(newSelectedDiscriminator: string)
+        {
+            const newSchema = schemasMap[newSelectedDiscriminator]!;
+            const newValue = context.apiSchemaService.CreateDefault(newSchema);
+            valueChanged(newValue);
+        }
+        function CreateSchemaWithoutDiscriminator(schema: OpenAPI.ObjectSchema): OpenAPI.ObjectSchema
+        {
+            return {
+                additionalProperties: schema.additionalProperties,
+                properties: schema.properties.Entries().Filter(kv => kv.key !== discriminatorPropName).ToDictionary(kv => kv.key, kv => kv.value!),
+                required: schema.required.filter(x => x !== discriminatorPropName),
+                type: "object",
+                description: schema.description,
+                title: schema.title
+            };
+        }
+
+        const selectedDiscriminator = value[discriminatorPropName];
+        const selectedSchema = GetSelectedSchema(selectedDiscriminator);
+
+        return <fragment>
+            <FormField title={RenderTitle(selectedSchema, discriminatorPropName)} description={selectedSchema.description}>
+                <Select onChanged={newValue => OnSelectionChanged(newValue[0])}>
+                    {schemasMap.OwnKeys().OrderBy(x => x).Map(x => <option selected={selectedDiscriminator === x}>{x.toString()}</option>).ToArray()}
+                </Select>
+            </FormField>
+            {this.RenderObject(value, CreateSchemaWithoutDiscriminator(selectedSchema), valueChanged, fallback)}
+        </fragment>;
+    }
+
     private RenderString(value: any, schema: OpenAPI.StringSchema, valueChanged: (newValue: any) => void)
     {
         if(schema.enum !== undefined)
@@ -105,6 +186,14 @@ export class ObjectEditorComponent extends Component<{
                         onLoadSuggestions={this.LoadHostNames.bind(this)}
                         selection={ (value.trim().length === 0 ? null : ({ key: value, displayValue: value}))} />;
             }
+
+            if(schema.format?.startsWith("instance-same-host["))
+            {
+                const idx = schema.format.indexOf("[");
+                const arg = schema.format.substring(idx+1, schema.format.length - 1);
+                return <HostInstanceSelectionComponent type={arg} hostName={this.input.context!.hostName} value={value} valueChanged={valueChanged} />;
+            }
+
             const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
             className = validator.ValidateString(value, schema) ? "is-valid" : "is-invalid";
         }
@@ -117,10 +206,7 @@ export class ObjectEditorComponent extends Component<{
         if("anyOf" in schema)
             throw new Error("anyof not implemented");
         if("oneOf" in schema)
-        {
-            throw new Error("oneof not implemented");
-            return "oneof TODO";
-        }
+            return this.RenderOneOf(value, schema, valueChanged, fallback);
         if("$ref" in schema)
             return this.RenderValue(value, this.apiSchemaService.ResolveReference(schema), valueChanged, schema.title || fallback);
 
@@ -140,24 +226,7 @@ export class ObjectEditorComponent extends Component<{
                 </FormField>;
 
             case "object":
-            {
-                const keys = Object.keys(schema.properties);
-                const children = [];
-                for (const key of keys)
-                {
-                    const prop = value[key];
-                    const renderValue = this.RenderValue(prop, schema.properties[key]!, newValue => {
-                        value[key] = newValue;
-                        valueChanged(value);
-                    }, key);
-                    children.push(renderValue);
-                }
-
-                return <fragment>
-                    <h2>{RenderTitle(schema, fallback)}</h2>
-                    {...children}
-                </fragment>;
-            }
+                return this.RenderObject(value, schema, valueChanged, fallback);
 
             case "string":
                 return <FormField title={RenderTitle(schema, fallback)} description={schema.description}>
