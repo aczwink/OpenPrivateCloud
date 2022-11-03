@@ -19,8 +19,10 @@
 import { BackupVaultProperties } from "./backup-services/BackupVaultProperties";
 import { VirtualMachineProperties } from "./compute-services/VirtualMachineProperties";
 import { FileStorageProperties } from "./file-services/FileStorageProperties";
+import { OpenVPNGatewayProperties } from "./network-services/OpenVPNGatewayProperties";
 
 export type AnyResourceProperties = 
     BackupVaultProperties
     | FileStorageProperties
+    | OpenVPNGatewayProperties
     | VirtualMachineProperties;

@@ -1,0 +1,1 @@
+zip -9 opc-release.zip backend/dist/bundle.js frontend/dist/bundle.js frontend/dist/index.htm

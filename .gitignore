@@ -5,3 +5,4 @@ common/dist
 frontend/dist
 frontend/node_modules
 frontend/package-lock.json
+opc-release.zip

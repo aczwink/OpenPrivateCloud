@@ -24,3 +24,6 @@ export const c_virtualMachineResourceTypeName = "virtual-machine";
 
 export const c_fileServicesResourceProviderName = "file-services";
 export const c_fileStorageResourceTypeName = "file-storage";
+
+export const c_networkServicesResourceProviderName = "network-services";
+export const c_openVPNGatewayResourceTypeName = "openvpn-gateway";

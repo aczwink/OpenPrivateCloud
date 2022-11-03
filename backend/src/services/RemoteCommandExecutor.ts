@@ -15,9 +15,42 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import ssh2 from "ssh2";
 import { Injectable } from "acts-util-node";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 import { Command } from "./SSHService";
+
+interface Shell
+{
+    ChangeDirectory(targetDirectory: string): void;
+    Close(): Promise<void>;
+    SendCommand(command: string[]): void;
+}
+
+class ShellImpl implements Shell
+{
+    constructor(private channel: ssh2.ClientChannel)
+    {
+    }
+
+    //Public methods
+    public ChangeDirectory(targetDirectory: string): void
+    {
+        this.channel.write("cd " + targetDirectory + "\n");
+    }
+
+    public Close(): Promise<void>
+    {
+        this.channel.end("exit\n");
+        return new Promise<void>( resolve => this.channel.on("exit", resolve) );
+    }
+
+    public SendCommand(command: string[]): void
+    {
+        const cmdLine = command.join(" ");
+        this.channel.write(cmdLine + "\n", "utf-8");
+    }
+}
 
 @Injectable
 export class RemoteCommandExecutor
@@ -51,5 +84,21 @@ export class RemoteCommandExecutor
 
         const exitCode = parseInt(exitCodeString);
         return exitCode;
+    }
+
+    public async SpawnShell(hostId: number): Promise<Shell>
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+
+        const channel = await conn.value.SpawnShell();
+
+        channel.stderr.setEncoding("utf-8");
+        channel.stdout.setEncoding("utf-8");
+
+        channel.on("close", () => conn.Release());
+        channel.stderr.on("data", chunk => process.stderr.write(chunk));
+        channel.stdout.on("data", (chunk: any) => process.stdout.write(chunk));
+
+        return new ShellImpl(channel);
     }
 }

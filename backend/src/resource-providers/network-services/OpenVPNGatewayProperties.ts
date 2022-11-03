@@ -16,11 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-export type ModuleName = "core" | "libvirt" | "openvpn" | "samba";
+import { BaseResourceProperties } from "../ResourceProvider";
 
-export interface DistroPackageManager
+export interface OpenVPNGatewayProperties extends BaseResourceProperties
 {
-    Install(hostId: number, moduleName: ModuleName): Promise<void>;
-    IsModuleInstalled(hostId: number, moduleName: ModuleName): Promise<boolean>;
-    Uninstall(hostId: number, moduleName: ModuleName): Promise<void>;
+    type: "openvpn-gateway";
+    keySize: 2048 | 4096;
 }

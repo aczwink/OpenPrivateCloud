@@ -17,20 +17,24 @@
  * */
 
 import { GlobalInjector } from "acts-util-node";
-import { ResourceProviderManager } from "../services/ResourceProviderManager";
-import { BackupServicesResourceProvider } from "./backup-services/BackupServicesResourceProvider";
-import { ComputeServicesResourceProvider } from "./compute-services/ComputeServicesResourceProvider";
-import { FileServicesResourceProvider } from "./file-services/FileServicesResourceProvider";
+import { ResourceProviderManager } from "./services/ResourceProviderManager";
+import { BackupServicesResourceProvider } from "./resource-providers/backup-services/BackupServicesResourceProvider";
+import { ComputeServicesResourceProvider } from "./resource-providers/compute-services/ComputeServicesResourceProvider";
+import { FileServicesResourceProvider } from "./resource-providers/file-services/FileServicesResourceProvider";
+import { NetworkServicesResourceProvider } from "./resource-providers/network-services/NetworkServicesResourceProvider";
 
-export function RegisterResourceProviders()
+function RegisterResourceProviders()
 {
     const resourceProviders = [
         BackupServicesResourceProvider,
         ComputeServicesResourceProvider,
-        FileServicesResourceProvider
+        FileServicesResourceProvider,
+        NetworkServicesResourceProvider
     ];
 
     const rpm = GlobalInjector.Resolve(ResourceProviderManager);
     for (const resourceProvider of resourceProviders)
         rpm.Register(resourceProvider);
 }
+
+RegisterResourceProviders();

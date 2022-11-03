@@ -19,11 +19,10 @@ import fs from "fs";
 import * as https from "https";
 import * as os from "os";
 import { OpenAPI } from "acts-util-core";
-import { Factory, GlobalInjector, HTTP, ModuleLoader } from "acts-util-node";
+import { Factory, GlobalInjector, HTTP } from "acts-util-node";
 import { APIRegistry } from "acts-util-apilib";
 import { HTTPAuthHandler } from "./HTTPAuthHandler";
 import { DBConnectionsManager } from "./data-access/DBConnectionsManager";
-import { RegisterResourceProviders } from "./resource-providers/registry";
 import { APISchemaService } from "./services/APISchemaService";
 
 const port = 8078;
@@ -32,8 +31,9 @@ async function SetupServer()
 {
     const openAPIDef: OpenAPI.Root = (await import("../dist/openapi.json")) as any;
     GlobalInjector.RegisterInstance(APISchemaService, new APISchemaService(openAPIDef));
-    
-    RegisterResourceProviders();
+
+    await import("./__http-registry");
+    await import("./__resource-providers-registry");
 
     const requestHandlerChain = Factory.CreateRequestHandlerChain();
     requestHandlerChain.AddCORSHandler([
@@ -41,10 +41,6 @@ async function SetupServer()
         "https://" + os.hostname() + ":8079",
     ]);
     requestHandlerChain.AddBodyParser();
-
-    const apiLoader = new ModuleLoader;
-    await apiLoader.LoadDirectory(__dirname + "/api/");
-    await apiLoader.LoadDirectory(__dirname + "/resource-providers/");
 
     const backendStructure: any = await import("../dist/openapi-structure.json");
     requestHandlerChain.AddRequestHandler(GlobalInjector.Resolve(HTTPAuthHandler));

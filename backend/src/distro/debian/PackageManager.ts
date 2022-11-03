@@ -114,6 +114,8 @@ class DebianPackageManager implements DistroPackageManager
                 return ["smartmontools", "unattended-upgrades"];
             case "libvirt":
                 return ["libosinfo-bin", "libvirt-daemon-system", "qemu-kvm"];
+            case "openvpn":
+                return ["openvpn", "easy-rsa"];
             case "samba":
                 return ["samba"];
             /*case "apache":
@@ -128,8 +130,6 @@ class DebianPackageManager implements DistroPackageManager
                 return ["mariadb-server"];
             case "nextcloud":
                 return ["php", "php-mysql", "php-zip", "php-xml", "php-mbstring", "php-gd", "php-curl"];
-            case "openvpn":
-                return ["openvpn", "easy-rsa"];
             case "phpmyadmin":
                 return ["phpmyadmin", "libapache2-mod-php"];
             */

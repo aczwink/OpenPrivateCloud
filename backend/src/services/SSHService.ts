@@ -46,6 +46,7 @@ export interface SSHConnection
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
     ReadTextFile(remotePath: string): Promise<string>;
     RemoveDirectory(remotePath: string): Promise<void>;
+    SpawnShell(): Promise<ssh2.ClientChannel>;
     UnlinkFile(remotePath: string): Promise<void>;
     WriteFile(remotePath: string, content: Buffer): Promise<void>;
 }
@@ -220,6 +221,18 @@ class SSHConnectionImpl implements SSHConnection
                     reject(err);
                 else
                     resolve();
+            });
+        });
+    }
+
+    public SpawnShell(): Promise<ssh2.ClientChannel>
+    {
+        return new Promise<ssh2.ClientChannel>( (resolve, reject) => {
+            this.conn.shell( (err, channel) => {
+                if(err !== undefined)
+                    reject(err);
+                else
+                    resolve(channel);
             });
         });
     }
