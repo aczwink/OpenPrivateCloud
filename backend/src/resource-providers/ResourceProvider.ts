@@ -48,6 +48,11 @@ export interface DeploymentContext
     userId: number;
 }
 
+export interface DeploymentResult
+{
+    config?: any;
+}
+
 export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
 {
     readonly name: string;
@@ -55,5 +60,5 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
 
     DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>;
     InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>;
-    ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<void>;
+    ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
 }

@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Component, Injectable, JSX_CreateElement } from "acfrontend";
+import { Anchor, Component, Injectable, JSX_CreateElement, MatIcon } from "acfrontend";
 import { Duration } from "acts-util-core";
 import { AuthenticationService } from "./Services/AuthenticationService";
 
@@ -35,7 +35,7 @@ export class SessionComponent extends Component
         const left = new Duration(Math.max(li.expiryDateTime.valueOf() - Date.now(), 0));
 
         return <div className="d-flex align-items-center">
-            Welcome, {li.emailAddress}!
+            <Anchor route="/usersettings"><MatIcon>account_circle</MatIcon></Anchor>
             <button className="ms-2 btn btn-danger btn-sm" type="button" onclick={this.OnLogOut.bind(this)}>Sign out ({left.ToStringWithSecondPrecision()})</button>
         </div>;
     }

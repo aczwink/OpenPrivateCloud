@@ -15,18 +15,29 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
+import path from "path";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 
 @Injectable
 export class EasyRSAManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
 
     //Public methods
+    public async AddClient(hostId: number, cadir: string, clientName: string)
+    {
+        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        shell.ChangeDirectory(cadir);
+
+        shell.SendCommand(["./easyrsa", "--batch", "--req-cn=" + clientName, "build-client-full", clientName, "nopass"]);
+
+        await shell.Close();
+    }
+
     public async CreateCA(hostId: number, cadir: string, caCommonName: string, keySize: number)
     {
         const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
@@ -46,6 +57,36 @@ export class EasyRSAManager
         const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
         shell.ChangeDirectory(cadir);
         shell.SendCommand(["./easyrsa init-pki"]);
+        await shell.Close();
+    }
+
+    public async CreateServer(hostId: number, cadir: string, domainName: string, keySize: number)
+    {
+        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        shell.ChangeDirectory(cadir);
+        
+        shell.SendCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "build-server-full", domainName, "nopass"]);
+
+        await shell.Close();
+    }
+
+    public async ListClients(hostId: number, cadir: string, domainName: string)
+    {
+        const children = await this.remoteFileSystemManager.ListDirectoryContents(hostId, path.join(cadir, "pki/issued"));
+        return children.Values()
+            .Map(x => x.filename)
+            .Map(child => child.substring(0, child.lastIndexOf(".")))
+            .Filter(child => child !== domainName);
+    }
+
+    public async RevokeClient(hostId: number, cadir: string, clientName: string)
+    {
+        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        shell.ChangeDirectory(cadir);
+
+        shell.SendCommand(["./easyrsa", "--batch", "revoke", clientName]);
+        shell.SendCommand(["./easyrsa", "gen-crl"]);
+
         await shell.Close();
     }
 }

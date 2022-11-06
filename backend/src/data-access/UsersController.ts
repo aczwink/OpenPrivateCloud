@@ -117,4 +117,10 @@ export class UsersController
 
         return rows;
     }
+
+    public async UpdateUserPassword(userId: number, pwSalt: string, pwHash: string)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.UpdateRows("users", { pwHash, pwSalt }, "id = ?", userId);
+    }
 }

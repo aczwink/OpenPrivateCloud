@@ -28,14 +28,37 @@ export class UsersManager
     }
     
     //Public methods
+    public async Authenticate(userId: number, password: string)
+    {
+        const user = await this.usersController.QueryPrivateData(userId);
+        if(user === undefined)
+            return null;
+            
+        const expectedHash = this.HashPassword(password, user.pwSalt);
+        return expectedHash === user.pwHash;
+    }
+
     public async CreateUser(emailAddress: string, password: string)
     {
-        const pwSalt = crypto.randomBytes(16).toString("hex");
+        const pwSalt = this.CreateSalt();
         const pwHash = this.HashPassword(password, pwSalt);
         await this.usersController.CreateUser(emailAddress, pwHash, pwSalt);
     }
 
-    public HashPassword(password: string, pwSalt: string)
+    public async SetUserPassword(userId: number, password: string)
+    {
+        const pwSalt = this.CreateSalt();
+        const pwHash = this.HashPassword(password, pwSalt);
+        await this.usersController.UpdateUserPassword(userId, pwSalt, pwHash);
+    }
+
+    //Private methods
+    private CreateSalt()
+    {
+        return crypto.randomBytes(16).toString("hex");
+    }
+
+    private HashPassword(password: string, pwSalt: string)
     {
         return crypto.scryptSync(password, pwSalt, 32).toString("hex");
     }

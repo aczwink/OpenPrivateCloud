@@ -16,11 +16,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { BaseResourceProperties } from "../ResourceProvider";
+import { RoutingViewModel } from "../UI/ViewModel";
+import { ChangeUserPasswordComponent } from "../Views/user-settings/ChangeUserPasswordComponent";
 
-export interface OpenVPNGatewayProperties extends BaseResourceProperties
-{
-    type: "openvpn-gateway";
-    domainName: string;
-    keySize: 2048 | 4096;
+ 
+const root: RoutingViewModel = {
+    type: "routing",
+    entries: [
+        {
+            key: "usersettings",
+            viewModel: {
+                type: "component",
+                component: ChangeUserPasswordComponent
+            },
+        }
+    ]
 }
+
+export default root;

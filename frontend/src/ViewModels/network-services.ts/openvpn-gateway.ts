@@ -17,7 +17,8 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { OpenVPNGatewayInfo } from "../../../dist/api";
+import { OpenVPNGatewayClient, OpenVPNGatewayInfo } from "../../../dist/api";
+import { ListViewModel } from "../../UI/ListViewModel";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 
 type InstanceId = { instanceName: string };
@@ -36,6 +37,25 @@ const overviewViewModel: ObjectViewModel<OpenVPNGatewayInfo, InstanceId>  = {
     schemaName: "OpenVPNGatewayInfo",
 };
 
+const clientsViewModel: ListViewModel<OpenVPNGatewayClient, InstanceId> = {
+    type: "list",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, client) => service.resourceProviders.networkservices.openvpngateway._any_.clients.post(ids.instanceName, client)
+        }
+    ],
+    boundActions: [
+        {
+            type: "delete",
+            deleteResource: (service, ids, client) => service.resourceProviders.networkservices.openvpngateway._any_.clients.delete(ids.instanceName, client)
+        }
+    ],
+    displayName: "Clients",
+    requestObjects: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.clients.get(ids.instanceName),
+    schemaName: "OpenVPNGatewayClient",
+};
+
 export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
     actions: [
         {
@@ -49,6 +69,11 @@ export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
             displayName: "Overview",
             child: overviewViewModel,
         },
+        {
+            key: "clients",
+            displayName: "Clients",
+            child: clientsViewModel
+        }
     ],
     formTitle: ids => ids.instanceName,
     type: "multiPage"

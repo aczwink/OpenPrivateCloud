@@ -33,6 +33,18 @@ sudo systemctl reload apache2
 #setup db
 sudo apt install mariadb-server
 
+export config="{
+	\"database\": {
+		\"userName\": \"mysqluser\",
+		\"password\": \"mysqlpw\"
+	}
+}"
+sudo -E sh -c 'echo "$config" > /etc/OpenPrivateCloud/config.json'
+
+ea3925fcddd37ebcdaddf02f991f28b37debfb0ea677b5b2a532ce03628d9983 #hash
+00000000000000000000000000000000 #salt
+#standard pw is "root"
+
 
 
 #backend setup

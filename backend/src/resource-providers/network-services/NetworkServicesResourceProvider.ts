@@ -15,22 +15,20 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import path from "path";
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
 import { InstancesManager } from "../../services/InstancesManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { OpenVPNGatewayProperties } from "./OpenVPNGatewayProperties";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { EasyRSAManager } from "./EasyRSAManager";
-
+import { OpenVPNGatewayConfig, OpenVPNGatewayManager } from "./OpenVPNGatewayManager";
  
 @Injectable
 export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPNGatewayProperties>
 {
-    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager,
-        private easyRSAManager: EasyRSAManager)
+    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager,
+        private easyRSAManager: EasyRSAManager, private openVPNGatwayManager: OpenVPNGatewayManager)
     {
     }
 
@@ -62,13 +60,22 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
         throw new Error("Method not implemented.");
     }
 
-    public async ProvideResource(instanceProperties: OpenVPNGatewayProperties, context: DeploymentContext): Promise<void>
+    public async ProvideResource(instanceProperties: OpenVPNGatewayProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "openvpn");
-        const instancePath = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
 
-        const pkiPath = path.join(instancePath, "pki");
+        const pkiPath = this.openVPNGatwayManager.GetPKIPath(context.storagePath, context.fullInstanceName);
         await this.easyRSAManager.CreateCADir(context.hostId, pkiPath);
         await this.easyRSAManager.CreateCA(context.hostId, pkiPath, instanceProperties.name, instanceProperties.keySize);
+        await this.easyRSAManager.CreateServer(context.hostId, pkiPath, instanceProperties.domainName, instanceProperties.keySize);
+
+        const config: OpenVPNGatewayConfig = {
+            domainName: instanceProperties.domainName,
+            keySize: instanceProperties.keySize
+        };
+        return {
+            config
+        };
     }
 }

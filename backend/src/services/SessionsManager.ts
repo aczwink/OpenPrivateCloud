@@ -61,12 +61,8 @@ export class SessionsManager
         if(userId === undefined)
             return null;
 
-        const user = await this.usersController.QueryPrivateData(userId);
-        if(user === undefined)
-            return null;
-
-        const expectedHash = this.usersManager.HashPassword(password, user.pwSalt);
-        if(expectedHash === user.pwHash)
+        const ok = await this.usersManager.Authenticate(userId, password);
+        if(ok)
         {
             const token = await this.CreateToken();
             const session = this.sessions[token] = {

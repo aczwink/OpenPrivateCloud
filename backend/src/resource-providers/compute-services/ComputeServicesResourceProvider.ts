@@ -17,7 +17,7 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { VirtualMachineProperties } from "./VirtualMachineProperties";
 import { ModulesManager } from "../../services/ModulesManager";
@@ -82,7 +82,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
         throw new Error("NOT IMPLEMENTED");
     }
 
-    public async ProvideResource(instanceProperties: VirtualMachineProperties, context: DeploymentContext): Promise<void>
+    public async ProvideResource(instanceProperties: VirtualMachineProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "libvirt");
         //await this.hostUsersManager.EnsureHostUserIsInNativeGroup("opc", "kvm");
@@ -115,6 +115,8 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
         ];
 
         await this.remoteCommandExecutor.ExecuteCommand(cmd, context.hostId);
+
+        return {};
     }
 
     //Private methods

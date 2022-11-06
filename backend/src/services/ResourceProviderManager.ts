@@ -75,14 +75,18 @@ export class ResourceProviderManager
 
         const storageId = await this.hostStoragesManager.FindOptimalStorage(hostId, resourceTypeDef.fileSystemType);
         const storage = await this.hostStoragesController.RequestHostStorage(storageId);
-        await resourceProvider.ProvideResource(instanceProperties, {
+        const result = await resourceProvider.ProvideResource(instanceProperties, {
             fullInstanceName,
             hostId,
             storagePath: storage!.path,
             userId
         });
 
-        await this.instancesController.AddInstance(storageId, fullInstanceName);
+        const instanceId = await this.instancesController.AddInstance(storageId, fullInstanceName);
+        if(result.config !== undefined)
+        {
+            await this.instanceConfigController.UpdateOrInsertConfig(instanceId, result.config);
+        }
     }
 
     public async InstancePermissionsChanged(fullInstanceName: string)

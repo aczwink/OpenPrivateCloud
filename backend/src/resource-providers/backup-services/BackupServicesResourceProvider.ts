@@ -17,7 +17,7 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { BackupVaultProperties } from "./BackupVaultProperties";
 import { resourceProviders } from "openprivatecloud-common";
 
@@ -50,8 +50,9 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     {
     }
 
-    public async ProvideResource(instanceProperties: BackupVaultProperties, context: DeploymentContext): Promise<void>
+    public async ProvideResource(instanceProperties: BackupVaultProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         //this is a virtual resource
+        return {};
     }
 }

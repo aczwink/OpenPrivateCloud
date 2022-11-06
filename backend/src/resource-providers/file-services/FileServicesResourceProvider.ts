@@ -18,7 +18,7 @@
 import { Injectable } from "acts-util-node";
 import { InstancesManager } from "../../services/InstancesManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { FileStorageProperties } from "./FileStorageProperties";
 import { FileStoragesManager } from "./FileStoragesManager";
@@ -63,7 +63,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
         await this.fileStoragesManager.UpdateSMBConfig(hostId, fullInstanceName);
     }
 
-    public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<void>
+    public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
         await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
@@ -74,5 +74,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
         await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "create", dataPath], context.hostId);
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, snapshotsPath);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, dataPath, 0o770);
+
+        return {};
     }
 }

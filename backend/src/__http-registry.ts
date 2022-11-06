@@ -16,8 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { ModuleLoader } from "acts-util-node";
-
 import "./api/HostsAPIController";
 import "./api/HostStorageDevicesAPIController";
 import "./api/HostStoragesAPIController";
@@ -25,6 +23,7 @@ import "./api/InstancesAPIController";
 import "./api/ResourceProviderAPIController";
 import "./api/SessionsAPIController";
 import "./api/UserGroupsAPIController";
+import "./api/UserAPIController";
 import "./api/UsersAPIController";
 
 import "./resource-providers/backup-services/BackupVaultAPIController";
@@ -34,9 +33,10 @@ import "./resource-providers/network-services/OpenVPNGatewayAPIController";
 
 async function LoadAPIControllers()
 {
-    const apiLoader = new ModuleLoader;
+    //import { ModuleLoader } from "acts-util-node";
+    /*const apiLoader = new ModuleLoader;
     await apiLoader.LoadDirectory(__dirname + "/api/");
-    await apiLoader.LoadDirectory(__dirname + "/resource-providers/");
+    await apiLoader.LoadDirectory(__dirname + "/resource-providers/");*/
 }
 
 LoadAPIControllers();

@@ -47,7 +47,8 @@ export class InstancesController
     public async AddInstance(storageId: number, fullName: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("instances", { storageId, fullName });
+        const result = await conn.InsertRow("instances", { storageId, fullName });
+        return result.insertId;
     }
 
     public async AddInstancePermission(fullInstanceName: string, instancePermission: InstancePermission)

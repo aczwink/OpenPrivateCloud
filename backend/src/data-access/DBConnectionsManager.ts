@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
+import fs from "fs";
 import { DBConnectionPool, DBFactory, DBResource, Injectable } from "acts-util-node";
 
 @Injectable
@@ -51,11 +51,15 @@ export class DBConnectionsManager
         {
             const factory = new DBFactory;
 
+            const configPath = "/etc/OpenPrivateCloud/config.json";
+            const data = await fs.promises.readFile(configPath, "utf-8");
+            const config = JSON.parse(data);
+
             this.pool = await factory.CreateConnectionPool({
                 type: "mysql",
                 host: "localhost",
-                username: "phpmyadmin",
-                password: "phpmyadmin",
+                username: config.database.userName,
+                password: config.database.password,
                 defaultDatabase: "openprivatecloud"
             });
         }
