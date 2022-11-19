@@ -19,24 +19,24 @@
 import { Injectable } from "acts-util-node";
 import { HostsController } from "../data-access/HostsController";
 import { HostStorage, HostStorageCreationProperties } from "../data-access/HostStoragesController";
+import { FileSystemInfoService } from "./FileSystemInfoService";
 import { HostUsersManager } from "./HostUsersManager";
-import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
 
 @Injectable
 export class HostStoragesManager
 {
-    constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor,
+    constructor(private hostsController: HostsController,
         private remoteFileSystemManager: RemoteFileSystemManager, private hostUsersManager: HostUsersManager,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager)
+        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private fileSystemInfoService: FileSystemInfoService)
     {
     }
     
     //Public methods
     public async AddHostStorage(hostId: number, props: HostStorageCreationProperties)
     {
-        const fsType = await this.QueryFileSystemInfoForDirectory(hostId, props.path);
+        const fsType = await this.fileSystemInfoService.QueryFileSystemInfoForDirectory(hostId, props.path);
 
         const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
         const hostNoGroupId = await this.hostUsersManager.ResolveHostGroupId(hostId, "nogroup");
@@ -74,29 +74,10 @@ export class HostStoragesManager
         return bestFS;
     }
 
-    public async QueryFileSystemInfoForDirectory(hostId: number, path: string)
-    {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["df", "-T", path], hostId);
-        const lines = result.stdOut.split("\n");
-        lines.pop();
-        const line = lines.pop()!;
-        const parts = line.split(/[ \t]+/);
-
-        const freeSpace = parseInt(parts[4]);
-        const usedSpace = parseInt(parts[3])
-
-        return {
-            freeSpace,
-            type: parts[1],
-            usedSpace,
-            totalSize: freeSpace + usedSpace
-        };
-    }
-
     //Private methods
     private async QueryFreeStorageCapacity(hostId: number, storage: HostStorage)
     {
-        const info = await this.QueryFileSystemInfoForDirectory(hostId, storage.path);
+        const info = await this.fileSystemInfoService.QueryFileSystemInfoForDirectory(hostId, storage.path);
         return {
             storage,
             info

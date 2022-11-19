@@ -30,7 +30,6 @@ export interface CollectionViewModel<ObjectType, IdType, ObjectCreationType = Ob
 
     actions: UnboundResourceAction<ObjectCreationType, IdType>[];
     child: ViewModel;
-    customRouting?: (id: number | string) => string;
     displayName: string;
     extractId: (resource: ObjectType) => number | string;
     idKey: string;

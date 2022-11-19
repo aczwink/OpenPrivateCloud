@@ -30,6 +30,7 @@ class DebianPackageManager implements DistroPackageManager
     //Public methods
     public async Install(hostId: number, moduleName: ModuleName)
     {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt-get", "update"], hostId);
         await this.DoDebConfig(hostId, moduleName);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "install", this.MapModuleToPackageList(moduleName).join(" ")], hostId);
     }
@@ -40,7 +41,7 @@ class DebianPackageManager implements DistroPackageManager
         const packages = this.MapModuleToPackageList(moduleName);
         for (const packageName of packages)
         {
-            const installed = await this.IsPackageInstalled(hostId, installedPackages, packageName);
+            const installed = await this.IsPackageInstalled(hostId, installedPackages, packageName, new Set());
             if(!installed)
                 return false;
         }
@@ -66,6 +67,9 @@ class DebianPackageManager implements DistroPackageManager
             case "samba":
                 await this.SetDebConfValue(hostId, "samba-common", "samba-common/dhcp", false);
                 break;
+            case "webdav":
+                await this.SetDebConfValue(hostId, "davfs2", "davfs2/suid_file", false);
+                break;
         }
     }
 
@@ -85,11 +89,15 @@ class DebianPackageManager implements DistroPackageManager
         return result;
     }
 
-    private async IsPackageInstalled(hostId: number, installedPackages: string[], packageName: string): Promise<boolean>
+    private async IsPackageInstalled(hostId: number, installedPackages: string[], packageName: string, uninstalled: Set<string>): Promise<boolean>
     {
         const allPackages = installedPackages;
         if(allPackages.Contains(packageName))
             return true;
+
+        if(uninstalled.has(packageName)) //prevent cycles. For example btrfs-progs causes this
+            return false;
+        uninstalled.add(packageName);
 
         //check if it is a virtual package
         const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["apt-cache", "showpkg", packageName], hostId);
@@ -101,35 +109,38 @@ class DebianPackageManager implements DistroPackageManager
         {
             providers.push(line.split(" ")[0]);
         }
-        const childrenResults = await providers.Values().Distinct(x => x).Filter(x => x.length > 0).Map(x => this.IsPackageInstalled(hostId, installedPackages, x)).PromiseAll();
+        const childrenResults = await providers.Values().Distinct(x => x).Filter(x => x.length > 0).Map(x => this.IsPackageInstalled(hostId, installedPackages, x, uninstalled)).PromiseAll();
 
-        return childrenResults.Values().Any();
+        return childrenResults.Values().Filter(x => x).Any();
     }
 
     private MapModuleToPackageList(moduleName: ModuleName)
     {
         switch(moduleName)
         {
+            case "apache":
+                return ["apache2"];
             case "core":
-                return ["smartmontools", "unattended-upgrades"];
+                return ["btrfs-progs", "smartmontools", "unattended-upgrades", "unzip"];
+            case "java":
+                return ["openjdk-11-jre-headless"];
+            case "letsencrypt":
+                return ["certbot"];
             case "libvirt":
                 return ["libosinfo-bin", "libvirt-daemon-system", "qemu-kvm"];
+            case "mariadb":
+                return ["mariadb-server"];
+            case "nextcloud-dependencies":
+                return ["php", "php-mysql", "php-zip", "php-xml", "php-mbstring", "php-gd", "php-curl"];
             case "openvpn":
                 return ["openvpn", "easy-rsa"];
             case "samba":
                 return ["samba"];
-            /*case "apache":
-                return ["apache2"];
+            case "webdav":
+                return ["davfs2"];
+            /*
             case "cifs":
                 return ["cifs-utils"];
-            case "jdownloader":
-                return ["openjdk-11-jre-headless"];
-            case "letsencrypt":
-                return ["certbot"];
-            case "mariadb":
-                return ["mariadb-server"];
-            case "nextcloud":
-                return ["php", "php-mysql", "php-zip", "php-xml", "php-mbstring", "php-gd", "php-curl"];
             case "phpmyadmin":
                 return ["phpmyadmin", "libapache2-mod-php"];
             */
@@ -145,8 +156,13 @@ class DebianPackageManager implements DistroPackageManager
             input += "boolean " + value.toString();
         else
             input += "multiselect " + value.join(", ");
-
-        await this.remoteCommandExecutor.ExecuteCommand(["echo", '"' + input + '"', "|", "sudo", "debconf-set-selections"], hostId);
+            
+        await this.remoteCommandExecutor.ExecuteCommand({
+            source: ["echo", '"' + input + '"'],
+            target: ["debconf-set-selections"],
+            type: "pipe",
+            sudo: true,
+        }, hostId);
     }
 }
 

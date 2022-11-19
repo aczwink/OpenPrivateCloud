@@ -52,16 +52,31 @@ export class RemoteRootFileSystemManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rm", "-rf", remotePath], hostId);
     }
 
+    public async RemoveFile(hostId: number, remotePath: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rm", remotePath], hostId);
+    }
+
     public async WriteTextFile(hostId: number, filePath: string, text: string)
     {
-        const status = await this.remoteFileSystemManager.QueryStatus(hostId, filePath);
+        let status = undefined;
+        try
+        {
+            status = await this.remoteFileSystemManager.QueryStatus(hostId, filePath);
+        }
+        catch(_)
+        {
+        }
 
         const tempPath = await this.RequestTempPath(hostId);
         await this.remoteFileSystemManager.WriteTextFile(hostId, tempPath, text);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mv", "-f", tempPath, filePath], hostId);
 
-        await this.remoteFileSystemManager.ChangeMode(hostId, filePath, status.mode);
-        await this.ChangeOwnerAndGroup(hostId, filePath, status.uid, status.gid);
+        if(status !== undefined)
+        {
+            await this.remoteFileSystemManager.ChangeMode(hostId, filePath, status.mode);
+            await this.ChangeOwnerAndGroup(hostId, filePath, status.uid, status.gid);
+        }
     }
 
     //Private methods

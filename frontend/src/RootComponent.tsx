@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, Navigation, NavItem, RouterComponent } from "acfrontend";
+import { BootstrapIcon, Component, Injectable, JSX_CreateElement, Navigation, NavItem, RouterComponent } from "acfrontend";
 import { AuthenticationService } from "./Services/AuthenticationService";
 import { SessionComponent } from "./SessionComponent";
 
@@ -53,6 +53,8 @@ export class RootComponent extends Component
                 <NavItem route="/instances"><BootstrapIcon>server</BootstrapIcon> Instances</NavItem>
                 <NavItem route="/hosts"><BootstrapIcon>pc</BootstrapIcon> Hosts</NavItem>
                 <NavItem route="/usersandgroups"><BootstrapIcon>people-fill</BootstrapIcon> Users</NavItem>
+                <NavItem route="/activitymonitor"><BootstrapIcon>activity</BootstrapIcon> Activity monitor</NavItem>
+                <NavItem route="/settings"><BootstrapIcon>gear-fill</BootstrapIcon> Settings</NavItem>
             </ul>
             <SessionComponent />
         </Navigation>;

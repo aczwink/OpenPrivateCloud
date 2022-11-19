@@ -22,12 +22,13 @@ import { LocalCommandExecutor } from "./LocalCommandExecutor";
 import { SSHConnection, SSHService } from "./SSHService";
 import { HostsController } from "../data-access/HostsController";
 import { HostStoragesManager } from "./HostStoragesManager";
+import { ModulesManager } from "./ModulesManager";
 
 @Injectable
 export class HostsManager
 {
-    constructor(private localCommandExecutor: LocalCommandExecutor,
-        private sshService: SSHService, private hostsController: HostsController, private hostStoragesManager: HostStoragesManager)
+    constructor(private localCommandExecutor: LocalCommandExecutor, private modulesManager: ModulesManager,
+        private sshService: SSHService, private hostsController: HostsController)
     {
     }
 
@@ -41,8 +42,7 @@ export class HostsManager
         conn.Close();
 
         const hostId = await this.hostsController.AddHost(hostName, pw);
-
-        await this.hostStoragesManager.AddHostStorage(hostId, { path: "/home/opc" });
+        await this.modulesManager.EnsureModuleIsInstalled(hostId, "core");
 
         //await this.GenerateKeyPair(hostName);
         //await this.CopyPublicKeyToHost(hostName, hostName);

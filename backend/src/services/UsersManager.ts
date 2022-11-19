@@ -18,12 +18,13 @@
 import crypto from "crypto";
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../data-access/UsersController";
+import { HostUsersManager } from "./HostUsersManager";
 
  
 @Injectable
 export class UsersManager
 {
-    constructor(private usersController: UsersController)
+    constructor(private usersController: UsersController, private hostUsersManager: HostUsersManager)
     {
     }
     
@@ -42,7 +43,15 @@ export class UsersManager
     {
         const pwSalt = this.CreateSalt();
         const pwHash = this.HashPassword(password, pwSalt);
-        await this.usersController.CreateUser(emailAddress, pwHash, pwSalt);
+        await this.usersController.CreateUser(emailAddress, pwHash, pwSalt, this.CreateSambaPassword());
+    }
+
+    public async RotateSambaPassword(userId: number)
+    {
+        const newPw = this.CreateSambaPassword();
+
+        await this.usersController.UpdateSambaPassword(userId, newPw);
+        await this.hostUsersManager.UpdateSambaPasswordOnAllHosts(userId, newPw);
     }
 
     public async SetUserPassword(userId: number, password: string)
@@ -56,6 +65,12 @@ export class UsersManager
     private CreateSalt()
     {
         return crypto.randomBytes(16).toString("hex");
+    }
+
+    private CreateSambaPassword()
+    {
+        const pw = crypto.randomBytes(64).toString("hex");
+        return this.HashPassword(pw, this.CreateSalt());
     }
 
     private HashPassword(password: string, pwSalt: string)

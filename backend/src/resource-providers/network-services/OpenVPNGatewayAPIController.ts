@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Put, Query } from "acts-util-apilib";
 import { resourceProviders } from "openprivatecloud-common";
 import { c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { HostsController } from "../../data-access/HostsController";
@@ -24,6 +24,7 @@ import { HostStoragesController } from "../../data-access/HostStoragesController
 import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
 import { EasyRSAManager } from "./EasyRSAManager";
+import { OpenVPNServerConfig } from "./models";
 import { OpenVPNGatewayManager } from "./OpenVPNGatewayManager";
 
 interface CommonData
@@ -80,8 +81,23 @@ class OpenVPNGatewayAPIController
         @Body client: OpenVPNGatewayClient
     )
     {
-        const pkiPath = this.openVPNGatwayManager.GetPKIPath(common.storagePath, common.fullInstanceName)
-        await this.easyRSAManager.AddClient(common.hostId, pkiPath, client.name);
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(common.storagePath, common.fullInstanceName);
+        await this.easyRSAManager.AddClient(common.hostId, instanceDir, client.name);
+    }
+
+    @Get("clientconfig")
+    public async QueryClientConfig(
+        @Common common: CommonData,
+        @Query clientName: string
+    )
+    {
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(common.storagePath, common.fullInstanceName);
+        const instanceConfig = await this.openVPNGatwayManager.ReadInstanceConfig(common.instanceId);
+        const paths = this.easyRSAManager.GetCertPaths(instanceDir, clientName);
+        const config = await this.openVPNGatwayManager.GenerateClientConfig(common.hostId, instanceDir, instanceConfig.domainName, instanceConfig.dnsServerAddress, common.fullInstanceName, paths);
+        console.log(config);
+
+        return config;
     }
 
     @Get("clients")
@@ -89,23 +105,13 @@ class OpenVPNGatewayAPIController
         @Common common: CommonData
     )
     {
-        const pkiPath = this.openVPNGatwayManager.GetPKIPath(common.storagePath, common.fullInstanceName);
-        const config = await this.openVPNGatwayManager.ReadConfig(common.instanceId);
-        const result = await this.easyRSAManager.ListClients(common.hostId, pkiPath, config.domainName);
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(common.storagePath, common.fullInstanceName);
+        const config = await this.openVPNGatwayManager.ReadInstanceConfig(common.instanceId);
+        const result = await this.easyRSAManager.ListClients(common.hostId, instanceDir, config.domainName);
         return result.Map(x => {
             const res: OpenVPNGatewayClient = { name: x };
             return res;
         }).ToArray();
-    }
-
-    @Delete("clients")
-    public async RevokeClient(
-        @Common common: CommonData,
-        @Body client: OpenVPNGatewayClient
-    )
-    {
-        const pkiPath = this.openVPNGatwayManager.GetPKIPath(common.storagePath, common.fullInstanceName)
-        await this.easyRSAManager.RevokeClient(common.hostId, pkiPath, client.name);
     }
 
     @Get("info")
@@ -119,5 +125,33 @@ class OpenVPNGatewayAPIController
             hostName: host!.hostName,
         };
         return result;
+    }
+
+    @Get("config")
+    public async QueryServerConfig(
+        @Common common: CommonData
+    )
+    {
+        return await this.openVPNGatwayManager.ReadServerConfig(common.hostId, common.fullInstanceName);
+    }
+
+    @Delete("clients")
+    public async RevokeClient(
+        @Common common: CommonData,
+        @Body client: OpenVPNGatewayClient
+    )
+    {
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(common.storagePath, common.fullInstanceName);
+        await this.easyRSAManager.RevokeClient(common.hostId, instanceDir, client.name);
+        //TODO: restart service in case it is running
+    }
+
+    @Put("config")
+    public async UpdateServerConfig(
+        @Common common: CommonData,
+        @Body config: OpenVPNServerConfig
+    )
+    {
+        await this.openVPNGatwayManager.UpdateServerConfig(common.hostId, common.fullInstanceName, config);
     }
 }

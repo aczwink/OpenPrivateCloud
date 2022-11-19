@@ -53,8 +53,17 @@ export class InstanceLogsController
             instanceId,
             startTime: processTracker.startTime,
             endTime: "NOW()",
-            log: processTracker.fullText
+            log: processTracker.fullText,
+            status: processTracker.status,
+            title: processTracker.title
         });
+    }
+
+    public async DeleteLogsAssociatedWithInstance(instanceId: number)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+
+        await conn.DeleteRows("instances_logs", "instanceId = ?", instanceId);
     }
 
     public async QueryInstanceLog(logId: number)

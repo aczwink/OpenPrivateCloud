@@ -30,7 +30,7 @@ export class InstancesManager
     //Public methods
     public BuildInstanceStoragePath(hostStoragePath: string, fullInstanceName: string)
     {
-        return path.join(hostStoragePath, this.DerviceInstancePathFromUniqueInstanceName(fullInstanceName));
+        return path.join(hostStoragePath, this.DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName));
     }
     
     public async CreateInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string)
@@ -49,6 +49,11 @@ export class InstancesManager
         return "/" + resourceProviderName + "/" + instanceType + "/" + instanceName;
     }
 
+    public DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName: string)
+    {
+        return fullInstanceName.substring(1).ReplaceAll("/", "-");
+    }
+
     public ExtractPartsFromFullInstanceName(fullInstanceName: string)
     {
         const parts = fullInstanceName.substring(1).split("/");
@@ -63,11 +68,5 @@ export class InstancesManager
     {
         const instancePath = this.BuildInstanceStoragePath(hostStoragePath, fullInstanceName);
         await this.remoteRootFileSystemManager.RemoveDirectoryRecursive(hostId, instancePath);
-    }
-
-    //Private methods
-    private DerviceInstancePathFromUniqueInstanceName(fullInstanceName: string)
-    {
-        return fullInstanceName.substring(1).ReplaceAll("/", "-");
     }
 }

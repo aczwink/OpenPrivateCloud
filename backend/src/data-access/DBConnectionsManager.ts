@@ -41,6 +41,12 @@ export class DBConnectionsManager
         return instance.value.CreateAnyConnectionQueryExecutor();
     }
 
+    public ParseDateTime(dt: string)
+    {
+        const factory = new DBFactory;
+        return factory.ParseDateTime("mysql", dt);
+    }
+
     //Private variables
     private pool: DBResource<DBConnectionPool> | null;
 

@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { TimeSchedule } from "../common/TimeSchedule";
+
 export interface BaseResourceProperties
 {
     type: string;
@@ -30,6 +32,7 @@ export interface BaseResourceProperties
 
 export interface ResourceTypeDefinition
 {
+    healthCheckSchedule: TimeSchedule | null;
     fileSystemType: "btrfs" | "ext4";
     schemaName: string;
 }
@@ -58,6 +61,8 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
     readonly name: string;
     readonly resourceTypeDefinitions: ResourceTypeDefinition[];
 
+    CheckInstanceAvailability(hostId: number, fullInstanceName: string): Promise<void>;
+    CheckInstanceHealth(hostId: number, fullInstanceName: string): Promise<void>;
     DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>;
     InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;

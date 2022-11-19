@@ -19,29 +19,47 @@ import crypto from "crypto";
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { FileSystemEntry, fstabParser } from "../common/mount/fstabParser";
-import { MountedFileSytem, StaticFileSystem } from "../common/mount/MountOptions";
+import { FileSystemType, MountedFileSytem, StaticFileSystem } from "../common/mount/MountOptions";
 import { MountOptionsParser } from "../common/mount/MountOptionsParser";
 import { APISchemaService } from "./APISchemaService";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
+import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 
 
 @Injectable
 export class MountsManager
 {
     constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager, private apiSchemaService: APISchemaService,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager)
+        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteConnectionsManager: RemoteConnectionsManager)
     {
     }
     
     //Public methods
-    public async CreateUniqueLocationAndMount(hostId: number, devicePath: string)
+    public async CreateUniqueMountPointAndMount(hostId: number, devicePath: string)
     {
-        const mountPoint = path.join("/media", "opc" + crypto.pseudoRandomBytes(16).toString("hex"))
-        await this.remoteRootFileSystemManager.CreateDirectory(hostId, mountPoint);
-
+        const mountPoint = await this.CreateUniqueMountPoint(hostId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mount", devicePath, mountPoint], hostId);
+
+        return mountPoint;
+    }
+
+    public async CreateUniqueLocationAndMountFull(hostId: number, type: FileSystemType, source: string, stdin?: string)
+    {
+        const mountPoint = await this.CreateUniqueMountPoint(hostId);
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+
+        const channel = await conn.value.ExecuteInteractiveCommand(["sudo", "mount", "-t", type, source, mountPoint]);
+        if(stdin !== undefined)
+            channel.stdin.write(stdin);
+
+        await new Promise<boolean>( (resolve, reject) => {
+            channel.on("exit", code => resolve(code === "0"));
+            channel.on("error", reject);
+        });
+
+        conn.Release();
 
         return mountPoint;
     }
@@ -68,12 +86,32 @@ export class MountsManager
 
     public async UnmountAndRemoveMountPoint(hostId: number, devicePath: string)
     {
-        const mountPoint = await this.QueryMountPoint(hostId, devicePath);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "umount", devicePath], hostId);
-        await this.remoteRootFileSystemManager.RemoveDirectory(hostId, mountPoint!);
+        const pathToRemove = await this.QueryMountPoint(hostId, devicePath);
+
+        for(let i = 0; i < 120; i++)
+        {
+            await this.TryUnmount(hostId, devicePath);
+
+            const mountPoint = await this.QueryMountPoint(hostId, devicePath);
+            if(mountPoint === undefined)
+            {
+                await this.remoteRootFileSystemManager.RemoveDirectory(hostId, pathToRemove!);
+                return;
+            }
+            await new Promise<void>(resolve => setTimeout(resolve, i * 1000) );
+        }
+        throw new Error("Failed unmounting file system: " + devicePath);
     }
 
     //Private methods
+    private async CreateUniqueMountPoint(hostId: number)
+    {
+        const mountPoint = path.join("/media", "opc" + crypto.pseudoRandomBytes(16).toString("hex"));
+        await this.remoteRootFileSystemManager.CreateDirectory(hostId, mountPoint);
+
+        return mountPoint;
+    }
+
     private MapChildren(children: any)
     {
         if(children === undefined)
@@ -111,5 +149,15 @@ export class MountsManager
     {
         const { stdOut } = await this.remoteCommandExecutor.ExecuteBufferedCommand(["findmnt", "-AJ"], hostId);
         return JSON.parse(stdOut);
+    }
+
+    private async TryUnmount(hostId: number, devicePath: string)
+    {
+        const mountPoint = await this.QueryMountPoint(hostId, devicePath);
+        if(mountPoint === undefined)
+            return;
+
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "sync", mountPoint], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "umount", devicePath], hostId);
     }
 }

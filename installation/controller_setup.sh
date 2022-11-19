@@ -1,4 +1,5 @@
 sudo apt update
+sudo apt install unzip
 
 sudo useradd -r -m -g nogroup opc-controller
 
@@ -33,17 +34,22 @@ sudo systemctl reload apache2
 #setup db
 sudo apt install mariadb-server
 
+sudo mysql -u root -p -e "CREATE DATABASE openprivatecloud;"
+
+wget https://raw.githubusercontent.com/aczwink/OpenPrivateCloud/main/db.sql
+sudo mysql -u root -p openprivatecloud < db.sql
+rm db.sql
+
+sudo mysql -u root -p -e "CREATE USER 'opc'@'localhost' IDENTIFIED BY 'opc'; GRANT ALL PRIVILEGES ON openprivatecloud.* TO 'opc'@'localhost'; FLUSH PRIVILEGES;"
+sudo mysql -u root -p -e "INSERT INTO openprivatecloud.users (emailAddress, pwHash, pwSalt, sambaPW) VALUES ('<your email address>', 'ea3925fcddd37ebcdaddf02f991f28b37debfb0ea677b5b2a532ce03628d9983', '00000000000000000000000000000000', '');" #standard pw is "root"
+
 export config="{
 	\"database\": {
-		\"userName\": \"mysqluser\",
-		\"password\": \"mysqlpw\"
+		\"userName\": \"opc\",
+		\"password\": \"opc\"
 	}
 }"
 sudo -E sh -c 'echo "$config" > /etc/OpenPrivateCloud/config.json'
-
-ea3925fcddd37ebcdaddf02f991f28b37debfb0ea677b5b2a532ce03628d9983 #hash
-00000000000000000000000000000000 #salt
-#standard pw is "root"
 
 
 
@@ -57,10 +63,14 @@ npm install ssh2
 wget https://raw.githubusercontent.com/aczwink/OpenPrivateCloud/main/installation/openprivatecloud.service
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-absDirPath=$(realpath "$SCRIPTPATH/../")
+absDirPath=$(realpath "$SCRIPTPATH/")
 echo $absDirPath
 sed -i -e "s:\\\$TARGETDIR\\\$:$absDirPath:g" openprivatecloud.service
 sudo mv openprivatecloud.service /etc/systemd/system/
 
 sudo systemctl enable openprivatecloud.service
 sudo systemctl start openprivatecloud.service
+
+wget https://raw.githubusercontent.com/aczwink/OpenPrivateCloud/main/installation/controller_update.sh
+chmod +x controller_update.sh
+./controller_update.sh

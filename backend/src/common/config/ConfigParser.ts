@@ -55,12 +55,17 @@ export class ConfigParser
     }
     
     //Public methods
-    public async Parse(hostId: number, filePath: string)
+    public async Parse(hostId: number, filePath: string): Promise<ConfigEntry[]>
     {
+        const rfsm = GlobalInjector.Resolve(RemoteFileSystemManager);
+        const stat = await rfsm.QueryStatus(hostId, filePath);
+        if(stat.isSymbolicLink())
+            return this.Parse(hostId, await rfsm.ReadLink(hostId, filePath));
+
         const entries: ConfigEntry[] = [];
         this.entriesStack.push(entries);
 
-        const data = await GlobalInjector.Resolve(RemoteFileSystemManager).ReadTextFile(hostId, filePath); //const data = await fs.promises.readFile(filePath, "utf-8");
+        const data = await rfsm.ReadTextFile(hostId, filePath);
         const lines = data.split("\n");
 
         for (const line of lines)
@@ -73,6 +78,16 @@ export class ConfigParser
     }
 
     //Protected methods
+    protected FileNameMatchesIncludeDir(fileName: string): boolean
+    {
+        return false;
+    }
+
+    protected ParseIncludeDir(line: string): string | undefined
+    {
+        return undefined;
+    }
+    
     protected ParseKeyValue(line: string): KeyValueEntry
     {
         const parts = line.split("=");
@@ -168,16 +183,4 @@ export class ConfigParser
 
         this.AddEntry({ type: "IncludeDir", path: dirPath, entries: subEntries});
     }
-
-    //TODO:
-    private FileNameMatchesIncludeDir(fileName: string): boolean
-    {
-        return false;
-    }
-
-    private ParseIncludeDir(line: string): string | undefined
-    {
-        return undefined;
-    }
-    //TODO:
 }

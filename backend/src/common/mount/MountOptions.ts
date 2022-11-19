@@ -76,7 +76,13 @@ interface UnknownTypeAndOptions extends FileSystemIndependentMountOptions
     fileSystemSpecificOptions: string[];
 }
 
-export type FileSystemTypeAndOptions = CIFSTypeAndOptions | UnknownTypeAndOptions;
+interface WebDAVTypeAndOptions extends FileSystemIndependentMountOptions
+{
+    type: "davfs";
+}
+
+export type FileSystemType = "cifs" | "davfs";
+export type FileSystemTypeAndOptions = CIFSTypeAndOptions | UnknownTypeAndOptions | WebDAVTypeAndOptions;
 
 export interface StaticFileSystemProperties
 {

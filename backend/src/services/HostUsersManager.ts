@@ -38,6 +38,23 @@ export class HostUsersManager
     }
 
     //Public methods
+    public async CreateHostServicePrinciple(hostId: number, name: string)
+    {
+        const linuxGroupName = "opc-sg-" + name;
+        await this.CreateHostGroup(hostId, linuxGroupName);
+
+        const linuxUserName = "opc-su-" + name;
+        await this.CreateHostUser(hostId, linuxUserName, linuxGroupName);
+
+        return this.ResolveHostServicePrinciple(hostId, name);
+    }
+
+    public async DeleteHostServicePrinciple(hostId: number, name: string)
+    {
+        await this.DeleteHostUser(hostId, "opc-su-" + name);
+        await this.DeleteHostGroup(hostId, "opc-sg-" + name);
+    }
+
     public MapGroupToLinuxGroupName(userGroupId: number)
     {
         return "opc-g" + userGroupId;
@@ -63,7 +80,7 @@ export class HostUsersManager
     public async RemoveGroupFromHost(hostId: number, userGroupId: number)
     {
         const linuxGroupName = this.MapGroupToLinuxGroupName(userGroupId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "groupdel", linuxGroupName], hostId);
+        await this.DeleteHostGroup(hostId, linuxGroupName);
 
         const members = await this.usersController.QueryMembersOfGroup(userGroupId);
         const userIds = await this.permissionsController.QueryAllUsersRequiredOnHost(hostId);
@@ -78,6 +95,19 @@ export class HostUsersManager
         const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["getent", "group", linuxGroupName], hostId);
         const parts = result.stdOut.split(":");
         return parseInt(parts[2]);
+    }
+
+    public async ResolveHostServicePrinciple(hostId: number, name: string)
+    {
+        const linuxGroupName = "opc-sg-" + name;
+        const linuxUserName = "opc-su-" + name;
+
+        return {
+            hostGroupId: await this.ResolveHostGroupId(hostId, linuxGroupName),
+            hostUserId: await this.ResolveHostUserId(hostId, linuxUserName),
+            linuxGroupName: linuxGroupName,
+            linuxUserName: linuxUserName
+        };
     }
 
     public async ResolveHostUserId(hostId: number, linuxUserName: string)
@@ -117,33 +147,46 @@ export class HostUsersManager
 
     public async SyncSambaUserToHost(hostId: number, userId: number)
     {
-        const linuxUserName = this.MapUserToLinuxUserName(userId);
-        const sambaUsers = await this.QuerySambaUsers(hostId);
-
-        const user = sambaUsers.find(x => x.unixUserName === linuxUserName);
-        if(user === undefined)
+        const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
+        if(!exists)
         {
             const privateData = await this.usersController.QueryPrivateData(userId);
-            await this.AddSambaUser(hostId, linuxUserName, privateData!.sambaPW);
+            await this.AddSambaUser(hostId, this.MapUserToLinuxUserName(userId), privateData!.sambaPW);
         }
     }
 
     /**
      * @returns The host user id
      */
-     public async SyncUserToHost(hostId: number, userId: number)
-     {
-         const linuxUserName = this.MapUserToLinuxUserName(userId);
-         const uid = await this.TryResolveHostUserId(hostId, linuxUserName);
-         if(uid === undefined)
-         {
-             await this.CreateHostUser(hostId, linuxUserName);
-             return await this.ResolveHostUserId(hostId, linuxUserName);
-         }
-         return uid;
-     }
+    public async SyncUserToHost(hostId: number, userId: number)
+    {
+        const linuxUserName = this.MapUserToLinuxUserName(userId);
+        const uid = await this.TryResolveHostUserId(hostId, linuxUserName);
+        if(uid === undefined)
+        {
+            await this.CreateHostUser(hostId, linuxUserName, "nogroup");
+            return await this.ResolveHostUserId(hostId, linuxUserName);
+        }
+        return uid;
+    }
+    
+    public async UpdateSambaPasswordOnAllHosts(userId: number, newPw: string)
+    {
+        const hostIds = await this.hostsController.RequestHostIds();
+        for (const hostId of hostIds)
+        {
+            const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
+            if(exists)
+            {
+                await this.AddSambaUser(hostId, this.MapUserToLinuxUserName(userId), newPw);
+            }
+        }
+    }
 
     //Private methods
+    /**
+     * If the user already exists it is basically "overwritten", i.e. only the password is changed
+     */
     private async AddSambaUser(hostId: number, userName: string, password: string)
     {
         const host = await this.hostsController.RequestHostCredentials(hostId);
@@ -172,16 +215,26 @@ export class HostUsersManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "groupadd", linuxGroupName], hostId);
     }
 
-    private async CreateHostUser(hostId: number, linuxUserName: string)
+    private async CreateHostUser(hostId: number, linuxUserName: string, primaryLinuxGroupName: string)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "useradd", "-M", "-g", "nogroup", linuxUserName], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "useradd", "-M", "-g", primaryLinuxGroupName, linuxUserName], hostId);
+    }
+
+    private async DeleteHostGroup(hostId: number, linuxGroupName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "groupdel", linuxGroupName], hostId);
+    }
+
+    private async DeleteHostUser(hostId: number, linuxUserName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "userdel", linuxUserName], hostId);
     }
 
     private async DeleteUserFromHost(hostId: number, userId: number)
     {
         const linuxUserName = this.MapUserToLinuxUserName(userId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-x", linuxUserName], hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "userdel", linuxUserName], hostId);
+        await this.DeleteHostUser(hostId, linuxUserName);
     }
 
     private async DeleteUserFromHostIfNotUsed(hostId: number, userId: number)
@@ -189,6 +242,14 @@ export class HostUsersManager
         const isRequired = await this.permissionsController.IsUserRequiredOnHost(hostId, userId);
         if(!isRequired)
             await this.DeleteUserFromHost(hostId, userId);
+    }
+
+    private async DoesSambaUserExistOnHost(hostId: number, userId: number)
+    {
+        const sambaUsers = await this.QuerySambaUsers(hostId);
+        const linuxUserName = this.MapUserToLinuxUserName(userId);
+        const user = sambaUsers.find(x => x.unixUserName === linuxUserName);
+        return user !== undefined;
     }
 
     private async QuerySambaUsers(hostId: number)

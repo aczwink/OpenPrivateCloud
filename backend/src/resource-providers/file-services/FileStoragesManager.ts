@@ -67,6 +67,11 @@ export class FileStoragesManager
         return path.join(instancePath, "snapshots");
     }
 
+    public MapToSMBShareName(fullInstanceName: string)
+    {
+        return fullInstanceName.substring(1).ReplaceAll("/", "_");
+    }
+
     public async QuerySMBConfig(hostId: number, fullInstanceName: string)
     {
         const shareName = this.MapToSMBShareName(fullInstanceName);
@@ -115,11 +120,5 @@ export class FileStoragesManager
             shareName: this.MapToSMBShareName(fullInstanceName),
             sharePath: this.GetDataPath(storage!.path, fullInstanceName)
         });
-    }
-
-    //Private methods
-    private MapToSMBShareName(fullInstanceName: string)
-    {
-        return fullInstanceName.substring(1).ReplaceAll("/", "_");
     }
 }

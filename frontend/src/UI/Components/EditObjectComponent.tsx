@@ -19,7 +19,7 @@
 import { Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterState } from "acfrontend";
 import { Dictionary, OpenAPI } from "acts-util-core";
 import { ResponseData } from "../../../dist/api";
-import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
+import { ExtractDataFromResponseOrShowErrorMessageOnError, ShowErrorMessageOnErrorFromResponse } from "../ResponseHandler";
 import { ReplaceRouteParams } from "../Shared";
 import { ObjectEditorComponent } from "./ObjectEditorComponent";
 
@@ -29,7 +29,7 @@ interface ObjectInput<ObjectType>
     postUpdateUrl: string;
     requestObject: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType>>;
     schema: OpenAPI.ObjectSchema;
-    updateResource: (routeParams: Dictionary<string>, object: any) => Promise<void>;
+    updateResource: (routeParams: Dictionary<string>, object: any) => Promise<ResponseData<number, number, void>>;
 }
 
 @Injectable
@@ -51,7 +51,7 @@ export class EditObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         return <fragment>
             <h1>{this.heading}</h1>
             <form onsubmit={this.OnSave.bind(this)}>
-                <ObjectEditorComponent object={this.data} schema={this.input.schema} />
+                <ObjectEditorComponent object={this.data} schema={this.input.schema} onObjectUpdated={this.OnObjectUpdated.bind(this)} />
                 <button className="btn btn-primary" type="submit">Save</button>
             </form>
         </fragment>;
@@ -71,11 +71,17 @@ export class EditObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         this.heading = this.input.formTitle(this.data);
     }
 
+    private OnObjectUpdated(newValue: ObjectType)
+    {
+        this.data = newValue;
+    }
+
     private async OnSave(event: Event)
     {
         event.preventDefault();
 
-        await this.input.updateResource(this.routerState.routeParams, this.data);
+        const response = await this.input.updateResource(this.routerState.routeParams, this.data);
+        ShowErrorMessageOnErrorFromResponse(response);
 
         const updateUrl = ReplaceRouteParams(this.input.postUpdateUrl, this.routerState.routeParams)
         this.router.RouteTo(updateUrl);

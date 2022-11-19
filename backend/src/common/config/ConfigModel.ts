@@ -113,12 +113,7 @@ export class ConfigModel
         const entry = section[propertyName];
         if(entry === undefined)
         {
-            const insertPos = this.sectionInsertPositions[sectionName]!;
-            if(insertPos === undefined)
-            {
-                console.log("skipping", sectionName, propertyName, value);
-                return;
-            }
+            const insertPos = this.FindBestInsertPos(sectionName);
 
             const newEntry: KeyValueEntry = {
                 type: "KeyValue",
@@ -139,18 +134,13 @@ export class ConfigModel
 
     //Private variables
     private sections: Dictionary<Section>;
-    private sectionInsertPositions: Dictionary<SectionInsertPosition>;
+    private sectionInsertPositions: Dictionary<SectionInsertPosition[]>;
     private newSectionInsertPos: SectionInsertPosition;
     private sectionRanges: Dictionary<SectionRange[]>;
 
     //Private methods
     private EndSection(sectionName: string, before: ConfigEntry | undefined, entries: ConfigEntry[], from: ConfigEntry, to: ConfigEntry)
     {
-        if(sectionName in this.sectionInsertPositions)
-        {
-            throw new Error("Duplicate insert pos for " + sectionName);
-        }
-
         let beforeNext = undefined;
         if(before !== undefined)
         {
@@ -162,10 +152,15 @@ export class ConfigModel
             beforeNext = entries[index+1];
         }
 
-        this.sectionInsertPositions[sectionName] = {
+        const insertPos: SectionInsertPosition = {
             entries,
             before
         };
+
+        if(sectionName in this.sectionInsertPositions)
+            this.sectionInsertPositions[sectionName]!.push(insertPos);
+        else
+            this.sectionInsertPositions[sectionName] = [insertPos];
 
         this.newSectionInsertPos = {
             entries,
@@ -180,6 +175,12 @@ export class ConfigModel
             to,
             source: entries
         });
+    }
+
+    private FindBestInsertPos(sectionName: string)
+    {
+        const positions = this.sectionInsertPositions[sectionName]!;
+        return positions.Values().OrderByDescending(x => x.entries.length).First();
     }
     
     private FindKeyValueEntries(entries: ConfigEntry[])
@@ -261,7 +262,7 @@ export class ConfigModel
 
         const section = {};
         this.sections[sectionName] = section;
-        this.sectionInsertPositions[sectionName] = pos;
+        this.sectionInsertPositions[sectionName] = [pos];
         return section;
     }
 }

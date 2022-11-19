@@ -21,6 +21,7 @@ import { BaseResourceProperties } from "../ResourceProvider";
 export interface OpenVPNGatewayProperties extends BaseResourceProperties
 {
     type: "openvpn-gateway";
+    dnsServerAddress: string;
     domainName: string;
     keySize: 2048 | 4096;
 }

@@ -16,20 +16,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
-import { ModulesManager } from "./ModulesManager";
+import { TimeSchedule } from "../common/TimeSchedule";
+import { TaskScheduler } from "./TaskScheduler";
 
- 
 @Injectable
-export class HostHealthManager
+export class TaskSchedulingManager
 {
-    constructor(private modulesManager: ModulesManager)
+    constructor(private taskScheduler: TaskScheduler)
     {
+        this.scheduled = {};
     }
 
     //Public methods
-    public async EnsureHostIsConfiguredAppropriatly(hostId: number)
+    public ScheduleForInstance(fullInstanceName: string, lastScheduleTime: Date, schedule: TimeSchedule, task: () => void)
     {
-        await this.modulesManager.EnsureModuleIsInstalled(hostId, "core");
+        const oldTaskId = this.scheduled[fullInstanceName];
+        if(oldTaskId !== undefined)
+            this.taskScheduler.Stop(oldTaskId);
+        this.scheduled[fullInstanceName] = this.taskScheduler.ScheduleWithOverdueProtection(lastScheduleTime, schedule, task);
     }
+
+    //Private variables
+    private scheduled: Dictionary<number>;
 }

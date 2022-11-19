@@ -24,8 +24,16 @@ import { APIRegistry } from "acts-util-apilib";
 import { HTTPAuthHandler } from "./HTTPAuthHandler";
 import { DBConnectionsManager } from "./data-access/DBConnectionsManager";
 import { APISchemaService } from "./services/APISchemaService";
+import { HostAvailabilityManager } from "./services/HostAvailabilityManager";
+import { InstanceHealthManager } from "./services/InstanceHealthManager";
 
 const port = 8078;
+
+async function EnableHealthManagement()
+{
+    await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
+    GlobalInjector.Resolve(InstanceHealthManager).ScheduleInstanceChecks();
+}
 
 async function SetupServer()
 {
@@ -56,6 +64,7 @@ async function SetupServer()
 
     server.listen(port, () => {
         console.log("Backend is running...");
+        EnableHealthManagement();
     });
 
     process.on('SIGINT', function()

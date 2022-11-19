@@ -43,6 +43,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     {
         return [
             {
+                healthCheckSchedule: null,
                 fileSystemType: "btrfs",
                 schemaName: "FileStorageProperties"
             }
@@ -50,6 +51,14 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     }
 
     //Public methods
+    public async CheckInstanceAvailability(hostId: number, fullInstanceName: string): Promise<void>
+    {
+    }
+
+    public async CheckInstanceHealth(hostId: number, fullInstanceName: string): Promise<void>
+    {
+    }
+    
     public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
     {
         await this.fileStoragesManager.DeleteSMBConfigIfExists(hostId, fullInstanceName);

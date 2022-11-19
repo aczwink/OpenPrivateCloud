@@ -19,6 +19,7 @@
 import { Component, FormField, Injectable, JSX_CreateElement, ProgressSpinner, RouterState, Switch } from "acfrontend";
 import { UpdateInfoDto } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
+import { ExtractDataFromResponseOrShowErrorMessageOnError, ShowErrorMessageOnErrorFromResponse } from "../../UI/ResponseHandler";
 
 @Injectable
 export class HostUpdateComponent extends Component
@@ -60,10 +61,9 @@ export class HostUpdateComponent extends Component
     private async QueryData()
     {
         const response = await this.apiService.hosts._any_.update.get(this.hostName);
-        if(response.statusCode !== 200)
-            throw new Error("Not implemented");
-
-        this.data = response.data;
+        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
+            this.data = result.value;
     }
 
     //Event handlers
@@ -87,7 +87,8 @@ export class HostUpdateComponent extends Component
     private async OnUpdateClicked()
     {
         this.data = null;
-        await this.apiService.hosts._any_.update.post(this.hostName);
+        const response = await this.apiService.hosts._any_.update.post(this.hostName);
+        ShowErrorMessageOnErrorFromResponse(response);
         this.QueryData();
     }
 }

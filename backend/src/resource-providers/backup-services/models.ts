@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { TimeSchedule } from "../../common/TimeSchedule";
+
 export interface BackupVaultFileStorageConfig
 {
     /**
@@ -30,13 +32,46 @@ export interface BackupVaultFileStorageConfig
     createSnapshotBeforeBackup: boolean;
 }
 
+export interface BackupVaultDatabaseConfig
+{
+    /**
+     * @title MariaDB Instance
+     * @format instance-same-host[database-services/mariadb]
+     */
+     fullInstanceName: string;
+     databaseName: string;
+}
+
 export interface BackupVaultSourcesConfig
 {
     fileStorages: BackupVaultFileStorageConfig[];
+    databases: BackupVaultDatabaseConfig[];
 }
 
-export interface BackupVaultTargetConfig
+interface BackupVaultStorageDeviceTargetConfig
 {
     type: "storage-device";
     storageDevicePath: string;
 }
+
+export interface BackupVaultWebDAVTargetConfig
+{
+    type: "webdav";
+    serverUrl: string;
+    userName: string;
+    password: string;
+}
+
+export type BackupVaultTargetConfig = BackupVaultStorageDeviceTargetConfig | BackupVaultWebDAVTargetConfig;
+
+interface BackupVaultManualTrigger
+{
+    type: "manual";
+}
+interface BackupVaultAutomaticTrigger
+{
+    type: "automatic";
+    schedule: TimeSchedule;
+}
+
+export type BackupVaultTrigger = BackupVaultManualTrigger | BackupVaultAutomaticTrigger;

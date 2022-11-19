@@ -116,7 +116,6 @@ export class ViewModelsManager
                     component: <ObjectListComponent
                         idBoundActions={this.FindActions(viewModel.child)}
                         baseUrl={baseRoute}
-                        customRouting={viewModel.customRouting}
                         elementSchema={mappedSchema}
                         extractId={viewModel.extractId}
                         hasChild={true}

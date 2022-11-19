@@ -17,34 +17,62 @@
  * */
 
 
-import { FileStorageProperties, InstanceDto } from "../../dist/api";
-import { CollectionViewModel, RoutingViewModel } from "../UI/ViewModel";
-import { instanceTypesRouting } from "./instancetypes";
-
-const instancesViewModel: CollectionViewModel<InstanceDto, {}, FileStorageProperties> = {
-    actions: [
-        {
-            type: "create",
-            createResource: (service, _ids, props) => service.instances.post(props),
-            schemaName: "AnyResourceProperties"
-        }
-    ],
-    customRouting: instanceFullName => "/instances" + instanceFullName,
-    child: instanceTypesRouting,
-    displayName: "Instances",
-    extractId: instance => instance.fullName,
-    idKey: "instanceFullName",
-    requestObjects: async service => service.instances.get(),
-    schemaName: "InstanceDto",
-    type: "collection"
-};
+import { RoutingViewModel } from "../UI/ViewModel";
+import { InstancesListComponent } from "../Views/instances/InstancesListComponent";
+import { resourceProviders } from "openprivatecloud-common/resourceProviders";
+import { backupVaultViewModel } from "./backup-services/backup-vault";
+import { virtualMachineViewModel } from "./compute-services/virtual-machine";
+import { mariadbViewModel } from "./database-services/mariadb";
+import { fileStorageViewModel } from "./file-services/file-storage";
+import { openVPNGatewayViewModel } from "./network-services.ts/openvpn-gateway";
+import { nextcloudViewModel } from "./web-services/nextcloud";
+import { AddInstanceComponent } from "../Views/instances/AddInstanceComponent";
+import { jdownloaderViewModel } from "./web-services/jdownloader";
 
 const root: RoutingViewModel = {
     type: "routing",
     entries: [
         {
             key: "instances",
-            viewModel: instancesViewModel,
+            viewModel: {
+                type: "component",
+                component: InstancesListComponent
+            },
+        },
+        {
+            key: "instances/add",
+            viewModel: {
+                type: "component",
+                component: AddInstanceComponent,
+            }
+        },
+        {
+            key: `instances/${resourceProviders.backupServices.name}/${resourceProviders.backupServices.backupVaultResourceType.name}/:instanceName`,
+            viewModel: backupVaultViewModel
+        },
+        {
+            key: `instances/${resourceProviders.computeServices.name}/${resourceProviders.computeServices.virtualMachineResourceType.name}/:instanceName`,
+            viewModel: virtualMachineViewModel
+        },
+        {
+            key: `instances/${resourceProviders.databaseServices.name}/${resourceProviders.databaseServices.mariadbResourceType.name}/:instanceName`,
+            viewModel: mariadbViewModel
+        },
+        {
+            key: `instances/${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:instanceName`,
+            viewModel: fileStorageViewModel
+        },
+        {
+            key: `instances/${resourceProviders.networkServices.name}/${resourceProviders.networkServices.openVPNGatewayResourceType.name}/:instanceName`,
+            viewModel: openVPNGatewayViewModel,
+        },
+        {
+            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.jdownloaderResourceType.name}/:instanceName`,
+            viewModel: jdownloaderViewModel,
+        },
+        {
+            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.nextcloudResourceType.name}/:instanceName`,
+            viewModel: nextcloudViewModel,
         }
     ]
 }

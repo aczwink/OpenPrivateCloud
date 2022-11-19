@@ -16,9 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { FileDownloadService, RootInjector } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common";
-import { OpenVPNGatewayClient, OpenVPNGatewayInfo } from "../../../dist/api";
+import { OpenVPNGatewayClient, OpenVPNGatewayInfo, OpenVPNServerConfig } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 
 type InstanceId = { instanceName: string };
@@ -37,6 +39,21 @@ const overviewViewModel: ObjectViewModel<OpenVPNGatewayInfo, InstanceId>  = {
     schemaName: "OpenVPNGatewayInfo",
 };
 
+const configViewModel: ObjectViewModel<OpenVPNServerConfig, InstanceId> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "OpenVPNServerConfig",
+            requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
+            updateResource: (service, ids, props) => service.resourceProviders.networkservices.openvpngateway._any_.config.put(ids.instanceName, props),
+        }
+    ],
+    formTitle: _ => "Server configuration",
+    requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
+    schemaName: "OpenVPNServerConfig"
+};
+
 const clientsViewModel: ListViewModel<OpenVPNGatewayClient, InstanceId> = {
     type: "list",
     actions: [
@@ -47,9 +64,22 @@ const clientsViewModel: ListViewModel<OpenVPNGatewayClient, InstanceId> = {
     ],
     boundActions: [
         {
+            type: "custom",
+            action: async (service, ids, client) => {
+                const response = await service.resourceProviders.networkservices.openvpngateway._any_.clientconfig.get(ids.instanceName, { clientName: client.name });
+                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(result.ok)
+                {
+                    const fds = RootInjector.Resolve(FileDownloadService);
+                    fds.DownloadBlobAsFile(new Blob([result.value]), "client.ovpn");
+                }
+            },
+            matIcon: "download"
+        },
+        {
             type: "delete",
             deleteResource: (service, ids, client) => service.resourceProviders.networkservices.openvpngateway._any_.clients.delete(ids.instanceName, client)
-        }
+        },
     ],
     displayName: "Clients",
     requestObjects: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.clients.get(ids.instanceName),
@@ -68,6 +98,11 @@ export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
             key: "overview",
             displayName: "Overview",
             child: overviewViewModel,
+        },
+        {
+            key: "config",
+            displayName: "Config",
+            child: configViewModel,
         },
         {
             key: "clients",

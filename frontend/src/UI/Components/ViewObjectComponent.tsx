@@ -67,12 +67,33 @@ export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<Objec
     private heading: string;
 
     //Private methods
+    private RenderOneOf(value: any, oneOfSchema: OpenAPI.OneOfSchema, tables: SingleRenderValue[]): RenderValue
+    {
+        if(oneOfSchema.discriminator === undefined)
+            throw new Error("NOT IMPLEMENTED. NEEED A DISCRIMINATOR");
+        const discriminatorPropName = oneOfSchema.discriminator.propertyName;
+        const selectedDiscriminator = value[discriminatorPropName];
+
+        function ExtractKey(schema: OpenAPI.ObjectSchema)
+        {
+            const x = schema.properties[discriminatorPropName] as OpenAPI.StringSchema;
+            return x.enum![0];
+        }
+        
+        const selectedSchema = oneOfSchema.oneOf.Values()
+            .Map(x => this.apiSchemaService.ResolveSchemaOrReference(x) as OpenAPI.ObjectSchema)
+            .Filter(x => ExtractKey(x) === selectedDiscriminator)
+            .First();
+
+        return this.RenderValue(value, selectedSchema, tables, "");
+    }
+
     private RenderValue(value: any, schema: OpenAPI.Schema | OpenAPI.Reference, tables: SingleRenderValue[], fallback: string): RenderValue
     {
         if("anyOf" in schema)
             throw new Error("anyof not implemented");
         if("oneOf" in schema)
-            throw new Error("oneof not implemented");
+            return this.RenderOneOf(value, schema, tables);
         if("$ref" in schema)
             return this.RenderValue(value, this.apiSchemaService.ResolveReference(schema), tables, schema.title || fallback);
 

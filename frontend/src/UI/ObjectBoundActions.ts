@@ -19,10 +19,17 @@
 import { ResponseData } from "../../dist/api";
 import { APIService } from "../Services/APIService";
 
-interface DeleteAction<ObjectType, IdType>
+interface CustomAction<ObjectType, IdType>
+{
+    type: "custom";
+    action: (service: APIService, ids: IdType, object: ObjectType) => Promise<void>;
+    matIcon: string;
+}
+
+export interface DeleteAction<ObjectType, IdType>
 {
     type: "delete";
     deleteResource: (service: APIService, ids: IdType, object: ObjectType) => Promise<ResponseData<number, number, void>>;
 }
 
-export type ObjectBoundAction<ObjectType, IdType> = DeleteAction<ObjectType, IdType>;
+export type ObjectBoundAction<ObjectType, IdType> = CustomAction<ObjectType, IdType> | DeleteAction<ObjectType, IdType>;

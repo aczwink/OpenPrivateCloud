@@ -22,8 +22,18 @@ export const c_backupVaultResourceTypeName = "backup-vault";
 export const c_computeServicesResourceProviderName = "compute-services";
 export const c_virtualMachineResourceTypeName = "virtual-machine";
 
+export const c_databaseServicesResourceProviderName = "database-services";
+export const c_mariadbResourceTypeName = "mariadb";
+
 export const c_fileServicesResourceProviderName = "file-services";
 export const c_fileStorageResourceTypeName = "file-storage";
 
 export const c_networkServicesResourceProviderName = "network-services";
 export const c_openVPNGatewayResourceTypeName = "openvpn-gateway";
+
+export const c_webServicesResourceProviderName = "web-services";
+export const c_jdownloaderResourceTypeName = "jdownloader";
+export const c_letsencryptCertResourceTypeName = "letsencrypt-cert";
+export const c_nextcloudResourceTypeName = "nextcloud";
+export const c_nodeAppServiceResourceTypeName = "node-app-service";
+export const c_staticWebsiteResourceTypeName = "static-website";

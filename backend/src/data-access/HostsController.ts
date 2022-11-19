@@ -98,6 +98,14 @@ export class HostsController
         return conn.Select<Host>("SELECT hostName FROM hosts");
     }
 
+    public async RequestHostIds()
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select("SELECT id FROM hosts");
+
+        return rows.map(x => x.id as number);
+    }
+
     public async RequestHostStorages(hostId: number)
     {
         const query = `

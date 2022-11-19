@@ -16,10 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import "./api/ClusterConfigAPIController";
+import "./api/HealthAPIController";
 import "./api/HostsAPIController";
 import "./api/HostStorageDevicesAPIController";
 import "./api/HostStoragesAPIController";
 import "./api/InstancesAPIController";
+import "./api/ProcessesAPIController";
 import "./api/ResourceProviderAPIController";
 import "./api/SessionsAPIController";
 import "./api/UserGroupsAPIController";
@@ -30,6 +33,7 @@ import "./resource-providers/backup-services/BackupVaultAPIController";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/file-services/FileStorageAPIController";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";
+import "./resource-providers/web-services/JdownloaderAPIController";
 
 async function LoadAPIControllers()
 {

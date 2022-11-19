@@ -16,19 +16,40 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { RoutingViewModel } from "../UI/ViewModel";
+import { MultiPageViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ChangeUserPasswordComponent } from "../Views/user-settings/ChangeUserPasswordComponent";
+import { UserSecretComponent } from "../Views/user-settings/UserSecretComponent";
 
+const userSettingsViewModel: MultiPageViewModel<{}> = {
+    type: "multiPage",
+    actions: [],
+    entries: [
+        {
+            key: "secret",
+            child: {
+                type: "component",
+                component: UserSecretComponent,
+            },
+            displayName: "Secret"
+        },
+        {
+            key: "pw",
+            child: {
+                type: "component",
+                component: ChangeUserPasswordComponent
+            },
+            displayName: "Change password"
+        }
+    ],
+    formTitle: _ => "User settings",
+};
  
 const root: RoutingViewModel = {
     type: "routing",
     entries: [
         {
             key: "usersettings",
-            viewModel: {
-                type: "component",
-                component: ChangeUserPasswordComponent
-            },
+            viewModel: userSettingsViewModel,
         }
     ]
 }

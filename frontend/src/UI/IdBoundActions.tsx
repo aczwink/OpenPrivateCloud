@@ -50,7 +50,7 @@ interface ManagedEditResourceAction<IdType, ObjectType>
     type: "edit";
     propertiesSchemaName: string;
     requestObject: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType>>;
-    updateResource: (service: APIService, ids: IdType, properties: ObjectType) => Promise<void>;
+    updateResource: (service: APIService, ids: IdType, properties: ObjectType) => Promise<ResponseData<number, number, void>>;
 }
 
 export type IdBoundResourceAction<IdType, PropertiesType, ServiceType> =

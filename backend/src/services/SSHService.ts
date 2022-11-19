@@ -20,7 +20,7 @@ import ssh2 from "ssh2";
 import { Injectable } from "acts-util-node";
 
 export type Command = string[] | {
-    type: "pipe",
+    type: "redirect-stdout" | "pipe",
     sudo?: boolean;
     source: Command;
     target: Command;
@@ -44,6 +44,7 @@ export interface SSHConnection
     ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
     ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
+    ReadLink(remotePath: string): Promise<string>;
     ReadTextFile(remotePath: string): Promise<string>;
     RemoveDirectory(remotePath: string): Promise<void>;
     SpawnShell(): Promise<ssh2.ClientChannel>;
@@ -201,6 +202,18 @@ class SSHConnectionImpl implements SSHConnection
         });
     }
 
+    public ReadLink(remotePath: string): Promise<string>
+    {
+        return new Promise<string>( (resolve, reject) => {
+            this.sftp.readlink(remotePath, (err, target) => {
+                if(err)
+                    reject(err);
+                else
+                    resolve(target);
+            });
+        });
+    }
+
     public ReadTextFile(remotePath: string): Promise<string>
     {
         return new Promise<string>( (resolve, reject) => {
@@ -276,7 +289,18 @@ class SSHConnectionImpl implements SSHConnection
             };
         }
 
-        const nested = this.CommandToString(command.source).commandLine + " | " + this.CommandToString(command.target).commandLine;
+        let op;
+        switch(command.type)
+        {
+            case "pipe":
+                op = "|";
+                break;
+            case "redirect-stdout":
+                op = ">";
+                break;
+        }
+
+        const nested = this.CommandToString(command.source).commandLine + " " + op + " " + this.CommandToString(command.target).commandLine;
 
         return {
             commandLine: (command.sudo === true ? "sudo --stdin sh -c '" + nested + "'" : nested),
@@ -294,6 +318,7 @@ export class SSHService
         const conn = new ssh2.Client();
 
         await new Promise<void>( (resolve, reject) => {
+            conn.on("error", reject);
             conn.on("ready", resolve).connect({
                 host,
                 username: userName,

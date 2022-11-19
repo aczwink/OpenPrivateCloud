@@ -32,6 +32,7 @@ function ExtractDataOrErrorFromResponse<ObjectType>(response: ResponseData<numbe
         case 204:
             return { ok: true, value: undefined as any };
         case 409:
+        case 500:
             return { ok: false, error: response.rawBody };
         default:
             alert("unhandled status code: " + response.statusCode);

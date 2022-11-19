@@ -17,7 +17,7 @@
  * */
 import {App, RootInjector, Routes} from "acfrontend";
 import { AuthGuard } from "./AuthGuard";
-import { DashboardComponent } from "./Dashboard/DashboardComponent";
+import { DashboardComponent } from "./Views/DashboardComponent";
 import { LoginComponent } from "./LoginComponent";
 import { PageNotFoundComponent } from "./PageNotFoundComponent";
 import { RootComponent } from "./RootComponent";
@@ -41,7 +41,7 @@ async function LoadViewModels()
     const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
 
     const viewModelNames = [
-        "hosts", "instances", "usersandgroups", "usersettings"
+        "activitymonitor", "hosts", "instances", "settings", "usersandgroups", "usersettings"
     ];
 
     for (const viewModelName of viewModelNames)

@@ -151,11 +151,13 @@ class FileStorageAPIController
         const host = await this.hostsController.RequestHostCredentials(data.hostId);
         const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
         const userName = this.hostUsersManager.MapUserToLinuxUserName(userId);
+
+        const shareName = this.fileStoragesManager.MapToSMBShareName(data.fullInstanceName);
         
         const result: SMBConnectionInfo = {
             fstab: `
 for /etc/fstab:
-//${host!.hostName}/${instanceName} /<some/local/path> cifs noauto,user,_netdev,credentials=/home/<your user>/.smbcredentials/${host!.hostName} 0 0
+//${host!.hostName}/${shareName} /<some/local/path> cifs noauto,user,_netdev,credentials=/home/<your user>/.smbcredentials/${host!.hostName} 0 0
 
 for /home/<your user>/.smbcredentials/${host!.hostName}:
 username=${userName}

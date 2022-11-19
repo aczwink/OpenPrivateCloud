@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-export type ModuleName = "core" | "libvirt" | "openvpn" | "samba";
+export type ModuleName = "apache" | "core" | "java" | "letsencrypt" | "libvirt" | "mariadb" | "nextcloud-dependencies" | "openvpn" | "samba" | "webdav";
 
 export interface DistroPackageManager
 {

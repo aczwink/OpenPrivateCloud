@@ -64,9 +64,7 @@ const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId>  = {
             type: "edit",
             propertiesSchemaName: "SMBConfig",
             requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.smbcfg.get(ids.instanceName),
-            updateResource: async (service, ids, cfg) => {
-                await service.resourceProviders.fileservices.filestorage._any_.smbcfg.put(ids.instanceName, cfg);
-            }
+            updateResource: (service, ids, cfg) => service.resourceProviders.fileservices.filestorage._any_.smbcfg.put(ids.instanceName, cfg)
         }
     ],
     formTitle: _ => "SMB config",

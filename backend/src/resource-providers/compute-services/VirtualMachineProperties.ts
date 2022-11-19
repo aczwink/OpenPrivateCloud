@@ -22,4 +22,9 @@ export interface VirtualMachineProperties extends BaseResourceProperties
 {
     type: "virtual-machine";
     os: "ubuntu-latest" | "ubuntu-server-latest";
+    /**
+     * @title Size of the OS Disk in GB
+     * @default 25
+     */
+    osDiskSize: number;
 }

@@ -52,6 +52,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
     {
         return [
             {
+                healthCheckSchedule: null,
                 fileSystemType: "ext4",
                 schemaName: "VirtualMachineProperties"
             }
@@ -59,6 +60,14 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
     }
 
     //Public methods
+    public async CheckInstanceAvailability(hostId: number, fullInstanceName: string): Promise<void>
+    {
+    }
+
+    public async CheckInstanceHealth(hostId: number, fullInstanceName: string): Promise<void>
+    {
+    }
+    
     public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
     {
         const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
@@ -79,7 +88,6 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
 
     public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
     {
-        throw new Error("NOT IMPLEMENTED");
     }
 
     public async ProvideResource(instanceProperties: VirtualMachineProperties, context: DeploymentContext): Promise<DeploymentResult>
@@ -92,7 +100,9 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
         const isoPath = await this.osImageDownloader.DownloadImage(osInfo, context.hostId, vmImagesDirPath);
 
         const vmDir = await this.CreateVMDir(context);
+        console.log(vmDir);
         const osDiskPath = path.join(vmDir, "os.qcow2");
+        console.log(osDiskPath);
 
         const cmd = [
             "virt-install",
@@ -103,7 +113,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
             //network
             "--network", "network=default",
             //disk
-            "--disk", "path=" + osDiskPath + ",format=qcow2,size=6", //TODO: size to 25
+            "--disk", "path=" + osDiskPath + ",format=qcow2,size=" + instanceProperties.osDiskSize,
             //image
             "--cdrom", isoPath,
             //cpu
@@ -111,7 +121,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
             //ram
             "--ram", "2048",
             //graphics
-            "--graphics", "none"
+            //"--graphics", "none"
         ];
 
         await this.remoteCommandExecutor.ExecuteCommand(cmd, context.hostId);

@@ -1,6 +1,10 @@
 module.exports = {
     mode: "production",
     target: "node",
+    
+    optimization: {
+        minimize: false //unfortunately mysqljs requires this
+    },
 
     entry: "./src/main.ts",
     output: {

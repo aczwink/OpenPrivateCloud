@@ -16,6 +16,20 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `cluster_configuration`
+--
+
+DROP TABLE IF EXISTS `cluster_configuration`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `cluster_configuration` (
+  `configKey` varchar(100) NOT NULL,
+  `value` text NOT NULL,
+  PRIMARY KEY (`configKey`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `hosts`
 --
 
@@ -27,6 +41,21 @@ CREATE TABLE `hosts` (
   `hostName` varchar(200) NOT NULL,
   `password` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `hosts_health`
+--
+
+DROP TABLE IF EXISTS `hosts_health`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `hosts_health` (
+  `hostId` int(10) unsigned NOT NULL,
+  `status` tinyint(3) unsigned NOT NULL,
+  `log` text NOT NULL,
+  PRIMARY KEY (`hostId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -82,6 +111,24 @@ CREATE TABLE `instances_configuration` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `instances_health`
+--
+
+DROP TABLE IF EXISTS `instances_health`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `instances_health` (
+  `instanceId` int(10) unsigned NOT NULL,
+  `status` tinyint(3) unsigned NOT NULL,
+  `availabilityLog` text NOT NULL,
+  `lastSuccessfulCheck` datetime NOT NULL,
+  `checkLog` text NOT NULL,
+  PRIMARY KEY (`instanceId`),
+  CONSTRAINT `instances_health_instanceId` FOREIGN KEY (`instanceId`) REFERENCES `instances` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `instances_logs`
 --
 
@@ -93,6 +140,8 @@ CREATE TABLE `instances_logs` (
   `instanceId` int(10) unsigned NOT NULL,
   `startTime` datetime NOT NULL,
   `endTime` datetime NOT NULL,
+  `title` text NOT NULL,
+  `status` tinyint(3) unsigned NOT NULL,
   `log` text NOT NULL,
   PRIMARY KEY (`logId`),
   KEY `instances_logs_instanceId` (`instanceId`),
@@ -175,4 +224,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-11-03 22:37:08
+-- Dump completed on 2022-11-19 15:48:36

@@ -22,14 +22,18 @@ import { BackupServicesResourceProvider } from "./resource-providers/backup-serv
 import { ComputeServicesResourceProvider } from "./resource-providers/compute-services/ComputeServicesResourceProvider";
 import { FileServicesResourceProvider } from "./resource-providers/file-services/FileServicesResourceProvider";
 import { NetworkServicesResourceProvider } from "./resource-providers/network-services/NetworkServicesResourceProvider";
+import { DatabaseServicesResourceProvider } from "./resource-providers/database-services/DatabaseServicesResourceProvider";
+import { WebServicesResourceProvider } from "./resource-providers/web-services/WebServicesResourceProvider";
 
 function RegisterResourceProviders()
 {
     const resourceProviders = [
         BackupServicesResourceProvider,
         ComputeServicesResourceProvider,
+        DatabaseServicesResourceProvider,
         FileServicesResourceProvider,
-        NetworkServicesResourceProvider
+        NetworkServicesResourceProvider,
+        WebServicesResourceProvider
     ];
 
     const rpm = GlobalInjector.Resolve(ResourceProviderManager);

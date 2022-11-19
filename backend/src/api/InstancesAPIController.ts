@@ -63,7 +63,7 @@ class InstancesAPIController
         if(hostId === undefined)
             return NotFound("host not found");
 
-        await this.resourceProviderManager.DeployInstance(instanceProperties, hostId, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
+        await this.resourceProviderManager.StartInstanceDeployment(instanceProperties, hostId, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
     }
 
     @Get()

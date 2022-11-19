@@ -21,7 +21,7 @@ import { Dictionary, OpenAPI } from "acts-util-core";
 import { ResponseData } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
 import { IdBoundResourceAction } from "../IdBoundActions";
-import { ObjectBoundAction } from "../ObjectBoundActions";
+import { DeleteAction, ObjectBoundAction } from "../ObjectBoundActions";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
 import { ReplaceRouteParams } from "../Shared";
 import { UnboundResourceAction } from "../UnboundActions";
@@ -30,7 +30,6 @@ import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
 interface ObjectListInput<ObjectType>
 {
     baseUrl: string;
-    customRouting?: (id: number | string) => string;
     elementSchema: OpenAPI.ObjectSchema;
     extractId: (object: any) => number | string;
     hasChild: boolean;
@@ -126,6 +125,9 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
     {
         switch(action.type)
         {
+            case "custom":
+                return <a role="button" onclick={() => action.action(this.apiService, this.routerState.routeParams, object)}><MatIcon>{action.matIcon}</MatIcon></a>;
+
             case "delete":
                 return <a className="link-danger" role="button" onclick={this.OnDelete.bind(this, action, object)}><MatIcon>delete_forever</MatIcon></a>;
         }
@@ -142,9 +144,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         if((idx === 0) && this.input.hasChild)
         {
             const id = this.ExtractId(obj);
-            const route = (this.input.customRouting === undefined)
-                ? this.ReplaceRouteParams(this.input.baseUrl + "/" + encodeURIComponent(id))
-                : this.input.customRouting(id);
+            const route = this.ReplaceRouteParams(this.input.baseUrl + "/" + encodeURIComponent(id));
             return <Anchor route={route}>{this.RenderObjectProperty(obj, key)}</Anchor>;
         }
         return this.RenderObjectProperty(obj, key);
@@ -177,7 +177,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
     }
 
     //Event handlers
-    private async OnDelete(action: ObjectBoundAction<any, any>, object: any)
+    private async OnDelete(action: DeleteAction<any, any>, object: any)
     {
         if(confirm("Are you sure that you want to delete this?"))
         {

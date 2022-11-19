@@ -16,12 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Component } from "acfrontend";
+import { BaseResourceProperties } from "../ResourceProvider";
 
-export class DashboardComponent extends Component
+export interface MariadbProperties extends BaseResourceProperties
 {
-    protected Render(): RenderValue
-    {
-        return "todo dashboard";
-    }
+    type: "mariadb";
 }

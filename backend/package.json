@@ -12,11 +12,14 @@
   "author": "Amir Czwink",
   "license": "AGPL-3.0",
   "dependencies": {
+    "@types/nodemailer": "^6.4.6",
     "acts-util-apilib": "*",
     "acts-util-core": "*",
     "acts-util-node": "*",
+    "nodemailer": "^6.8.0",
     "openprivatecloud-common": "*",
-    "ssh2": "^1.11.0"
+    "ssh2": "^1.11.0",
+    "xml-js": "^1.6.11"
   },
   "devDependencies": {
     "@types/node": "^18.6.3",

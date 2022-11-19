@@ -50,6 +50,19 @@ export class RemoteFileSystemManager
         return result;
     }
 
+    public async Exists(hostId: number, remotePath: string)
+    {
+        try
+        {
+            await this.QueryStatus(hostId, remotePath);
+        }
+        catch(_)
+        {
+            return false;
+        }
+        return true;
+    }
+
     public async ListDirectoryContents(hostId: number, dirPath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
@@ -70,6 +83,14 @@ export class RemoteFileSystemManager
         {
             conn.Release();
         }
+    }
+
+    public async ReadLink(hostId: number, filePath: string)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        const result = await conn.value.ReadLink(filePath);
+        conn.Release();
+        return result;
     }
 
     public async ReadTextFile(hostId: number, filePath: string)

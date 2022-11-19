@@ -16,21 +16,46 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
+import { Dictionary } from "acts-util-core";
+import { GlobalInjector, Injectable } from "acts-util-node";
+import { ErrorService } from "./ErrorService";
 
-export interface ProcessTracker
+enum Status
 {
+    Running = 0,
+    Finished = 1,
+    Failed = 2
+}
+
+interface ProcessTrackerReadOnly
+{
+    /**
+     * @format multi-line
+     */
     readonly fullText: string;
     readonly startTime: Date;
+    readonly status: Status;
+    readonly title: string;
+}
 
+interface ProcessTrackerReadOnlyWithId extends ProcessTrackerReadOnly
+{
+    readonly id: number;
+}
+
+export interface ProcessTracker extends ProcessTrackerReadOnly
+{
     Add(...text: string[]): void;
+    Fail(e: unknown): void;
+    Finish(): void;
 }
 
 class ProcessTrackerImpl implements ProcessTracker
 {
-    constructor()
+    constructor(private _title: string, private finalizer: () => void)
     {
         this._startTime = new Date;
+        this._status = Status.Running;
         this.entries = [];
     }
 
@@ -45,6 +70,16 @@ class ProcessTrackerImpl implements ProcessTracker
         return this._startTime;
     }
 
+    public get status(): Status
+    {
+        return this._status;
+    }
+
+    public get title(): string
+    {
+        return this._title;
+    }
+
     //Public methods
     public Add(...text: string[])
     {
@@ -54,17 +89,85 @@ class ProcessTrackerImpl implements ProcessTracker
         });
     }
 
+    public Fail(e: unknown): void
+    {
+        const data = GlobalInjector.Resolve(ErrorService).ExtractData(e);
+        this.Add(...data);
+        this._status = Status.Failed;
+        this.finalizer();
+    }
+
+    public Finish(): void
+    {
+        this._status = Status.Finished;
+        this.finalizer();
+    }
+
     //Private variables
     private _startTime: Date;
+    private _status: Status;
     private entries: { timeStamp: Date; text: string; }[];
 }
 
 @Injectable
 export class ProcessTrackerManager
 {
-    //Public methods
-    public Create(): ProcessTracker
+    constructor()
     {
-        return new ProcessTrackerImpl;
+        this.trackerCounter = 0;
+        this.trackers = {};
+    }
+
+    //Properties
+    public get processes()
+    {
+        return this.trackers.Entries().Map(kv => {
+            const x = kv.value!;
+            const res: ProcessTrackerReadOnlyWithId = {
+                id: kv.key as number,
+                fullText: x.fullText,
+                startTime: x.startTime,
+                status: x.status,
+                title: x.title
+            };
+            return res;
+        });
+    }
+
+    //Public methods
+    public Create(title: string): ProcessTracker
+    {
+        const id = this.trackerCounter++;
+
+        const tracker = new ProcessTrackerImpl(title, this.OnTrackerFinished.bind(this, id));
+        this.trackers[id] = tracker;
+
+        return tracker;
+    }
+
+    public RequestTracker(processId: number): ProcessTrackerReadOnlyWithId | undefined
+    {
+        const tracker = this.trackers[processId];
+        if(tracker === undefined)
+            return undefined;
+        return {
+            id: processId,
+            fullText: tracker.fullText,
+            startTime: tracker.startTime,
+            status: tracker.status,
+            title: tracker.title,
+        };
+    }
+
+    //Private variables
+    private trackerCounter: number;
+    private trackers: Dictionary<ProcessTracker>;
+
+    //Event handlers
+    private OnTrackerFinished(trackerId: number)
+    {
+        setTimeout(() => {
+            delete this.trackers[trackerId];
+        }, 60 * 60 * 1000);
     }
 }

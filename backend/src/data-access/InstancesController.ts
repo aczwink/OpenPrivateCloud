@@ -21,9 +21,13 @@ import { DBConnectionsManager } from "./DBConnectionsManager";
 
 export interface Instance
 {
-    id: number;
     fullName: string;
     storageId: number;
+}
+
+export interface FullInstance extends Instance
+{
+    id: number;
 }
 
 export interface InstancePermission
@@ -98,7 +102,7 @@ export class InstancesController
         WHERE fullName = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.SelectOne<Instance>(query, fullInstanceName);
+        return await conn.SelectOne<FullInstance>(query, fullInstanceName);
     }
 
     public async QueryInstanceById(instanceId: number)
@@ -109,7 +113,21 @@ export class InstancesController
         WHERE id = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.SelectOne<Instance>(query, instanceId);
+        return await conn.SelectOne<FullInstance>(query, instanceId);
+    }
+
+    public async QueryInstanceIdsAssociatedWithHost(hostId: number)
+    {
+        const query = `
+        SELECT i.id
+        FROM instances i
+        INNER JOIN hosts_storages hs
+            ON hs.id = i.storageId
+        WHERE hs.hostId = ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, hostId);
+        return rows.map(x => x.id as number);
     }
 
     public async QueryInstancePermissions(fullInstanceName: string)
@@ -119,6 +137,7 @@ export class InstancesController
         FROM instances_permissions ip
         INNER JOIN instances i
             ON i.id = ip.instanceId
+        WHERE i.fullName = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         return await conn.Select<InstancePermission>(query, fullInstanceName);

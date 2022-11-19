@@ -16,36 +16,46 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { GlobalInjector, Injectable } from "acts-util-node";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
+import { Injectable } from "acts-util-node";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { InstanceLogsController } from "../../data-access/InstanceLogsController";
 import { InstancesController } from "../../data-access/InstancesController";
-import { InstancesManager } from "../../services/InstancesManager";
-import { MountsManager } from "../../services/MountsManager";
-import { ProcessTrackerManager } from "../../services/ProcessTrackerManager";
-import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { FileStoragesManager } from "../file-services/FileStoragesManager";
-import { BtrfsDiskBackupper } from "./BtrfsDiskBackupper";
-import { BackupVaultSourcesConfig, BackupVaultTargetConfig } from "./models";
+import { TaskSchedulingManager } from "../../services/TaskSchedulingManager";
+import { BackupProcessService } from "./BackupProcessService";
+import { BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
 
 interface BackupVaultConfig
 {
     sources: BackupVaultSourcesConfig;
     target: BackupVaultTargetConfig;
+    trigger: BackupVaultTrigger;
+
+    state: {
+        lastScheduleTime?: Date;
+    };
 }
 
 @Injectable
 export class BackupVaultManager
 {
-    constructor(private hostConfigController: InstanceConfigController, private instancesController: InstancesController,
-        private hostStoragesController: HostStoragesController, private processTrackerManager: ProcessTrackerManager, private instanceLogsController: InstanceLogsController)
+    constructor(private hostConfigController: InstanceConfigController, private backupProcessService: BackupProcessService,
+        private instancesController: InstancesController, private taskSchedulingManager: TaskSchedulingManager)
     {
     }
 
     //Public methods
+    public async EnsureBackupTimerIsRunningIfConfigured(fullInstanceName: string)
+    {
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        const instanceId = instance!.id;
+
+        const config = await this.ReadConfig(instanceId);
+        if(config.trigger.type === "automatic")
+        {
+            const lastScheduleTime = config.state.lastScheduleTime ?? new Date(0);
+            this.taskSchedulingManager.ScheduleForInstance(fullInstanceName, lastScheduleTime, config.trigger.schedule, this.OnAutomaticBackupTrigger.bind(this, instanceId, fullInstanceName));
+        }
+    }
+
     public async ReadConfig(instanceId: number): Promise<BackupVaultConfig>
     {
         const config = await this.hostConfigController.RequestConfig<BackupVaultConfig>(instanceId);
@@ -54,13 +64,25 @@ export class BackupVaultManager
         {
             return {
                 sources: {
+                    databases: [],
                     fileStorages: []
                 },
                 target: {
                     type: "storage-device",
                     storageDevicePath: ""
-                }
+                },
+                trigger: {
+                    type: "manual"
+                },
+
+                state: {
+                },
             };
+        }
+        else
+        {
+            if(config.state.lastScheduleTime !== undefined)
+                config.state.lastScheduleTime = new Date(config.state.lastScheduleTime);
         }
 
         return config;
@@ -68,27 +90,32 @@ export class BackupVaultManager
 
     public async StartBackupProcess(instanceId: number)
     {
-        const inj = GlobalInjector;
-
-        const processTracker = this.processTrackerManager.Create();
-
         const config = await this.ReadConfig(instanceId);
-        const backupper = new BtrfsDiskBackupper(
-            processTracker,
-            inj.Resolve(MountsManager), inj.Resolve(FileStoragesManager), this.instancesController,
-            this.hostStoragesController, inj.Resolve(RemoteFileSystemManager), inj.Resolve(InstancesManager),
-            inj.Resolve(RemoteRootFileSystemManager), inj.Resolve(RemoteCommandExecutor)
-        );
-
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-
-        await backupper.Backup(storage!.hostId, config.sources, config.target.storageDevicePath);
-        await this.instanceLogsController.AddInstanceLog(instanceId, processTracker);
+        await this.backupProcessService.RunBackup(instanceId, config.sources, config.target);
     }
 
     public async WriteConfig(instanceId: number, config: BackupVaultConfig)
     {
-        await this.hostConfigController.UpdateOrInsertConfig(instanceId, config);
+        const obj = {
+            sources: config.sources,
+            target: config.target,
+            trigger: config.trigger,
+            state: {
+                lastScheduleTime: (config.state.lastScheduleTime === undefined) ? undefined : config.state.lastScheduleTime.toISOString()
+            }
+        };
+        await this.hostConfigController.UpdateOrInsertConfig(instanceId, obj);
+    }
+
+    //Event handlers
+    private async OnAutomaticBackupTrigger(instanceId: number, fullInstanceName: string)
+    {
+        await this.StartBackupProcess(instanceId);
+
+        const config = await this.ReadConfig(instanceId);
+        config.state.lastScheduleTime = new Date();
+        await this.WriteConfig(instanceId, config);
+        
+        this.EnsureBackupTimerIsRunningIfConfigured(fullInstanceName);
     }
 }

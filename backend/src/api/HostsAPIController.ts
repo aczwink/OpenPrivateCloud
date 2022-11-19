@@ -18,7 +18,7 @@
 import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { HostsController } from "../data-access/HostsController";
 import { DistroInfoService } from "../services/DistroInfoService";
-import { HostHealthManager } from "../services/HostHealthManager";
+import { HostAvailabilityManager } from "../services/HostAvailabilityManager";
 import { HostsManager } from "../services/HostsManager";
 import { HostUpdateManager } from "../services/HostUpdateManager";
 import { RemoteCommandExecutor } from "../services/RemoteCommandExecutor";
@@ -120,7 +120,7 @@ class HostAPIController
 class HostUpdateAPIController
 {
     constructor(private hostsController: HostsController, private hostUpdateManager: HostUpdateManager, private distroInfoService: DistroInfoService,
-        private hostHealthManager: HostHealthManager)
+        private hostHealthManager: HostAvailabilityManager)
     {
     }
 

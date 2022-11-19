@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultTargetConfig, InstanceLog, InstanceLogOverviewData } from "../../../dist/api";
+import { BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultTargetConfig, BackupVaultTrigger, InstanceLog, InstanceLogOverviewData } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
@@ -50,9 +50,7 @@ const targetConfigViewModel: ObjectViewModel<BackupVaultTargetConfig, InstanceId
             type: "edit",
             propertiesSchemaName: "BackupVaultTargetConfig",
             requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.target.get(ids.instanceName),
-            updateResource: async (service, ids, newValue) => {
-                await service.resourceProviders.backupservices.backupvault._any_.target.put(ids.instanceName, newValue)
-            }
+            updateResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.target.put(ids.instanceName, newValue)
         }
     ],
     formTitle: _ => "Backup target configuration",
@@ -65,7 +63,7 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, I
     actions: [
         {
             type: "create",
-            createResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.fileStorages.post(ids.instanceName, newValue),
+            createResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.sources.post(ids.instanceName, newValue),
             loadContext: async (service, ids) => {
                 const response = await service.resourceProviders.backupservices.backupvault._any_.deploymentdata.get(ids.instanceName);
                 const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
@@ -78,13 +76,80 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, I
     boundActions: [
         {
             type: "delete",
-            deleteResource: (service, ids, config) => service.resourceProviders.backupservices.backupvault._any_.fileStorages.delete(ids.instanceName, { fullInstanceSourceName: config.fullInstanceName }),
+            deleteResource: (service, ids, config) => service.resourceProviders.backupservices.backupvault._any_.sources.delete(ids.instanceName, { fullInstanceSourceName: config.fullInstanceName }),
         }
     ],
     displayName: "File storage to backup",
-    requestObjects: (service, ids) => service.resourceProviders.backupservices.backupvault._any_.fileStorages.get(ids.instanceName),
+    requestObjects: async (service, ids) => 
+    {
+        const response = await service.resourceProviders.backupservices.backupvault._any_.sources.get(ids.instanceName);
+        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(data.ok)
+        {
+            return {
+                data: data.value.fileStorages,
+                rawBody: response.rawBody,
+                statusCode: response.statusCode
+            };
+        }
+        return response;
+    },
     schemaName: "BackupVaultFileStorageConfig",
     type: "list"
+};
+
+const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, InstanceId> = {
+    type: "list",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.sources.post(ids.instanceName, newValue),
+            loadContext: async (service, ids) => {
+                const response = await service.resourceProviders.backupservices.backupvault._any_.deploymentdata.get(ids.instanceName);
+                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(result.ok === false)
+                    throw new Error("TODO");
+                return result.value;
+            }
+        }
+    ],
+    boundActions: [
+        {
+            type: "delete",
+            deleteResource: (service, ids, config) => service.resourceProviders.backupservices.backupvault._any_.sources.delete(ids.instanceName, { fullInstanceSourceName: config.fullInstanceName }),
+        }
+    ],
+    displayName: "Databases to backup",
+    requestObjects: async (service, ids) => 
+    {
+        const response = await service.resourceProviders.backupservices.backupvault._any_.sources.get(ids.instanceName);
+        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(data.ok)
+        {
+            return {
+                data: data.value.databases,
+                rawBody: response.rawBody,
+                statusCode: response.statusCode
+            };
+        }
+        return response;
+    },
+    schemaName: "BackupVaultDatabaseConfig"
+};
+
+const triggerConfigViewModel: ObjectViewModel<BackupVaultTrigger, InstanceId> = {
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "BackupVaultTrigger",
+            requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.trigger.get(ids.instanceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.trigger.put(ids.instanceName, newValue)
+        }
+    ],
+    formTitle: _ => "Backup trigger configuration",
+    requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.trigger.get(ids.instanceName),
+    schemaName: "BackupVaultTrigger",
+    type: "object"
 };
 
 const logViewModel: ObjectViewModel<InstanceLog, InstanceId & { logId: number}> = {
@@ -128,6 +193,16 @@ export const backupVaultViewModel: MultiPageViewModel<InstanceId> = {
             key: "fileStorageSources",
             displayName: "File storages",
             child: fileStorageSourcesViewModel
+        },
+        {
+            key: "databaseSources",
+            displayName: "Databases",
+            child: databaseSourcesViewModel,
+        },
+        {
+            key: "trigger",
+            displayName: "Trigger config",
+            child: triggerConfigViewModel
         },
         {
             key: "logs",

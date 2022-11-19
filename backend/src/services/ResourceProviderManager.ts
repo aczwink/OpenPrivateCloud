@@ -19,20 +19,24 @@
 import { Instantiatable } from "acts-util-core";
 import { GlobalInjector, Injectable } from "acts-util-node";
 import { InstanceConfigController } from "../data-access/InstanceConfigController";
-import { HostStoragesController } from "../data-access/HostStoragesController";
+import { HostStorage, HostStoragesController } from "../data-access/HostStoragesController";
 import { InstancesController } from "../data-access/InstancesController";
-import { BaseResourceProperties, ResourceProvider } from "../resource-providers/ResourceProvider";
+import { BaseResourceProperties, ResourceProvider, ResourceTypeDefinition } from "../resource-providers/ResourceProvider";
 import { APISchemaService } from "./APISchemaService";
 import { HostStoragesManager } from "./HostStoragesManager";
 import { InstancesManager } from "./InstancesManager";
 import { PermissionsManager } from "./PermissionsManager";
+import { InstanceLogsController } from "../data-access/InstanceLogsController";
+import { ProcessTrackerManager } from "./ProcessTrackerManager";
+import { HealthController } from "../data-access/HealthController";
 
 @Injectable
 export class ResourceProviderManager
 {
     constructor(private apiSchemaService: APISchemaService, private instancesController: InstancesController, private hostStoragesManager: HostStoragesManager,
         private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController, private permissionsManager: PermissionsManager,
-        private instanceConfigController: InstanceConfigController)
+        private instanceConfigController: InstanceConfigController, private instanceLogsController: InstanceLogsController,
+        private processTrackerManager: ProcessTrackerManager, private healthController: HealthController)
     {
         this._resourceProviders = [];
     }
@@ -44,6 +48,26 @@ export class ResourceProviderManager
     }
 
     //Public methods
+    public async CheckInstanceAvailability(fullInstanceName: string)
+    {
+        const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+
+        await resourceProvider.CheckInstanceAvailability(storage!.hostId, fullInstanceName);
+    }
+
+    public async CheckInstanceHealth(fullInstanceName: string)
+    {
+        const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+
+        await resourceProvider.CheckInstanceHealth(storage!.hostId, fullInstanceName);
+    }
+
     public async DeleteInstance(fullInstanceName: string)
     {
         const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
@@ -56,6 +80,8 @@ export class ResourceProviderManager
             return result;
 
         await this.instanceConfigController.DeleteConfig(instance!.id);
+        await this.healthController.DeleteInstanceHealthData(instance!.id);
+        await this.instanceLogsController.DeleteLogsAssociatedWithInstance(instance!.id);
 
         const permissions = await this.instancesController.QueryInstancePermissions(fullInstanceName);
         for (const instancePermission of permissions)
@@ -66,7 +92,7 @@ export class ResourceProviderManager
         return null;
     }
 
-    public async DeployInstance(instanceProperties: BaseResourceProperties, hostId: number, userId: number)
+    public async StartInstanceDeployment(instanceProperties: BaseResourceProperties, hostId: number, userId: number)
     {
         const {resourceProvider, resourceTypeDef} = this._resourceProviders.Values()
             .Map(this.MatchPropertiesWithResourceProviderResourceTypes.bind(this, instanceProperties)).NotUndefined().First();
@@ -75,18 +101,7 @@ export class ResourceProviderManager
 
         const storageId = await this.hostStoragesManager.FindOptimalStorage(hostId, resourceTypeDef.fileSystemType);
         const storage = await this.hostStoragesController.RequestHostStorage(storageId);
-        const result = await resourceProvider.ProvideResource(instanceProperties, {
-            fullInstanceName,
-            hostId,
-            storagePath: storage!.path,
-            userId
-        });
-
-        const instanceId = await this.instancesController.AddInstance(storageId, fullInstanceName);
-        if(result.config !== undefined)
-        {
-            await this.instanceConfigController.UpdateOrInsertConfig(instanceId, result.config);
-        }
+        this.TryDeployInstance(resourceProvider, instanceProperties, fullInstanceName, hostId, storage!, userId);
     }
 
     public async InstancePermissionsChanged(fullInstanceName: string)
@@ -104,10 +119,40 @@ export class ResourceProviderManager
         this._resourceProviders.push(GlobalInjector.Resolve(resourceProviderClass));
     }
 
+    public RetrieveInstanceCheckSchedule(fullInstanceName: string)
+    {
+        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
+
+        const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+        const resourceType = resourceProvider.resourceTypeDefinitions.find(x => this.ExtractTypeNameFromResourceTypeDefinition(x) === parts.resourceTypeName);
+        return resourceType!.healthCheckSchedule;
+    }
+
     //Private variables
     private _resourceProviders: ResourceProvider<any>[];
 
     //Private methods
+    private async DeployInstance(resourceProvider: ResourceProvider<any>, instanceProperties: BaseResourceProperties, fullInstanceName: string, hostId: number, storage: HostStorage, userId: number)
+    {
+        const result = await resourceProvider.ProvideResource(instanceProperties, {
+            fullInstanceName,
+            hostId,
+            storagePath: storage.path,
+            userId
+        });
+
+        const instanceId = await this.instancesController.AddInstance(storage.id, fullInstanceName);
+        if(result.config !== undefined)
+        {
+            await this.instanceConfigController.UpdateOrInsertConfig(instanceId, result.config);
+        }
+    }
+
+    private ExtractTypeNameFromResourceTypeDefinition(resourceTypeDef: ResourceTypeDefinition): string
+    {
+        return this.apiSchemaService.CreateDefault(this.apiSchemaService.GetSchema(resourceTypeDef.schemaName)).type;
+    }
+
     private FindInstanceProviderFromFullInstanceName(fullInstanceName: string)
     {
         const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
@@ -125,5 +170,19 @@ export class ResourceProviderManager
             resourceProvider,
             resourceTypeDef: result
         };
+    }
+
+    private async TryDeployInstance(resourceProvider: ResourceProvider<any>, instanceProperties: BaseResourceProperties, fullInstanceName: string, hostId: number, storage: HostStorage, userId: number)
+    {
+        const tracker = this.processTrackerManager.Create("Deployment of: " + fullInstanceName);
+        try
+        {
+            await this.DeployInstance(resourceProvider, instanceProperties, fullInstanceName, hostId, storage, userId);
+            tracker.Finish();
+        }
+        catch(e)
+        {
+            tracker.Fail(e);
+        }
     }
 }

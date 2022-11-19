@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * */
 
-import { APIController, BodyProp, Header, Post, Unauthorized } from "acts-util-apilib";
+import { APIController, BodyProp, Get, Header, Post, Unauthorized } from "acts-util-apilib";
 import { UsersController } from "../data-access/UsersController";
 import { SessionsManager } from "../services/SessionsManager";
 import { UsersManager } from "../services/UsersManager";
@@ -42,5 +42,24 @@ class UserAPIController
             await this.usersManager.SetUserPassword(userId, newPw);
         else
             return Unauthorized("wrong password");
+    }
+
+    @Get("secret")
+    public async QuerySecret(
+        @Header Authorization: string
+    )
+    {
+        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+        const privData = await this.usersController.QueryPrivateData(userId);
+        return privData!.sambaPW;
+    }
+
+    @Post("secret")
+    public async RotateSecret(
+        @Header Authorization: string
+    )
+    {
+        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+        await this.usersManager.RotateSambaPassword(userId);
     }
 }

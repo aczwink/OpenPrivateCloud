@@ -19,6 +19,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+import { CertKeyFiles } from "./models";
 
 @Injectable
 export class EasyRSAManager
@@ -31,9 +32,9 @@ export class EasyRSAManager
     public async AddClient(hostId: number, cadir: string, clientName: string)
     {
         const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
-        shell.ChangeDirectory(cadir);
+        await shell.ChangeDirectory(cadir);
 
-        shell.SendCommand(["./easyrsa", "--batch", "--req-cn=" + clientName, "build-client-full", clientName, "nopass"]);
+        await shell.ExecuteCommand(["./easyrsa", "--batch", "--req-cn=" + clientName, "build-client-full", clientName, "nopass"]);
 
         await shell.Close();
     }
@@ -41,11 +42,11 @@ export class EasyRSAManager
     public async CreateCA(hostId: number, cadir: string, caCommonName: string, keySize: number)
     {
         const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
-        shell.ChangeDirectory(cadir);
+        await shell.ChangeDirectory(cadir);
 
-        shell.SendCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "--req-cn=" + caCommonName, "build-ca", "nopass"]);
-        shell.SendCommand(["./easyrsa", "gen-crl"]);
-        shell.SendCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "gen-dh"]);
+        await shell.ExecuteCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "--req-cn=" + caCommonName, "build-ca", "nopass"]);
+        await shell.ExecuteCommand(["./easyrsa", "gen-crl"]);
+        await shell.ExecuteCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "gen-dh"]);
 
         await shell.Close();
     }
@@ -55,19 +56,31 @@ export class EasyRSAManager
         await this.remoteCommandExecutor.ExecuteCommand(["make-cadir", cadir], hostId);
 
         const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
-        shell.ChangeDirectory(cadir);
-        shell.SendCommand(["./easyrsa init-pki"]);
+        await shell.ChangeDirectory(cadir);
+        await shell.ExecuteCommand(["./easyrsa init-pki"]);
         await shell.Close();
     }
 
     public async CreateServer(hostId: number, cadir: string, domainName: string, keySize: number)
     {
         const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
-        shell.ChangeDirectory(cadir);
+        await shell.ChangeDirectory(cadir);
         
-        shell.SendCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "build-server-full", domainName, "nopass"]);
+        await shell.ExecuteCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "build-server-full", domainName, "nopass"]);
 
         await shell.Close();
+    }
+
+    public GetCertPaths(cadir: string, clientOrServerName: string): CertKeyFiles
+    {
+        const pkiPath = path.join(cadir, "pki");
+        return {
+            caCertPath: path.join(pkiPath, "ca.crt"),
+            certPath: path.join(pkiPath, "issued", clientOrServerName + ".crt"),
+            keyPath: path.join(pkiPath, "private", clientOrServerName + ".key"),
+            crlPath: path.join(pkiPath, "crl.pem"),
+            dhPath: path.join(pkiPath, "dh.pem"),
+        };
     }
 
     public async ListClients(hostId: number, cadir: string, domainName: string)
@@ -82,10 +95,10 @@ export class EasyRSAManager
     public async RevokeClient(hostId: number, cadir: string, clientName: string)
     {
         const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
-        shell.ChangeDirectory(cadir);
+        await shell.ChangeDirectory(cadir);
 
-        shell.SendCommand(["./easyrsa", "--batch", "revoke", clientName]);
-        shell.SendCommand(["./easyrsa", "gen-crl"]);
+        await shell.ExecuteCommand(["./easyrsa", "--batch", "revoke", clientName]);
+        await shell.ExecuteCommand(["./easyrsa", "gen-crl"]);
 
         await shell.Close();
     }

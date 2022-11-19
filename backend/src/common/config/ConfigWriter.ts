@@ -47,6 +47,11 @@ export class ConfigWriter
     }
 
     //Protected methods
+    protected FormatIncludeDir(path: string): string
+    {
+        throw new Error("If you use include dirs you need to overwrite the FormatIncludeDir method");
+    }
+
     protected KeyValueEntryToString(entry: KeyValueEntry)
     {
         if(entry.value === null)
@@ -84,9 +89,7 @@ export class ConfigWriter
                 return "[" + entry.textValue + "]";
 
             case "IncludeDir":
-                throw new Error("TODO reimplement me");
-                //private formatIncludeDir: (path: string) => string
-                //return this.formatIncludeDir(entry.path);
+                return this.FormatIncludeDir(entry.path);
 
             case "KeyValue":
                 return this.KeyValueEntryToString(entry);

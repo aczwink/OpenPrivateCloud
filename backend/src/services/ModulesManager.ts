@@ -36,46 +36,23 @@ export class ModulesManager
             await this.Install(hostId, moduleName);
     }
 
-    //Private methods
-    /*private GetModuleInstaller(moduleName: string): ModuleInstaller
+    public async Uninstall(hostId: number, moduleName: ModuleName)
     {
-        const installer = this._moduleDefinitions[moduleName]?.installer;
-        if(installer === undefined)
-        {
-            return {
-                async Install()
-                {
-                },
+        const distroPackageManager = await this.ResolveDistroPackageManager(hostId);
+        await distroPackageManager.Uninstall(hostId, moduleName);
+    }
 
-                async IsModuleInstalled()
-                {
-                    return true;
-                },
-
-                async Uninstall()
-                {
-                }
-            };
-        }
-
-        return installer;
-    }*/
-    
+    //Private methods    
     private async Install(hostId: number, moduleName: ModuleName)
     {
         const distroPackageManager = await this.ResolveDistroPackageManager(hostId);
-        //const mod = await this.GetModuleInstaller(moduleName);
-
         await distroPackageManager.Install(hostId, moduleName);
-        //await mod.Install();
     }
 
     private async IsModuleInstalled(hostId: number, moduleName: ModuleName): Promise<boolean>
     {
         const distroPackageManager = await this.ResolveDistroPackageManager(hostId);
-        //const mod = await this.GetModuleInstaller(moduleName);
-
-        return (await distroPackageManager.IsModuleInstalled(hostId, moduleName)) /*&& (await mod.IsModuleInstalled())*/;
+        return (await distroPackageManager.IsModuleInstalled(hostId, moduleName));
     }
 
     private async ResolveDistroPackageManager(hostId: number): Promise<DistroPackageManager>

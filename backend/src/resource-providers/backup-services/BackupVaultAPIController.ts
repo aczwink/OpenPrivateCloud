@@ -23,12 +23,14 @@ import { HostStoragesController } from "../../data-access/HostStoragesController
 import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
-import { BackupVaultFileStorageConfig, BackupVaultTargetConfig } from "./models";
+import { BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
 
 interface BackupVaultDeploymentDataDto
 {
     hostName: string;
 }
+
+type BackupVaultAnySourceConfigDto = BackupVaultFileStorageConfig | BackupVaultDatabaseConfig;
 
 @APIController(`resourceProviders/${c_backupServicesResourceProviderName}/${c_backupVaultResourceTypeName}/{instanceName}`)
 class BackupVaultAPIController
@@ -51,14 +53,39 @@ class BackupVaultAPIController
         return instance.id;
     }
 
-    @Post("fileStorages")
-    public async AddFileStorageSource(
+    @Post("sources")
+    public async AddSource(
         @Common instanceId: number,
-        @Body source: BackupVaultFileStorageConfig
+        @Body source: BackupVaultAnySourceConfigDto
     )
     {
         const config = await this.backupVaultManager.ReadConfig(instanceId);
-        config.sources.fileStorages.push(source);
+        if("createSnapshotBeforeBackup" in source)
+            config.sources.fileStorages.push(source);
+        else
+            config.sources.databases.push(source);
+        await this.backupVaultManager.WriteConfig(instanceId, config);
+    }
+
+    @Delete("sources")
+    public async DeleteSource(
+        @Common instanceId: number,
+        @BodyProp fullInstanceSourceName: string
+    )
+    {
+        const config = await this.backupVaultManager.ReadConfig(instanceId);
+
+        const idx = config.sources.fileStorages.findIndex(x => x.fullInstanceName === fullInstanceSourceName);
+        if(idx === -1)
+        {
+            const idx = config.sources.databases.findIndex(x => x.fullInstanceName === fullInstanceSourceName);
+            config.sources.databases.Remove(idx);
+        }
+        else
+        {
+            config.sources.fileStorages.Remove(idx);
+        }
+
         await this.backupVaultManager.WriteConfig(instanceId, config);
     }
 
@@ -76,28 +103,14 @@ class BackupVaultAPIController
         };
         return result;
     }
-
-    @Delete("fileStorages")
-    public async DeleteFileStorageSource(
-        @Common instanceId: number,
-        @BodyProp fullInstanceSourceName: string
-    )
-    {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
-
-        const idx = config.sources.fileStorages.findIndex(x => x.fullInstanceName === fullInstanceSourceName);
-        config.sources.fileStorages.Remove(idx);
-
-        await this.backupVaultManager.WriteConfig(instanceId, config);
-    }
     
-    @Get("fileStorages")
-    public async QueryFileStoragesConfig(
+    @Get("sources")
+    public async QuerySourcesConfig(
         @Common instanceId: number
     )
     {
         const config = await this.backupVaultManager.ReadConfig(instanceId);
-        return config.sources.fileStorages;
+        return config.sources;
     }
 
     @Get("target")
@@ -107,6 +120,15 @@ class BackupVaultAPIController
     {
         const config = await this.backupVaultManager.ReadConfig(instanceId);
         return config.target;
+    }
+
+    @Get("trigger")
+    public async QueryTriggerConfig(
+        @Common instanceId: number
+    )
+    {
+        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        return config.trigger;
     }
 
     @Post()
@@ -126,5 +148,20 @@ class BackupVaultAPIController
         const config = await this.backupVaultManager.ReadConfig(instanceId);
         config.target = targetConfig;
         await this.backupVaultManager.WriteConfig(instanceId, config);
+    }
+
+    @Put("trigger")
+    public async UpdateTriggerConfig(
+        @Common instanceId: number,
+        @Path instanceName: string,
+        @Body targetConfig: BackupVaultTrigger
+    )
+    {
+        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        config.trigger = targetConfig;
+        await this.backupVaultManager.WriteConfig(instanceId, config);
+
+        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, instanceName);
+        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(fullInstanceName);
     }
 }
