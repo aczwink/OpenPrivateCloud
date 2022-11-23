@@ -1,6 +1,8 @@
 backend/dist
 backend/node_modules
 backend/package-lock.json
+backend-tests/dist
+backend-tests/node_modules
 common/dist
 frontend/dist
 frontend/node_modules

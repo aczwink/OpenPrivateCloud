@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js",
-    "build-release-package": "npx webpack",
+    "build-release-package": "rm ./dist/bundle.js && npx webpack",
     "restart-service": "sudo systemctl restart openprivatecloud.service"
   },
   "keywords": [],

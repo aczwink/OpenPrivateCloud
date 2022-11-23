@@ -52,7 +52,7 @@ export class OpenVPNGatewayManager
     //Public methods
     public BuildConfigPath(fullInstanceName: string)
     {
-        const name = this.instancesManager.DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const name = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
         return "/etc/openvpn/server/" + name + ".conf";
     }
 

@@ -17,34 +17,30 @@
  * */
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../../data-access/UsersController";
+import { InstancesManager } from "../../services/InstancesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { DeploymentContext } from "../ResourceProvider";
 import { ApacheManager } from "./ApacheManager";
+import { CertBotListParser } from "./CertBotListParser";
 import { LetsEncryptProperties } from "./Properties";
-
-interface Certificate
-{
-    name: string;
-    expiryDate: Date;
-    certificatePath: string;
-    privateKeyPath: string;
-}
   
 @Injectable
 export class LetsEncryptManager
 {
     constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private modulesManager: ModulesManager,
-        private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager)
+        private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager, private instancesManager: InstancesManager)
     {
     }
 
     //Public methods
     public async GetCert(hostId: number, fullInstanceName: string)
     {
+        const certName = this.MapFullInstanceNameToCertificateName(fullInstanceName);
+
         const certs = await this.ListCertificates(hostId);
-        const cert = certs.find(x => x.name === fullInstanceName);
+        const cert = certs.find(x => x.name === certName);
         return cert!;
     }
 
@@ -53,19 +49,21 @@ export class LetsEncryptManager
         const cert = await this.GetCert(hostId, fullInstanceName);
         const leftTimeUntilRenewal = (Date.now() - cert!.expiryDate.valueOf());
         if(leftTimeUntilRenewal < 30 * 24 * 60 * 60 *1000) //letsencrypt recommends renewing after 60 days. Cert is valid for 90 days.
-            await this.RenewCertificate(hostId, fullInstanceName);
+            await this.RenewCertificate(hostId, this.MapFullInstanceNameToCertificateName(fullInstanceName));
     }
 
     public async ProvideResource(instanceProperties: LetsEncryptProperties, context: DeploymentContext)
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "letsencrypt");
+        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "apache");
 
         const user = await this.usersController.QueryUser(context.userId);
 
         const enabledSiteNames = await this.SaveApacheState(context.hostId);
         await this.PrepareApacheForCertbot(context.hostId, enabledSiteNames);
 
-        const command = ["sudo", "certbot", "certonly", "--cert-name", context.fullInstanceName, "--webroot", "-w", "/var/www/html/", "-d", instanceProperties.domainName, "-m", user!.emailAddress, "--agree-tos"];
+        const certName = this.MapFullInstanceNameToCertificateName(context.fullInstanceName);
+        const command = ["sudo", "certbot", "certonly", "--cert-name", certName, "--webroot", "-w", "/var/www/html/", "-d", instanceProperties.domainName, "-m", user!.emailAddress, "--agree-tos"];
         try
         {
             await this.remoteCommandExecutor.ExecuteCommand(command, context.hostId);
@@ -84,30 +82,13 @@ export class LetsEncryptManager
     private async ListCertificates(hostId: number)
     {
         const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "certbot", "certificates"], hostId);
+        const parser = new CertBotListParser();
+        return parser.Parse(result.stdOut);
+    }
 
-        const certs: Certificate[] = [];
-
-        const lines = result.stdOut.split("\n");
-        for (let index = 0; index < lines.length; index++)
-        {
-            const line = lines[index];
-
-            const parts = line.split(":");
-            if( (parts.length == 2) && (parts[0].trim() === "Certificate Name") )
-            {
-                const expiry = lines[index+2].trim().substring("Expiry Date: ".length).split(" ");
-                const expiryDate = new Date(expiry[0] + " " + expiry[1]);
-
-                const certPath = lines[index+3].trim().substring("Certificate Path:".length).trim();
-                const keyPath = lines[index+4].trim().substring("Private Key Path:".length).trim();
-
-                certs.push({ name: parts[1].trim(), expiryDate, certificatePath: certPath, privateKeyPath: keyPath });
-
-                index += 4;
-            }
-        }
-
-        return certs;
+    private MapFullInstanceNameToCertificateName(fullInstanceName: string)
+    {
+        return this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
     }
 
     private async PrepareApacheForCertbot(hostId: number, enabledSiteNames: string[])

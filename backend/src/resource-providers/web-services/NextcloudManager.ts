@@ -43,13 +43,13 @@ export class NextcloudManager
     //Public methods
     public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string)
     {
-        const siteName = this.instancesManager.DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
 
         await this.apacheManager.DisableSite(hostId, siteName);
         await this.systemServicesManager.RestartService(hostId, "apache2");
         await this.apacheManager.DeleteSite(hostId, siteName);
 
-        const dbName = this.instancesManager.DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const dbName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
         const dbUser = dbName;
         await this.hostMySQLQueryService.DropDatabase(hostId, dbName);
         await this.hostMySQLQueryService.DropUser(hostId, dbUser);
@@ -67,7 +67,7 @@ export class NextcloudManager
 
         await this.DownloadNextcloudApp(context.hostId, instanceDir);
 
-        const dbName = this.instancesManager.DerviceInstanceFileNameFromUniqueInstanceName(context.fullInstanceName);
+        const dbName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(context.fullInstanceName);
         const dbUser = dbName;
         const dbPw = crypto.randomBytes(16).toString("hex");
 
@@ -104,7 +104,8 @@ export class NextcloudManager
             ],
         }];
 
-        const siteName = this.instancesManager.DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        await this.apacheManager.EnableModule(hostId, "ssl");
         await this.apacheManager.CreateSite(hostId, siteName, vh);
         await this.apacheManager.EnableSite(hostId, siteName);
 

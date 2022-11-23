@@ -30,7 +30,7 @@ export class InstancesManager
     //Public methods
     public BuildInstanceStoragePath(hostStoragePath: string, fullInstanceName: string)
     {
-        return path.join(hostStoragePath, this.DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName));
+        return path.join(hostStoragePath, this.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName));
     }
     
     public async CreateInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string)
@@ -49,7 +49,7 @@ export class InstancesManager
         return "/" + resourceProviderName + "/" + instanceType + "/" + instanceName;
     }
 
-    public DerviceInstanceFileNameFromUniqueInstanceName(fullInstanceName: string)
+    public DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName: string)
     {
         return fullInstanceName.substring(1).ReplaceAll("/", "-");
     }
