@@ -28,6 +28,7 @@ import { openVPNGatewayViewModel } from "./network-services.ts/openvpn-gateway";
 import { nextcloudViewModel } from "./web-services/nextcloud";
 import { AddInstanceComponent } from "../Views/instances/AddInstanceComponent";
 import { jdownloaderViewModel } from "./web-services/jdownloader";
+import { avTranscoderViewModel } from "./multimedia-services/av-transcoder";
 
 const root: RoutingViewModel = {
     type: "routing",
@@ -61,6 +62,10 @@ const root: RoutingViewModel = {
         {
             key: `instances/${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:instanceName`,
             viewModel: fileStorageViewModel
+        },
+        {
+            key: `instances/${resourceProviders.multimediaServices.name}/${resourceProviders.multimediaServices.avTranscoderResourceType.name}/:instanceName`,
+            viewModel: avTranscoderViewModel,
         },
         {
             key: `instances/${resourceProviders.networkServices.name}/${resourceProviders.networkServices.openVPNGatewayResourceType.name}/:instanceName`,

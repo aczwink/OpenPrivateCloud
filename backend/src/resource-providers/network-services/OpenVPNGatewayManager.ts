@@ -155,7 +155,7 @@ ${taData}
 
     public async ReadInstanceConfig(instanceId: number): Promise<OpenVPNGatewayConfig>
     {
-        const config = await this.instanceConfigController.RequestConfig<OpenVPNGatewayConfig>(instanceId);
+        const config = await this.instanceConfigController.QueryConfig<OpenVPNGatewayConfig>(instanceId);
         return config!;
     }
 

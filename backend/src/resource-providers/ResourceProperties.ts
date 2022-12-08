@@ -20,11 +20,13 @@ import { BackupVaultProperties } from "./backup-services/BackupVaultProperties";
 import { VirtualMachineProperties } from "./compute-services/VirtualMachineProperties";
 import { MariadbProperties } from "./database-services/MariadbProperties";
 import { FileStorageProperties } from "./file-services/FileStorageProperties";
+import { AVTranscoderProperties } from "./multimedia-services/AVTranscoderProperties";
 import { OpenVPNGatewayProperties } from "./network-services/OpenVPNGatewayProperties";
 import { JdownloaderProperties, LetsEncryptProperties, NextcloudProperties, NodeAppServiceProperties, StaticWebsiteProperties } from "./web-services/Properties";
 
 export type AnyResourceProperties = 
-    BackupVaultProperties
+    AVTranscoderProperties
+    | BackupVaultProperties
     | FileStorageProperties
     | JdownloaderProperties
     | LetsEncryptProperties

@@ -26,7 +26,7 @@ export type Command = string[] | {
     target: Command;
 };
 
-interface CommandResult
+export interface CommandResult
 {
     stdErr: string;
     stdOut: string;
@@ -43,6 +43,7 @@ export interface SSHConnection
     ExecuteCommand(command: Command): Promise<string>;
     ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
     ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
+    MoveFile(sourcePath: string, targetPath: string): Promise<void>;
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
     ReadLink(remotePath: string): Promise<string>;
     ReadTextFile(remotePath: string): Promise<string>;
@@ -186,6 +187,18 @@ class SSHConnectionImpl implements SSHConnection
                     reject(err);
                 else
                     resolve(list);
+            });
+        });
+    }
+
+    public MoveFile(sourcePath: string, targetPath: string): Promise<void>
+    {
+        return new Promise<void>( (resolve, reject) => {
+            this.sftp.rename(sourcePath, targetPath, err => {
+                if(err)
+                    reject(err);
+                else
+                    resolve();
             });
         });
     }

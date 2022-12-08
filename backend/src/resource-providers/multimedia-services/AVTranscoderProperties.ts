@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2022 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,11 +16,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-export type ModuleName = "apache" | "core" | "ffmpeg" | "java" | "letsencrypt" | "libvirt" | "mariadb" | "nextcloud-dependencies" | "openvpn" | "samba" | "webdav";
+import { BaseResourceProperties } from "../ResourceProvider";
 
-export interface DistroPackageManager
+export interface AVTranscoderProperties extends BaseResourceProperties
 {
-    Install(hostId: number, moduleName: ModuleName): Promise<void>;
-    IsModuleInstalled(hostId: number, moduleName: ModuleName): Promise<boolean>;
-    Uninstall(hostId: number, moduleName: ModuleName): Promise<void>;
+    type: "av-transcoder";
+    
+    /**
+     * @title Source file storage
+     * @format instance-same-host[file-services/file-storage]
+     */
+    fullInstanceName: string;
 }

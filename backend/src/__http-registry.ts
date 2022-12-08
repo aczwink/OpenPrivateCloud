@@ -32,6 +32,7 @@ import "./api/UsersAPIController";
 import "./resource-providers/backup-services/BackupVaultAPIController";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/file-services/FileStorageAPIController";
+import "./resource-providers/multimedia-services/AVTranscoderAPIController";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";
 import "./resource-providers/web-services/JdownloaderAPIController";
 

@@ -28,6 +28,9 @@ export const c_mariadbResourceTypeName = "mariadb";
 export const c_fileServicesResourceProviderName = "file-services";
 export const c_fileStorageResourceTypeName = "file-storage";
 
+export const c_multimediaServicesResourceProviderName = "multimedia-services";
+export const c_avTranscoderResourceTypeName = "av-transcoder";
+
 export const c_networkServicesResourceProviderName = "network-services";
 export const c_openVPNGatewayResourceTypeName = "openvpn-gateway";
 

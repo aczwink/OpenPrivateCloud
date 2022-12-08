@@ -122,6 +122,8 @@ class DebianPackageManager implements DistroPackageManager
                 return ["apache2"];
             case "core":
                 return ["btrfs-progs", "smartmontools", "unattended-upgrades", "unzip"];
+            case "ffmpeg":
+                return ["ffmpeg"];
             case "java":
                 return ["openjdk-11-jre-headless"];
             case "letsencrypt":

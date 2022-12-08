@@ -24,6 +24,7 @@ import { FileServicesResourceProvider } from "./resource-providers/file-services
 import { NetworkServicesResourceProvider } from "./resource-providers/network-services/NetworkServicesResourceProvider";
 import { DatabaseServicesResourceProvider } from "./resource-providers/database-services/DatabaseServicesResourceProvider";
 import { WebServicesResourceProvider } from "./resource-providers/web-services/WebServicesResourceProvider";
+import { MultimediaServicesResourceProvider } from "./resource-providers/multimedia-services/MultimediaServicesResourceProvider";
 
 function RegisterResourceProviders()
 {
@@ -32,6 +33,7 @@ function RegisterResourceProviders()
         ComputeServicesResourceProvider,
         DatabaseServicesResourceProvider,
         FileServicesResourceProvider,
+        MultimediaServicesResourceProvider,
         NetworkServicesResourceProvider,
         WebServicesResourceProvider
     ];

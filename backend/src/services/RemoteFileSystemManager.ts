@@ -71,6 +71,13 @@ export class RemoteFileSystemManager
         return result;
     }
 
+    public async MoveFile(hostId: number, sourcePath: string, targetPath: string)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        await conn.value.MoveFile(sourcePath, targetPath);
+        conn.Release();
+    }
+
     public async QueryStatus(hostId: number, filePath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);

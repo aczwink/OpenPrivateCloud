@@ -37,7 +37,7 @@ interface BackupVaultConfig
 @Injectable
 export class BackupVaultManager
 {
-    constructor(private hostConfigController: InstanceConfigController, private backupProcessService: BackupProcessService,
+    constructor(private instanceConfigController: InstanceConfigController, private backupProcessService: BackupProcessService,
         private instancesController: InstancesController, private taskSchedulingManager: TaskSchedulingManager)
     {
     }
@@ -58,7 +58,7 @@ export class BackupVaultManager
 
     public async ReadConfig(instanceId: number): Promise<BackupVaultConfig>
     {
-        const config = await this.hostConfigController.RequestConfig<BackupVaultConfig>(instanceId);
+        const config = await this.instanceConfigController.QueryConfig<BackupVaultConfig>(instanceId);
 
         if(config === undefined)
         {
@@ -104,7 +104,7 @@ export class BackupVaultManager
                 lastScheduleTime: (config.state.lastScheduleTime === undefined) ? undefined : config.state.lastScheduleTime.toISOString()
             }
         };
-        await this.hostConfigController.UpdateOrInsertConfig(instanceId, obj);
+        await this.instanceConfigController.UpdateOrInsertConfig(instanceId, obj);
     }
 
     //Event handlers

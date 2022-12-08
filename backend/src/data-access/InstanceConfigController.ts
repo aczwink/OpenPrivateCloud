@@ -35,7 +35,7 @@ export class InstanceConfigController
         await conn.DeleteRows("instances_configuration", "instanceId = ?", instanceId);
     }
 
-    public async RequestConfig<ConfigType>(instanceId: number)
+    public async QueryConfig<ConfigType>(instanceId: number)
     {
         const query = `
         SELECT config
