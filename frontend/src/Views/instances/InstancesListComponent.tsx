@@ -81,8 +81,12 @@ export class InstancesListComponent extends Component
                 return <MatIcon>storage</MatIcon>;
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return <BootstrapIcon>folder-fill</BootstrapIcon>;
+            case resourceProviders.multimediaServices.avTranscoderResourceType.name:
+                return <BootstrapIcon>film</BootstrapIcon>;
             case resourceProviders.networkServices.openVPNGatewayResourceType.name:
                 return <MatIcon>vpn_lock</MatIcon>;
+            case resourceProviders.webServices.jdownloaderResourceType.name:
+                return <BootstrapIcon>cloud-download</BootstrapIcon>;
             case resourceProviders.webServices.letsencryptCertResourceType.name:
                 return <MatIcon>verified</MatIcon>;
             case resourceProviders.webServices.nextcloudResourceType.name:

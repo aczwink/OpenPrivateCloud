@@ -19,7 +19,7 @@
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 
-interface FFProbe_StreamInfo
+export interface FFProbe_StreamInfo
 {
     codec_name: string;
     codec_type: "video" | "audio";

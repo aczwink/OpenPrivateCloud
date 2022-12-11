@@ -75,10 +75,8 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
         const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
 
         const tmpDir = path.join(instanceDir, "tmp");
-        const outDir = path.join(instanceDir, "out");
 
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, tmpDir);
-        await this.remoteFileSystemManager.CreateDirectory(context.hostId, outDir);
 
         const config: AVTranscoderConfig = {
             format: {
@@ -89,8 +87,9 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
             },
             source: {
                 fullInstanceName: instanceProperties.fullInstanceName,
-                path: "/"
-            }
+                sourcePath: "/"
+            },
+            targetPath: "/"
         };
         return {
             config

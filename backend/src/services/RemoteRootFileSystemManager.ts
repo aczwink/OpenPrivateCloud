@@ -42,6 +42,11 @@ export class RemoteRootFileSystemManager
         return exitCode === 0;
     }
 
+    public async MoveFile(hostId: number, sourcePath: string, targetPath: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mv", sourcePath, targetPath], hostId);
+    }
+
     public async RemoveDirectory(hostId: number, remotePath: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rmdir", remotePath], hostId);

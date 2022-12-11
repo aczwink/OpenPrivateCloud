@@ -17,7 +17,8 @@
  * */
 
 import ssh2 from "ssh2";
-import { Injectable } from "acts-util-node";
+import { GlobalInjector, Injectable } from "acts-util-node";
+import { ProcessTrackerManager } from "./ProcessTrackerManager";
 
 export type Command = string[] | {
     type: "redirect-stdout" | "pipe",
@@ -118,6 +119,7 @@ class SSHConnectionImpl implements SSHConnection
 
     public async ExecuteBufferedCommand(command: string[]): Promise<CommandResult>
     {
+        const tracker = this.CreateTracker(command);
         const channel = await this.ExecuteInteractiveCommand(command);
 
         let stdOut = "";
@@ -127,11 +129,24 @@ class SSHConnectionImpl implements SSHConnection
             channel.stdout.setEncoding("utf-8");
             channel.stderr.setEncoding("utf-8");
 
-            channel.stdout.on("data", (chunk: string) => stdOut += chunk);
-            channel.stderr.on("data", (chunk: string) => stdErr += chunk);
+            channel.stdout.on("data", (chunk: string) => {
+                stdOut += chunk;
+                tracker.Add(chunk);
+            });
+            channel.stderr.on("data", (chunk: string) => {
+                stdErr += chunk;
+                tracker.Add(chunk);
+            });
             
             channel.on("exit", code => {
+                tracker.Add("Process exit code is:", code);
+                tracker.Finish();
                 resolve();
+            });
+            channel.on("close", (code: any, signal: any) => {
+                tracker.Add("Processed closed.", code, signal);
+                tracker.Finish();
+                resolve(code);
             });
         });
 
@@ -143,15 +158,24 @@ class SSHConnectionImpl implements SSHConnection
 
     public async ExecuteCommand(command: Command): Promise<string>
     {
+        const tracker = this.CreateTracker(command);
+
         const channel = await this.ExecuteInteractiveCommand(command);
         return new Promise<string>( (resolve, reject) => {
             channel.stdout.setEncoding("utf-8");
             channel.stderr.setEncoding("utf-8");
 
-            channel.stdout.on("data", console.log);
-            channel.stderr.on("data", console.error);
+            channel.stdout.on("data", tracker.Add.bind(tracker));
+            channel.stderr.on("data", tracker.Add.bind(tracker));
             
             channel.on("exit", code => {
+                tracker.Add("Process exit code is:", code);
+                tracker.Finish();
+                resolve(code);
+            });
+            channel.on("close", (code: any, signal: any) => {
+                tracker.Add("Processed closed.", code, signal);
+                tracker.Finish();
                 resolve(code);
             });
         });
@@ -319,6 +343,12 @@ class SSHConnectionImpl implements SSHConnection
             commandLine: (command.sudo === true ? "sudo --stdin sh -c '" + nested + "'" : nested),
             sudo: command.sudo === true
         }
+    }
+
+    private CreateTracker(command: Command)
+    {
+        const ptm = GlobalInjector.Resolve(ProcessTrackerManager);
+        return ptm.Create(this.CommandToString(command).commandLine);
     }
 }
 

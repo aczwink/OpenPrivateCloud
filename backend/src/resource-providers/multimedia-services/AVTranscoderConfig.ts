@@ -43,8 +43,9 @@ export interface AVTranscoderConfig
         /**
          * @title Source path
          */
-        path: string;
+        sourcePath: string;
     };
 
     format: AVTranscoderFormat;
+    targetPath: string;
 }
