@@ -91,6 +91,8 @@ export class InstancesListComponent extends Component
                 return <MatIcon>verified</MatIcon>;
             case resourceProviders.webServices.nextcloudResourceType.name:
                 return <BootstrapIcon>cloud</BootstrapIcon>;
+            case resourceProviders.webServices.staticWebsiteResourceType.name:
+                return <BootstrapIcon>file-richtext</BootstrapIcon>;
         }
         return null;
     }

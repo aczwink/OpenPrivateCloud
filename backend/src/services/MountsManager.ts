@@ -25,14 +25,13 @@ import { APISchemaService } from "./APISchemaService";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
-import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 
 
 @Injectable
 export class MountsManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager, private apiSchemaService: APISchemaService,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteConnectionsManager: RemoteConnectionsManager)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
+        private apiSchemaService: APISchemaService, private remoteRootFileSystemManager: RemoteRootFileSystemManager)
     {
     }
     
@@ -48,18 +47,9 @@ export class MountsManager
     public async CreateUniqueLocationAndMountFull(hostId: number, type: FileSystemType, source: string, stdin?: string)
     {
         const mountPoint = await this.CreateUniqueMountPoint(hostId);
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-
-        const channel = await conn.value.ExecuteInteractiveCommand(["sudo", "mount", "-t", type, source, mountPoint]);
-        if(stdin !== undefined)
-            channel.stdin.write(stdin);
-
-        await new Promise<boolean>( (resolve, reject) => {
-            channel.on("exit", code => resolve(code === "0"));
-            channel.on("error", reject);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mount", "-t", type, source, mountPoint], hostId, {
+            stdin: stdin
         });
-
-        conn.Release();
 
         return mountPoint;
     }

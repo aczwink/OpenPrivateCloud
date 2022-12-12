@@ -48,4 +48,6 @@ export interface NodeAppServiceProperties extends BaseResourceProperties
 export interface StaticWebsiteProperties extends BaseResourceProperties
 {
     type: "static-website";
+    
+    port: number;
 }

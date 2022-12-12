@@ -21,7 +21,6 @@ import { HostsController } from "../data-access/HostsController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { UsersController } from "../data-access/UsersController";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
-import { SSHService } from "./SSHService";
 
 interface SambaUser
 {
@@ -33,7 +32,7 @@ interface SambaUser
 export class HostUsersManager
 {
     constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController,
-        private sshService: SSHService, private hostsController: HostsController, private permissionsController: PermissionsController)
+        private hostsController: HostsController, private permissionsController: PermissionsController)
     {
     }
 
@@ -189,25 +188,10 @@ export class HostUsersManager
      */
     private async AddSambaUser(hostId: number, userName: string, password: string)
     {
-        const host = await this.hostsController.RequestHostCredentials(hostId);
-        const conn = await this.sshService.ConnectWithCredentials(host!.hostName, "opc", host!.password);
-
-        const channel = await conn.ExecuteInteractiveCommand(["sudo", "smbpasswd", "-s", "-a", userName]);
-
-        channel.stdout.setEncoding("utf-8");
-        channel.stderr.setEncoding("utf-8");
-        channel.stdout.on("data", console.log);
-        channel.stderr.on("data", console.error);
-
-        channel.stdin.write(password + "\n");
-        channel.stdin.write(password + "\n");
-
-        await new Promise<boolean>( (resolve, reject) => {
-            channel.on("exit", code => resolve(code === "0"));
-            channel.on("error", reject);
+        const stdin = (password + "\n") + (password + "\n");
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-a", userName], hostId, {
+            stdin
         });
-
-        conn.Close();
     }
 
     private async CreateHostGroup(hostId: number, linuxGroupName: string)

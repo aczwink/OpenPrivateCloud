@@ -145,9 +145,6 @@ export class NextcloudManager
         const user = await this.usersController.QueryUser(userId);
         const priv = await this.usersController.QueryPrivateData(userId);
 
-        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
-        await shell.ChangeDirectory(appDir);
-
         const cmd = [
             "sudo", "-u", "www-data", "php", "occ", "maintenance:install",
             "--data-dir", '"' + dataDir + '"',
@@ -159,8 +156,6 @@ export class NextcloudManager
             "--admin-pass", '"' + priv!.sambaPW + '"',
         ];
 
-        await shell.ExecuteCommand(cmd);
-
-        await shell.Close();
+        await this.remoteCommandExecutor.ExecuteCommand(cmd, hostId, { workingDirectory: appDir });
     }
 }

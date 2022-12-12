@@ -21,14 +21,14 @@ import { Injectable } from "acts-util-node";
 import { LocalCommandExecutor } from "./LocalCommandExecutor";
 import { SSHConnection, SSHService } from "./SSHService";
 import { HostsController } from "../data-access/HostsController";
-import { HostStoragesManager } from "./HostStoragesManager";
 import { ModulesManager } from "./ModulesManager";
+import { SSHCommandExecutor } from "./SSHCommandExecutor";
 
 @Injectable
 export class HostsManager
 {
     constructor(private localCommandExecutor: LocalCommandExecutor, private modulesManager: ModulesManager,
-        private sshService: SSHService, private hostsController: HostsController)
+        private sshService: SSHService, private hostsController: HostsController, private sshCommandExecutor: SSHCommandExecutor)
     {
     }
 
@@ -51,17 +51,18 @@ export class HostsManager
     //Private methods
     private async ChangeUserPassword(conn: SSHConnection, oldPassword: string, newPassword: string)
     {
-        const channel = await conn.ExecuteInteractiveCommand(["passwd"]);
+        let stdin = "";
         if(oldPassword.trim().length !== 0) //it is possible, that the user does not have a password before. In that case it should be blank
-            channel.stdin.write(oldPassword + "\n");
-        channel.stdin.write(newPassword + "\n");
-        channel.stdin.write(newPassword + "\n");
-        channel.stdin.write("\n"); //in case the user had a password but oldPassword.length == 0, this will terminate passwd
+            stdin += (oldPassword + "\n");
+        
+        stdin += (newPassword + "\n");
+        stdin += (newPassword + "\n");
+        stdin += ("\n"); //in case the user had a password but oldPassword.length == 0, this will terminate passwd
 
-        return new Promise<boolean>( (resolve, reject) => {
-            channel.on("exit", code => resolve(code === "0"));
-            channel.on("error", reject);
-        });
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["passwd"], {
+            hostId: -1,
+            stdin,
+        }); //TODO: hostid
     }
 
     private async CopyPublicKeyToHost(keyName: string, hostName: string)
@@ -71,8 +72,9 @@ export class HostsManager
         const conn = await this.sshService.ConnectWithCredentials(hostName, "opc", "opc");
         await conn.AppendFile("/home/opc/.ssh/authorized_keys", pubKey);
 
-        conn.ExecuteCommand(["sudo", "passwd", "-d", "opc"]);
-        conn.ExecuteCommand(["sudo", "passwd", "-l", "opc"]);
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-d", "opc"], { hostId: -1 }); //TODO: hostid
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-l", "opc"], { hostId: -1 }); //TODO: hostid
+
         conn.Close();
     }
 

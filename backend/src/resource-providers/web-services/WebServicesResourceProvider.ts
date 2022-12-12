@@ -19,16 +19,17 @@ import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
 import { InstancesManager } from "../../services/InstancesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
-import { JdownloaderProperties, LetsEncryptProperties, NextcloudProperties } from "./Properties";
+import { JdownloaderProperties, LetsEncryptProperties, NextcloudProperties, StaticWebsiteProperties } from "./Properties";
 import { NextcloudManager } from "./NextcloudManager";
 import { LetsEncryptManager } from "./LetsEncryptManager";
 import { JdownloaderManager } from "./JdownloaderManager";
+import { StaticWebsitesManager } from "./StaticWebsitesManager";
 
 @Injectable
-export class WebServicesResourceProvider implements ResourceProvider<JdownloaderProperties | LetsEncryptProperties | NextcloudProperties>
+export class WebServicesResourceProvider implements ResourceProvider<JdownloaderProperties | LetsEncryptProperties | NextcloudProperties | StaticWebsiteProperties>
 { 
     constructor(private instancesManager: InstancesManager, private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager,
-        private jdownloaderManager: JdownloaderManager)
+        private jdownloaderManager: JdownloaderManager, private staticWebsitesManager: StaticWebsitesManager)
     {
     }
 
@@ -58,6 +59,11 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
                 schemaName: "NextcloudProperties"
+            },
+            {
+                healthCheckSchedule: null,
+                fileSystemType: "btrfs",
+                schemaName: "StaticWebsiteProperties"
             }
         ];
     }
@@ -91,6 +97,9 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
             case resourceProviders.webServices.nextcloudResourceType.name:
                 await this.nextcloudManager.DeleteResource(hostId, hostStoragePath, fullInstanceName);
                 break;
+            case resourceProviders.webServices.staticWebsiteResourceType.name:
+                await this.staticWebsitesManager.DeleteResource(hostId, hostStoragePath, fullInstanceName);
+                break;
         }
         return null;
     }
@@ -99,7 +108,7 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
     {
     }
 
-    public async ProvideResource(instanceProperties: JdownloaderProperties | LetsEncryptProperties | NextcloudProperties, context: DeploymentContext): Promise<DeploymentResult>
+    public async ProvideResource(instanceProperties: JdownloaderProperties | LetsEncryptProperties | NextcloudProperties | StaticWebsiteProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         switch(instanceProperties.type)
         {
@@ -111,6 +120,9 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
                 break;
             case "nextcloud":
                 await this.nextcloudManager.ProvideResource(instanceProperties, context);
+                break;
+            case "static-website":
+                await this.staticWebsitesManager.ProvideResource(instanceProperties, context);
                 break;
         }
 

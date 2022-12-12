@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { EnumeratorBuilder } from "acts-util-core/dist/Enumeration/EnumeratorBuilder";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
@@ -53,6 +54,15 @@ export class ApacheManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "a2dismod", name], hostId);
     }
 
+    public async DisablePort(hostId: number, port: number)
+    {
+        const ports = await this.ReadPortsFile(hostId);
+        const portsSet = ports.Values().ToSet();
+        portsSet.delete(port);
+
+        await this.WritePortsFile(hostId, portsSet.Values());
+    }
+
     public async DisableSite(hostId: number, name: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "a2dissite", name], hostId);
@@ -63,6 +73,14 @@ export class ApacheManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "a2enmod", name], hostId);
     }
 
+    public async EnablePort(hostId: number, port: number)
+    {
+        const ports = await this.ReadPortsFile(hostId);
+        const newPorts = ports.Values().ToSet().add(port);
+
+        await this.WritePortsFile(hostId, newPorts.Values());
+    }
+
     public async EnableSite(hostId: number, name: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "a2ensite", name], hostId);
@@ -71,12 +89,6 @@ export class ApacheManager
     public async QueryModules(hostId: number)
     {
         return this.QueryEntities("mods-available", "-m", hostId);
-    }
-
-    public QueryPorts()
-    {
-        throw new Error("not implemented");
-        //return fs.readFileSync("/etc/apache2/ports.conf", "utf-8");
     }
 
     public async QuerySite(hostId: number, siteName: string)
@@ -115,5 +127,27 @@ export class ApacheManager
             entities.push({ name: modName, enabled });
         }
         return entities;
+    }
+
+    private async ReadPortsFile(hostId: number)
+    {
+        const data = await this.remoteFileSystemManager.ReadTextFile(hostId, "/etc/apache2/ports.conf");
+        const lines = data.split("\n");
+
+        const ports = [];
+        for (const line of lines)
+        {
+            const trimmed = line.trim();
+            if( trimmed.startsWith("#") || (trimmed.length === 0) )
+                continue;
+            ports.push(parseInt(trimmed.split(" ")[1]));
+        }
+        return ports;
+    }
+
+    private async WritePortsFile(hostId: number, ports: EnumeratorBuilder<number>)
+    {
+        const data = ports.OrderBy(x => x).Map(x => "Listen " + x).Join("\n");
+        await this.remoteRootFileSystemManager.WriteTextFile(hostId, "/etc/apache2/ports.conf", data);
     }
 }

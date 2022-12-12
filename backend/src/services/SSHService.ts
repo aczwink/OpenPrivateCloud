@@ -17,8 +17,7 @@
  * */
 
 import ssh2 from "ssh2";
-import { GlobalInjector, Injectable } from "acts-util-node";
-import { ProcessTrackerManager } from "./ProcessTrackerManager";
+import { Injectable } from "acts-util-node";
 
 export type Command = string[] | {
     type: "redirect-stdout" | "pipe",
@@ -27,12 +26,6 @@ export type Command = string[] | {
     target: Command;
 };
 
-export interface CommandResult
-{
-    stdErr: string;
-    stdOut: string;
-}
-
 export interface SSHConnection
 {
     AppendFile(remotePath: string, content: string): Promise<void>;
@@ -40,9 +33,7 @@ export interface SSHConnection
     ChangeOwnerAndGroup(remotePath: string, ownerUserId: number, groupUserId: number): Promise<void>;
     Close(): void;
     CreateDirectory(remotePath: string, attributes?: ssh2.InputAttributes): Promise<Error | null>;
-    ExecuteBufferedCommand(command: string[]): Promise<CommandResult>;
-    ExecuteCommand(command: Command): Promise<string>;
-    ExecuteInteractiveCommand(command: string[]): Promise<ssh2.ClientChannel>;
+    ExecuteInteractiveCommand(command: string, asRoot?: boolean): Promise<ssh2.ClientChannel>;
     ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
     MoveFile(sourcePath: string, targetPath: string): Promise<void>;
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
@@ -117,74 +108,8 @@ class SSHConnectionImpl implements SSHConnection
         });
     }
 
-    public async ExecuteBufferedCommand(command: string[]): Promise<CommandResult>
+    public async ExecuteInteractiveCommand(commandLine: string, asRoot?: boolean): Promise<ssh2.ClientChannel>
     {
-        const tracker = this.CreateTracker(command);
-        const channel = await this.ExecuteInteractiveCommand(command);
-
-        let stdOut = "";
-        let stdErr = "";
-
-        await new Promise<void>( (resolve, reject) => {
-            channel.stdout.setEncoding("utf-8");
-            channel.stderr.setEncoding("utf-8");
-
-            channel.stdout.on("data", (chunk: string) => {
-                stdOut += chunk;
-                tracker.Add(chunk);
-            });
-            channel.stderr.on("data", (chunk: string) => {
-                stdErr += chunk;
-                tracker.Add(chunk);
-            });
-            
-            channel.on("exit", code => {
-                tracker.Add("Process exit code is:", code);
-                tracker.Finish();
-                resolve();
-            });
-            channel.on("close", (code: any, signal: any) => {
-                tracker.Add("Processed closed.", code, signal);
-                tracker.Finish();
-                resolve(code);
-            });
-        });
-
-        return {
-            stdErr,
-            stdOut
-        };
-    }
-
-    public async ExecuteCommand(command: Command): Promise<string>
-    {
-        const tracker = this.CreateTracker(command);
-
-        const channel = await this.ExecuteInteractiveCommand(command);
-        return new Promise<string>( (resolve, reject) => {
-            channel.stdout.setEncoding("utf-8");
-            channel.stderr.setEncoding("utf-8");
-
-            channel.stdout.on("data", tracker.Add.bind(tracker));
-            channel.stderr.on("data", tracker.Add.bind(tracker));
-            
-            channel.on("exit", code => {
-                tracker.Add("Process exit code is:", code);
-                tracker.Finish();
-                resolve(code);
-            });
-            channel.on("close", (code: any, signal: any) => {
-                tracker.Add("Processed closed.", code, signal);
-                tracker.Finish();
-                resolve(code);
-            });
-        });
-    }
-
-    public async ExecuteInteractiveCommand(command: Command): Promise<ssh2.ClientChannel>
-    {
-        const { commandLine, sudo } = this.CommandToString(command);
-
         const channel = await new Promise<ssh2.ClientChannel>( (resolve, reject) => {
             this.conn.exec(commandLine, {
                 //pty: hasSudo
@@ -197,7 +122,7 @@ class SSHConnectionImpl implements SSHConnection
             });
         });
 
-        if(sudo)
+        if(asRoot === true)
             channel.stdin.write(this.password + "\n");
 
         return channel;
@@ -309,46 +234,6 @@ class SSHConnectionImpl implements SSHConnection
                     resolve();
             });
         });
-    }
-
-    //Private methods
-    private CommandToString(command: Command): { commandLine: string; sudo: boolean }
-    {
-        if(Array.isArray(command))
-        {
-            if(command[0] === "sudo")
-            {
-                command.splice(1, 0, "--stdin");
-            }
-            return {
-                commandLine: command.join(" "),
-                sudo: command[0] === "sudo"
-            };
-        }
-
-        let op;
-        switch(command.type)
-        {
-            case "pipe":
-                op = "|";
-                break;
-            case "redirect-stdout":
-                op = ">";
-                break;
-        }
-
-        const nested = this.CommandToString(command.source).commandLine + " " + op + " " + this.CommandToString(command.target).commandLine;
-
-        return {
-            commandLine: (command.sudo === true ? "sudo --stdin sh -c '" + nested + "'" : nested),
-            sudo: command.sudo === true
-        }
-    }
-
-    private CreateTracker(command: Command)
-    {
-        const ptm = GlobalInjector.Resolve(ProcessTrackerManager);
-        return ptm.Create(this.CommandToString(command).commandLine);
     }
 }
 

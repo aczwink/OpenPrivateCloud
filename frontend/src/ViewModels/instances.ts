@@ -29,6 +29,7 @@ import { nextcloudViewModel } from "./web-services/nextcloud";
 import { AddInstanceComponent } from "../Views/instances/AddInstanceComponent";
 import { jdownloaderViewModel } from "./web-services/jdownloader";
 import { avTranscoderViewModel } from "./multimedia-services/av-transcoder";
+import { staticWebsiteViewModel } from "./web-services/staticWebsite";
 
 const root: RoutingViewModel = {
     type: "routing",
@@ -78,6 +79,10 @@ const root: RoutingViewModel = {
         {
             key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.nextcloudResourceType.name}/:instanceName`,
             viewModel: nextcloudViewModel,
+        },
+        {
+            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.staticWebsiteResourceType.name}/:instanceName`,
+            viewModel: staticWebsiteViewModel,
         }
     ]
 }
