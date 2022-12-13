@@ -42,7 +42,7 @@ export interface SSHConnection
     RemoveDirectory(remotePath: string): Promise<void>;
     SpawnShell(): Promise<ssh2.ClientChannel>;
     UnlinkFile(remotePath: string): Promise<void>;
-    WriteFile(remotePath: string, content: Buffer): Promise<void>;
+    WriteFile(remotePath: string, content: Buffer, mode?: number): Promise<void>;
 }
 
 class SSHConnectionImpl implements SSHConnection
@@ -224,10 +224,12 @@ class SSHConnectionImpl implements SSHConnection
         });
     }
 
-    public async WriteFile(remotePath: string, content: Buffer): Promise<void>
+    public async WriteFile(remotePath: string, content: Buffer, mode?: number): Promise<void>
     {
         return new Promise<void>( (resolve, reject) => {
-            this.sftp.writeFile(remotePath, content, err => {
+            this.sftp.writeFile(remotePath, content, {
+                mode
+            }, err => {
                 if(err)
                     reject(err);
                 else

@@ -28,6 +28,8 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { BackupTargetMountService, TargetFileSystemType } from "./BackupTargetMountService";
+import { Command } from "../../services/SSHService";
+import { TempFilesManager } from "../../services/TempFilesManager";
 
  
 @Injectable
@@ -37,7 +39,7 @@ export class BackupProcessService
         private hostStoragesController: HostStoragesController, private instanceLogsController: InstanceLogsController,
         private instancesManager: InstancesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private fileStoragesManager: FileStoragesManager,
-        private remoteFileSystemManager: RemoteFileSystemManager,
+        private remoteFileSystemManager: RemoteFileSystemManager, private tempFilesManager: TempFilesManager,
         private backupTargetMountService: BackupTargetMountService)
     {
     }
@@ -54,9 +56,9 @@ export class BackupProcessService
         const mountStatus = await this.backupTargetMountService.MountTarget(hostId, target, processTracker);
 
         for (const fileStorage of sources.fileStorages)
-            await this.BackupFileStorage(hostId, fileStorage, mountStatus.targetPath, mountStatus.targetFileSystemType, processTracker);
+            await this.BackupFileStorage(hostId, fileStorage, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
         for (const database of sources.databases)
-            await this.BackupDatabase(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, processTracker);
+            await this.BackupDatabase(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
 
         await mountStatus.Unmount();
 
@@ -66,30 +68,37 @@ export class BackupProcessService
     }
 
     //Private methods
-    private async BackupDatabase(hostId: number, database: BackupVaultDatabaseConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, processTracker: ProcessTracker)
+    private async BackupDatabase(hostId: number, database: BackupVaultDatabaseConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker)
     {
         const targetPath = this.instancesManager.BuildInstanceStoragePath(backupTargetPath, database.fullInstanceName);
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetPath);
 
-        const snapshotFileName = new Date().toISOString() + ".sql.gz";
+        const snapshotFileName = new Date().toISOString() + ".sql.gz" + (encryptionPassphrase === undefined ? "" : ".gpg");
         const targetSnapshotFileName = this.ReplaceSpecialCharacters(snapshotFileName, targetFileSystemType);
 
         processTracker.Add("Backing up MariaDB database", database.databaseName);
 
+        let secretPath = undefined;
+        if(encryptionPassphrase !== undefined)
+            secretPath = await this.tempFilesManager.CreateSecretFile(hostId, encryptionPassphrase);
+
         const dumpPath = path.join(targetPath, targetSnapshotFileName);
         await this.remoteCommandExecutor.ExecuteCommand({
-            source: {
+            source: this.CreateGPGEncryptionCommandOrPipe({
                 source: ["mysqldump", "-u", "root", database.databaseName],
                 target: ["gzip"],
                 type: "pipe",
-            },
+            }, secretPath),
             target: [dumpPath],
             type: "redirect-stdout",
             sudo: true
         }, hostId);
+
+        if(secretPath !== undefined)
+            await this.tempFilesManager.Cleanup(hostId, secretPath);
     }
 
-    private async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, processTracker: ProcessTracker)
+    private async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker)
     {
         const instance = await this.instancesController.QueryInstance(fileStorage.fullInstanceName);
         if(instance === undefined)
@@ -126,7 +135,7 @@ export class BackupProcessService
             {
                 processTracker.Add("Backing up snapshot", snapshotName);
 
-                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, processTracker);
+                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, encryptionPassphrase, processTracker);
             }
             else
             {
@@ -134,19 +143,22 @@ export class BackupProcessService
 
                 const prevSourceDir = path.join(this.fileStoragesManager.GetSnapshotsPath(storagePath, fileStorage.fullInstanceName), prevSnapshotName);
 
-                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, processTracker, prevSourceDir);
+                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, encryptionPassphrase, processTracker, prevSourceDir);
             }
 
             processTracker.Add("Finished copying snapshot", snapshotName);
         }
     }
 
-    private async BackupFileStorageSnapshot(hostId: number, sourceDir: string, targetDir: string, targetFileSystemType: TargetFileSystemType, processTracker: ProcessTracker, prevSourceDir?: string)
+    private async BackupFileStorageSnapshot(hostId: number, sourceDir: string, targetDir: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker, prevSourceDir?: string)
     {
         switch(targetFileSystemType)
         {
             case "btrfs":
             {
+                if(encryptionPassphrase !== undefined)
+                    throw new Error("should never happen");
+
                 const cmdExtra = [];
 
                 processTracker.Add("Doing btrfs send/receive backup");
@@ -167,22 +179,32 @@ export class BackupProcessService
                 processTracker.Add("Doing tar/gz backup");
 
                 const snapshotName = this.ReplaceSpecialCharacters(path.basename(sourceDir), targetFileSystemType);
-                const targetPath = path.join(targetDir, snapshotName + ".tar.gz");
+                const targetPath = path.join(targetDir, snapshotName + ".tar.gz" + (encryptionPassphrase === undefined ? "" : ".gpg"));
+
+                let secretPath = undefined;
+                if(encryptionPassphrase !== undefined)
+                    secretPath = await this.tempFilesManager.CreateSecretFile(hostId, encryptionPassphrase);
 
                 await this.remoteCommandExecutor.ExecuteCommand({
                     type: "redirect-stdout",
-                    source: {
+                    source: this.CreateGPGEncryptionCommandOrPipe({
                         type: "pipe",
                         source: ["tar", "-cf", "-", "-C", sourceDir, "."],
                         target: ["gzip"]
-                    },
+                    }, secretPath),
                     target: [targetPath],
                     sudo: true
                 }, hostId);
+
+                if(secretPath !== undefined)
+                    await this.tempFilesManager.Cleanup(hostId, secretPath);
             }
             break;
             case "linux":
             {
+                if(encryptionPassphrase !== undefined)
+                    throw new Error("should never happen");
+
                 processTracker.Add("Doing rsync backup");
                 processTracker.Add("THIS HAS NOT BEED TESTED");
                 throw new Error("TEST THIS");
@@ -190,6 +212,27 @@ export class BackupProcessService
                 await this.remoteCommandExecutor.ExecuteCommand(cmd, hostId);
             }
             break;
+        }
+    }
+
+    private CreateGPGEncryptionCommandOrPipe(input: Command, secretPath: string | undefined): Command
+    {
+        if(secretPath === undefined)
+            return input;
+
+        return {
+            type: "pipe",
+            source: input,
+            target: [
+                "gpg",
+                "-z", "0", //no compression
+                "--passphrase-file", secretPath,
+                "--cipher-algo", "AES256",
+                "--symmetric",
+                "--batch",
+                "--no-symkey-cache", //don't cache password in keyring
+                "-" //write to stdout
+            ]
         }
     }
 

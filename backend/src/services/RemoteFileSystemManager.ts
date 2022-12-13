@@ -139,10 +139,10 @@ export class RemoteFileSystemManager
         conn.Release();
     }
 
-    public async WriteTextFile(hostId: number, filePath: string, text: string)
+    public async WriteTextFile(hostId: number, filePath: string, text: string, mode?: number)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.WriteFile(filePath, Buffer.from(text, "utf-8"));
+        await conn.value.WriteFile(filePath, Buffer.from(text, "utf-8"), mode);
         conn.Release();
     }
 }

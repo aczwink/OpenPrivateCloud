@@ -25,6 +25,7 @@ import { BackupVaultTargetConfig, BackupVaultWebDAVTargetConfig } from "./models
 export type TargetFileSystemType = "btrfs" | "linux" | "limited";
 interface MountedBackupTarget
 {
+    encryptionPassphrase?: string;
     targetFileSystemType: TargetFileSystemType;
     targetPath: string;
     Unmount(): Promise<void>;
@@ -92,6 +93,7 @@ export class BackupTargetMountService
         processTracker.Add("Mounted", target.serverUrl, "on", mountPoint);
 
         return {
+            encryptionPassphrase: (target.encryptionPassphrase.trim().length > 0) ? target.encryptionPassphrase.trim() : undefined,
             targetFileSystemType: "limited",
             targetPath: mountPoint,
             Unmount: this.UnmountSource.bind(this, hostId, target.serverUrl, processTracker)

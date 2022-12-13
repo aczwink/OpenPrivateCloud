@@ -59,7 +59,15 @@ export interface BackupVaultWebDAVTargetConfig
     type: "webdav";
     serverUrl: string;
     userName: string;
+    /**
+     * @format secret
+     */
     password: string;
+    /**
+     * Leave blank for no encryption
+     * @format multi-line
+     */
+     encryptionPassphrase: string;
 }
 
 export type BackupVaultTargetConfig = BackupVaultStorageDeviceTargetConfig | BackupVaultWebDAVTargetConfig;

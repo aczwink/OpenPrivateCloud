@@ -104,10 +104,12 @@ export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleR
         case "number":
             return RenderNumber(value, schema);
         case "string":
-            switch(schema.format)
+            switch(schema.format as string)
             {
                 case "date-time":
                     return new Date(value).toLocaleString();
+                case "secret":
+                    return <input className="form-control" type="password" value={value} disabled />;
             }
             if(schema.format as string === "multi-line")
                 return <textarea className="form-control" cols="80" readOnly rows="12">{value}</textarea>;

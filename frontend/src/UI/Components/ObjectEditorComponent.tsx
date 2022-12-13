@@ -178,6 +178,9 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
         let className = "";
         if((schema.format !== undefined) || (schema.pattern !== undefined))
         {
+            const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
+            className = validator.ValidateString(value, schema) ? "is-valid" : "is-invalid";
+
             switch(schema.format as string)
             {
                 case "hostName":
@@ -185,6 +188,8 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
                         onChanged={newValue => valueChanged(newValue.key)}
                         onLoadSuggestions={this.LoadHostNames.bind(this)}
                         selection={ (value.trim().length === 0 ? null : ({ key: value, displayValue: value}))} />;
+                case "secret":
+                    return <LineEdit className={className} password value={value.toString()} onChanged={valueChanged} />;
             }
 
             if(schema.format?.startsWith("instance-same-host["))
@@ -193,9 +198,6 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
                 const arg = schema.format.substring(idx+1, schema.format.length - 1);
                 return <HostInstanceSelectionComponent type={arg} hostName={this.input.context!.hostName} value={value} valueChanged={valueChanged} />;
             }
-
-            const validator = new OpenAPISchemaValidator(this.apiSchemaService.root);
-            className = validator.ValidateString(value, schema) ? "is-valid" : "is-invalid";
         }
 
         return <LineEdit className={className} value={value.toString()} onChanged={valueChanged} />;
