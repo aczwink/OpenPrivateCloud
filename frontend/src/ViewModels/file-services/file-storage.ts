@@ -16,12 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { DeploymentDataDto, InstancePermission, SMBConfig, SMBConnectionInfo, SnapshotDto } from "../../../dist/api";
-import { APIService } from "../../Services/APIService";
+import { DeploymentDataDto, SMBConfig, SMBConnectionInfo, SnapshotDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { FileManagerComponent } from "../../Views/file-manager/FileManagerComponent";
 import { resourceProviders } from "openprivatecloud-common";
 import { ListViewModel } from "../../UI/ListViewModel";
+import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
 
 type InstanceId = { instanceName: string };
 
@@ -36,25 +36,6 @@ const overviewViewModel: ObjectViewModel<DeploymentDataDto, InstanceId>  = {
     formTitle: _ => "Overview",
     requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.deploymentdata.get(ids.instanceName),
     schemaName: "DeploymentDataDto",
-};
-
-const accessControlViewModel: ListViewModel<InstancePermission, InstanceId> = {
-    actions: [
-        {
-            type: "create",
-            createResource: (service, ids, permission) => service.instances.permissions.post({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
-        }
-    ],
-    boundActions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids, permission) => service.instances.permissions.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }, permission)
-        }
-    ],
-    displayName: "Access control",
-    requestObjects: (service, ids) => service.instances.permissions.get({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }),
-    schemaName: "InstancePermission",
-    type: "list",
 };
 
 const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId>  = {
@@ -108,11 +89,7 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId> = {
             child: overviewViewModel,
             displayName: "Overview"
         },
-        {
-            child: accessControlViewModel,
-            displayName: "Access control",
-            key: "access"
-        },
+        BuildAccessControlPageEntry(BuildFullInstanceName),
         {
             key: "file-manager",
             child: {

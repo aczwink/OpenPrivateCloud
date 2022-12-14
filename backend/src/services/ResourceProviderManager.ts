@@ -29,6 +29,7 @@ import { PermissionsManager } from "./PermissionsManager";
 import { InstanceLogsController } from "../data-access/InstanceLogsController";
 import { ProcessTrackerManager } from "./ProcessTrackerManager";
 import { HealthController } from "../data-access/HealthController";
+import { RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 
 @Injectable
 export class ResourceProviderManager
@@ -36,7 +37,7 @@ export class ResourceProviderManager
     constructor(private apiSchemaService: APISchemaService, private instancesController: InstancesController, private hostStoragesManager: HostStoragesManager,
         private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController, private permissionsManager: PermissionsManager,
         private instanceConfigController: InstanceConfigController, private instanceLogsController: InstanceLogsController,
-        private processTrackerManager: ProcessTrackerManager, private healthController: HealthController)
+        private processTrackerManager: ProcessTrackerManager, private healthController: HealthController, private roleAssignmentsController: RoleAssignmentsController)
     {
         this._resourceProviders = [];
     }
@@ -83,9 +84,9 @@ export class ResourceProviderManager
         await this.healthController.DeleteInstanceHealthData(instance!.id);
         await this.instanceLogsController.DeleteLogsAssociatedWithInstance(instance!.id);
 
-        const permissions = await this.instancesController.QueryInstancePermissions(fullInstanceName);
-        for (const instancePermission of permissions)
-            await this.permissionsManager.DeleteInstancePermission(fullInstanceName, instancePermission);
+        const roleAssignments = await this.roleAssignmentsController.QueryInstanceRoleAssignments(fullInstanceName);
+        for (const roleAssignment of roleAssignments)
+            await this.permissionsManager.DeleteInstanceRoleAssignment(instance!.id, roleAssignment);
 
         await this.instancesController.DeleteInstance(fullInstanceName);
         

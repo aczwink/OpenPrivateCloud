@@ -16,10 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { permissions } from "./permissions";
-import { resourceProviders } from "./resourceProviders";
+export const permissions =
+{
+    data: {
+        read: "/data/read"
+    },
 
-export {
-    permissions,
-    resourceProviders
+    /**
+     * General read rights, i.e. to read/see an instance
+     */
+    read: "/read"
 }

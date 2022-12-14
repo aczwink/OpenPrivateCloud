@@ -52,7 +52,7 @@ export class RootComponent extends Component
                 <NavItem route="/"><BootstrapIcon>speedometer2</BootstrapIcon> Dashboard</NavItem>
                 <NavItem route="/instances"><BootstrapIcon>server</BootstrapIcon> Instances</NavItem>
                 <NavItem route="/hosts"><BootstrapIcon>pc</BootstrapIcon> Hosts</NavItem>
-                <NavItem route="/usersandgroups"><BootstrapIcon>people-fill</BootstrapIcon> Users</NavItem>
+                <NavItem route="/usersandgroups"><BootstrapIcon>people-fill</BootstrapIcon> IAM</NavItem>
                 <NavItem route="/activitymonitor"><BootstrapIcon>activity</BootstrapIcon> Activity monitor</NavItem>
                 <NavItem route="/settings"><BootstrapIcon>gear-fill</BootstrapIcon> Settings</NavItem>
             </ul>

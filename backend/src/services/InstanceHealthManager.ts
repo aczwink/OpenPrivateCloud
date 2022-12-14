@@ -36,17 +36,17 @@ export class InstanceHealthManager
     //Public methods
     public async ScheduleInstanceChecks()
     {
-        const instances = await this.instancesController.QueryInstances();
-        for (const instance of instances)
+        const instanceIds = await this.instancesController.QueryAllInstanceIds();
+        for (const instanceId of instanceIds)
         {
-            this.ScheduleInstanceCheck(instance.fullName);
+            this.ScheduleInstanceCheck(instanceId);
         }
     }
 
     //Private methods
-    private async CheckInstance(fullInstanceName: string)
+    private async CheckInstance(instanceId: number)
     {
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        const instance = await this.instancesController.QueryInstanceById(instanceId);
         if(instance === undefined)
             return false; //instance was deleted
 
@@ -77,24 +77,25 @@ export class InstanceHealthManager
         return groups[0].id;
     }
 
-    private async ScheduleInstanceCheck(fullInstanceName: string)
+    private async ScheduleInstanceCheck(instanceId: number)
     {
-        const schedule = this.resourceProviderManager.RetrieveInstanceCheckSchedule(fullInstanceName);
+        const instance = await this.instancesController.QueryInstanceById(instanceId);
+
+        const schedule = this.resourceProviderManager.RetrieveInstanceCheckSchedule(instance!.fullName);
         if(schedule === null)
             return;
 
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        const hd = await this.healthController.QueryInstanceHealthData(instance!.id);
+        const hd = await this.healthController.QueryInstanceHealthData(instanceId);
         const lastSuccessfulCheck = hd?.lastSuccessfulCheck ?? new Date(0);
 
-        this.taskScheduler.ScheduleWithOverdueProtection(lastSuccessfulCheck, schedule, this.OnInstanceCheckScheduled.bind(this, fullInstanceName));
+        this.taskScheduler.ScheduleWithOverdueProtection(lastSuccessfulCheck, schedule, this.OnInstanceCheckScheduled.bind(this, instanceId));
     }
 
     //Event handlers
-    private async OnInstanceCheckScheduled(fullInstanceName: string)
+    private async OnInstanceCheckScheduled(instanceId: number)
     {
-        const checkResult = await this.CheckInstance(fullInstanceName);
+        const checkResult = await this.CheckInstance(instanceId);
         if(checkResult)
-            this.ScheduleInstanceCheck(fullInstanceName);
+            this.ScheduleInstanceCheck(instanceId);
     }
 }

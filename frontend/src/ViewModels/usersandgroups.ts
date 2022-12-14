@@ -16,7 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { MembershipDataDto, PublicUserData, UserCreationData, UserGroup, UserGroupCreationData } from "../../dist/api";
+import { MembershipDataDto, PublicUserData, RoleAssignment, UserCreationData, UserGroup, UserGroupCreationData } from "../../dist/api";
+import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 
 type UserIdRouteParams = { userId: number };
@@ -121,6 +122,25 @@ const userGroupsViewModel: CollectionViewModel<UserGroup, {}, UserGroupCreationD
     type: "collection",
 };
 
+const clusterRoleAssignmentsViewModel: ListViewModel<RoleAssignment, {}> = {
+    type: "list",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, _, roleAssignment) => service.roleAssignments.post(roleAssignment),
+        }
+    ],
+    boundActions: [
+        {
+            type: "delete",
+            deleteResource: (service, _, obj) => service.roleAssignments.delete(obj),
+        }
+    ],
+    displayName: "Cluster-level role assignments",
+    requestObjects: (service, _) => service.roleAssignments.get(),
+    schemaName: "RoleAssignment"
+};
+
 const usersAndGroupsViewModel: MultiPageViewModel<{}> = {
     type: "multiPage",
     actions: [],
@@ -129,11 +149,28 @@ const usersAndGroupsViewModel: MultiPageViewModel<{}> = {
             child: usersViewModel,
             displayName: "Users",
             key: "users",
+            icon: {
+                type: "bootstrap",
+                name: "person"
+            }
         },
         {
             child: userGroupsViewModel,
             displayName: "Groups",
-            key: "groups"
+            key: "groups",
+            icon: {
+                type: "bootstrap",
+                name: "people"
+            }
+        },
+        {
+            child: clusterRoleAssignmentsViewModel,
+            displayName: "Cluster access control",
+            key: "clusteraccess",
+            icon: {
+                type: "bootstrap",
+                name: "lock-fill"
+            }
         }
     ],
     formTitle: _ => "Users and groups management",

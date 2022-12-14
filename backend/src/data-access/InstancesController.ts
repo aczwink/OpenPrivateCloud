@@ -30,16 +30,6 @@ export interface FullInstance extends Instance
     id: number;
 }
 
-export interface InstancePermission
-{
-    /**
-     * @title Usergroup
-     * @format usergroup
-     */
-    userGroupId: number;
-    permission: string;
-}
-
 @Injectable
 export class InstancesController
 {
@@ -55,39 +45,34 @@ export class InstancesController
         return result.insertId;
     }
 
-    public async AddInstancePermission(fullInstanceName: string, instancePermission: InstancePermission)
-    {
-        const instanceId = await this.QueryInstanceId(fullInstanceName);
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("instances_permissions", { instanceId, userGroupId: instancePermission.userGroupId, permission: instancePermission.permission });
-    }
-
     public async DeleteInstance(fullInstanceName: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         await conn.DeleteRows("instances", "fullName = ?", fullInstanceName)
     }
 
-    public async DeleteInstancePermission(fullInstanceName: string, instancePermission: InstancePermission)
+    public async QueryAllInstanceIds()
     {
-        const instanceId = await this.QueryInstanceId(fullInstanceName);
-
+        const query = `
+        SELECT id
+        FROM instances
+        `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("instances_permissions", "instanceId = ? AND userGroupId = ? AND permission = ?", instanceId!, instancePermission.userGroupId, instancePermission.permission)
+        const rows = await conn.Select(query);
+        return rows.Values().Map(x => x.id as number);
     }
 
-    public async QueryHostIdOfInstance(fullInstanceName: string)
+    public async QueryHostIdOfInstance(instanceId: number)
     {
         const query = `
         SELECT hs.hostId
         FROM instances i
         INNER JOIN hosts_storages hs
             ON i.storageId = hs.id
-        WHERE i.fullName = ?
+        WHERE i.id = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, fullInstanceName);
+        const row = await conn.SelectOne(query, instanceId);
         if(row === undefined)
             return undefined;
 
@@ -128,29 +113,6 @@ export class InstancesController
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         const rows = await conn.Select(query, hostId);
         return rows.map(x => x.id as number);
-    }
-
-    public async QueryInstancePermissions(fullInstanceName: string)
-    {
-        const query = `
-        SELECT ip.userGroupId, ip.permission
-        FROM instances_permissions ip
-        INNER JOIN instances i
-            ON i.id = ip.instanceId
-        WHERE i.fullName = ?
-        `;
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.Select<InstancePermission>(query, fullInstanceName);
-    }
-
-    public async QueryInstances()
-    {
-        const query = `
-        SELECT fullName, storageId
-        FROM instances
-        `;
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.Select<Instance>(query);
     }
 
     public async Search(hostName: string, fullNamePattern: string)

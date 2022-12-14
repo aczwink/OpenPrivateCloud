@@ -27,8 +27,28 @@ export class PermissionsController
     }
 
     //Public methods
+    public async HasUserClusterWidePermission(userId: number, permission: string)
+    {
+        const query = `
+        SELECT TRUE
+        FROM cluster_roleAssignments cra
+        INNER JOIN usergroups_members ugm
+            ON ugm.groupId = cra.userGroupId AND ugm.userId = ?
+        INNER JOIN roles_permissions rp
+            ON cra.roleId = rp.roleId
+        WHERE rp.permission = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne(query, userId, permission);
+
+        return row !== undefined;
+    }
+
     public async IsUserRequiredOnHost(hostId: number, userId: number)
     {
+        throw new Error("TODO: reimplement IsUserRequiredOnHost");
+
         let query = `
         SELECT TRUE
         FROM usergroups_members ugm
@@ -49,6 +69,8 @@ export class PermissionsController
 
     public async QueryAllUsersRequiredOnHost(hostId: number)
     {
+        throw new Error("TODO: reimplement QueryAllUsersRequiredOnHost");
+        
         let query = `
         SELECT ugm.userId
         FROM usergroups_members ugm
@@ -70,10 +92,10 @@ export class PermissionsController
     public async QueryGroupsAssociatedWithHost(hostId: number)
     {
         let query = `
-        SELECT ip.userGroupId
-        FROM instances_permissions ip
+        SELECT ira.userGroupId
+        FROM instances_roleAssignments ira
         INNER JOIN instances i
-            ON ip.instanceId = i.id
+            ON ira.instanceId = i.id
         INNER JOIN hosts_storages hs
             ON i.storageId = hs.id
         WHERE hs.hostId = ?
@@ -87,6 +109,8 @@ export class PermissionsController
 
     public async QueryGroupsWithPermission(instanceId: number, permission: string)
     {
+        throw new Error("TODO: reimplement QueryGroupsWithPermission");
+
         let query = `
         SELECT userGroupId
         FROM instances_permissions
@@ -101,6 +125,8 @@ export class PermissionsController
 
     public async QueryHostsAssociatedWithGroup(userGroupId: number)
     {
+        throw new Error("TODO: reimplement QueryHostsAssociatedWithGroup");
+
         let query = `
         SELECT DISTINCT hs.hostId
         FROM hosts_storages hs
@@ -119,6 +145,8 @@ export class PermissionsController
 
     public async QueryInstancesAssociatedWithGroup(userGroupId: number)
     {
+        throw new Error("TODO: reimplement QueryInstancesAssociatedWithGroup");
+
         let query = `
         SELECT DISTINCT i.fullName
         FROM instances i
@@ -131,5 +159,25 @@ export class PermissionsController
         const rows = await conn.Select(query, userGroupId);
 
         return rows.Values().Map(x => x.fullName as string);
+    }
+
+    public async QueryInstanceIdsThatUserHasAccessTo(userId: number)
+    {
+        const query = `
+        SELECT i.id
+        FROM instances i
+        INNER JOIN instances_roleAssignments ira
+            ON ira.instanceId = i.id
+        INNER JOIN usergroups_members ugm
+            ON ugm.groupId = ira.userGroupId
+        INNER JOIN roles_permissions rp
+            ON rp.roleId = ira.roleId AND rp.permission = '/read'
+        WHERE ugm.userId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, userId);
+
+        return rows.Values().Map(x => x.id as number);
     }
 }

@@ -19,6 +19,8 @@
 import { JSX_CreateElement, RootInjector } from "acfrontend";
 import { OpenAPI } from "acts-util-core";
 import { APISchemaService } from "../Services/APISchemaService";
+import { RolePresenter } from "./ValuePresenters/RolePresenter";
+import { UserGroupPresenter } from "./ValuePresenters/UserGroupPresenter";
 import { UserValuePresenter } from "./ValuePresenters/UserValuePresenter";
 
 /*
@@ -81,6 +83,8 @@ function RenderNumber(value: number, schema: OpenAPI.NumberSchema)
             return value.toString(8) + " " + RenderPermissions((value >> 6) & 7) + RenderPermissions((value >> 3) & 7) + RenderPermissions(value & 7);
         case "user":
             return <UserValuePresenter userId={value} />;
+        case "usergroup":
+            return <UserGroupPresenter userGroupId={value} />;
     }
     return value;
 }
@@ -108,6 +112,8 @@ export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleR
             {
                 case "date-time":
                     return new Date(value).toLocaleString();
+                case "role":
+                    return <RolePresenter roleId={value} />;
                 case "secret":
                     return <input className="form-control" type="password" value={value} disabled />;
             }

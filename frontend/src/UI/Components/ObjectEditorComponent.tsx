@@ -21,6 +21,7 @@ import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { APIService } from "../../Services/APIService";
 import { HostInstanceSelectionComponent } from "../ValueEditors/HostInstanceSelectionComponent";
+import { RoleSelectionComponent } from "../ValueEditors/RoleSelectionComponent";
 import { UserGroupSelectionComponent } from "../ValueEditors/UserGroupSelectionComponent";
 import { UserSelectionComponent } from "../ValueEditors/UserSelectionComponent";
 import { RenderTitle } from "../ValuePresentation";
@@ -188,6 +189,8 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
                         onChanged={newValue => valueChanged(newValue.key)}
                         onLoadSuggestions={this.LoadHostNames.bind(this)}
                         selection={ (value.trim().length === 0 ? null : ({ key: value, displayValue: value}))} />;
+                case "role":
+                    return <RoleSelectionComponent roleId={value} valueChanged={valueChanged} />;
                 case "secret":
                     return <LineEdit className={className} password value={value.toString()} onChanged={valueChanged} />;
             }

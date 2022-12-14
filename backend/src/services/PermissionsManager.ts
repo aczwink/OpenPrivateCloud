@@ -16,37 +16,39 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { InstancePermission, InstancesController } from "../data-access/InstancesController";
+import { InstancesController } from "../data-access/InstancesController";
 import { PermissionsController } from "../data-access/PermissionsController";
+import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { HostUsersManager } from "./HostUsersManager";
   
 @Injectable
 export class PermissionsManager
 {
-    constructor(private instancesController: InstancesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager)
+    constructor(private instancesController: InstancesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
+        private roleAssignmentsController: RoleAssignmentsController)
     {
     }
     
     //Public methods
-    public async AddInstancePermission(fullInstanceName: string, instancePermission: InstancePermission)
+    public async AddInstanceRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
     {
-        const hostId = await this.instancesController.QueryHostIdOfInstance(fullInstanceName);
+        const hostId = await this.instancesController.QueryHostIdOfInstance(instanceId);
         const userGroupIds = await this.permissionsController.QueryGroupsAssociatedWithHost(hostId!);
 
-        await this.instancesController.AddInstancePermission(fullInstanceName, instancePermission);
+        await this.roleAssignmentsController.AddInstanceRoleAssignment(instanceId, roleAssignment);
 
-        if(!userGroupIds.has(instancePermission.userGroupId))
-            await this.hostUsersManager.SyncGroupToHost(hostId!, instancePermission.userGroupId);
+        if(!userGroupIds.has(roleAssignment.userGroupId))
+            await this.hostUsersManager.SyncGroupToHost(hostId!, roleAssignment.userGroupId);
     }
 
-    public async DeleteInstancePermission(fullInstanceName: string, instancePermission: InstancePermission)
+    public async DeleteInstanceRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
     {        
-        await this.instancesController.DeleteInstancePermission(fullInstanceName, instancePermission);
+        await this.roleAssignmentsController.DeleteInstanceRoleAssignment(instanceId, roleAssignment);
 
-        const hostId = await this.instancesController.QueryHostIdOfInstance(fullInstanceName);
+        const hostId = await this.instancesController.QueryHostIdOfInstance(instanceId);
         const userGroupIds = await this.permissionsController.QueryGroupsAssociatedWithHost(hostId!);
 
-        if(!userGroupIds.has(instancePermission.userGroupId))
-            await this.hostUsersManager.RemoveGroupFromHost(hostId!, instancePermission.userGroupId);
+        if(!userGroupIds.has(roleAssignment.userGroupId))
+            await this.hostUsersManager.RemoveGroupFromHost(hostId!, roleAssignment.userGroupId);
     }
 }

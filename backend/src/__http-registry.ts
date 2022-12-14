@@ -24,6 +24,8 @@ import "./api/HostStoragesAPIController";
 import "./api/InstancesAPIController";
 import "./api/ProcessesAPIController";
 import "./api/ResourceProviderAPIController";
+import "./api/RolesAPIController";
+import "./api/RoleAssignmentsAPIController";
 import "./api/SessionsAPIController";
 import "./api/UserGroupsAPIController";
 import "./api/UserAPIController";

@@ -20,9 +20,11 @@ import { AnyResourceProperties } from "../resource-providers/ResourceProperties"
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { HostsController } from "../data-access/HostsController";
 import { SessionsManager } from "../services/SessionsManager";
-import { InstancePermission, InstancesController } from "../data-access/InstancesController";
-import { PermissionsManager } from "../services/PermissionsManager";
+import { InstancesController } from "../data-access/InstancesController";
 import { InstanceLogsController } from "../data-access/InstanceLogsController";
+import { permissions } from "openprivatecloud-common";
+import { PermissionsController } from "../data-access/PermissionsController";
+import { PermissionsManager } from "../services/PermissionsManager";
 
 interface InstanceDto
 {
@@ -33,7 +35,7 @@ interface InstanceDto
 class InstancesAPIController
 {
     constructor(private resourceProviderManager: ResourceProviderManager, private hostsController: HostsController, private sessionsManager: SessionsManager,
-        private instancesController: InstancesController, private instanceLogsController: InstanceLogsController)
+        private instancesController: InstancesController, private instanceLogsController: InstanceLogsController, private permissionsController: PermissionsController)
     {
     }
 
@@ -67,12 +69,22 @@ class InstancesAPIController
     }
 
     @Get()
-    public async QueryInstances(): Promise<InstanceDto[]>
+    public async QueryInstances(
+        @Header Authorization: string
+    ): Promise<InstanceDto[]>
     {
-        const instances = await this.instancesController.QueryInstances();
-        return instances.map(x => ({
+        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+
+        let instanceIds;
+        if(await this.permissionsController.HasUserClusterWidePermission(userId, permissions.read))
+            instanceIds = await this.instancesController.QueryAllInstanceIds();
+        else
+            instanceIds = await this.permissionsController.QueryInstanceIdsThatUserHasAccessTo(userId);
+
+        const instances = await instanceIds.Map(x => this.instancesController.QueryInstanceById(x)).PromiseAll();
+        return instances.Values().NotUndefined().Map(x => ({
             fullName: x.fullName
-        }));
+        })).ToArray();
     }
 
     @Get("logs/{logId}")
@@ -104,41 +116,5 @@ class InstancesAPIController
     )
     {
         return await this.instancesController.Search(hostName, "/" + type + "%" + instanceNameFilter + "%");
-    }
-}
-
-@APIController("instances/permissions")
-class InstancePermissionsAPIController
-{
-    constructor(private instancesController: InstancesController, private permissionsManager: PermissionsManager, private resourceProviderManager: ResourceProviderManager)
-    {
-    }
-
-    @Post()
-    public async Add(
-        @Query fullInstanceName: string,
-        @Body instancePermission: InstancePermission
-    )
-    {
-        await this.permissionsManager.AddInstancePermission(fullInstanceName, instancePermission);
-        await this.resourceProviderManager.InstancePermissionsChanged(fullInstanceName);
-    }
-
-    @Delete()
-    public async Delete(
-        @Query fullInstanceName: string,
-        @Body instancePermission: InstancePermission
-    )
-    {
-        await this.permissionsManager.DeleteInstancePermission(fullInstanceName, instancePermission);
-        await this.resourceProviderManager.InstancePermissionsChanged(fullInstanceName);
-    }
-
-    @Get()
-    public async QueryInstancePermissions(
-        @Query fullInstanceName: string
-    )
-    {
-        return await this.instancesController.QueryInstancePermissions(fullInstanceName);
     }
 }
