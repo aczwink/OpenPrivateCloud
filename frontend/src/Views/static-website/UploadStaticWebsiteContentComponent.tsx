@@ -16,11 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Component, FileSelect, JSX_CreateElement, ProgressSpinner, Router, RouterState } from "acfrontend";
+import { Component, FileSelect, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterState } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common";
 import { APIService } from "../../Services/APIService";
 
-export class UploadContentComponent extends Component
+@Injectable
+export class UploadStaticWebsiteContentComponent extends Component
 {
     constructor(private apiService: APIService, private routerState: RouterState, private router: Router)
     {

@@ -150,10 +150,19 @@ export class ApacheConfigParser
     private ParseKeyValue(token: StandardToken)
     {
         const valueToken = this.FetchNextToken();
-        if(valueToken.type !== TokenType.Text)
-            throw new Error("Wrong data: " + valueToken);
+        switch(valueToken.type)
+        {
+            case TokenType.Identifier:
+                const remaining = this.input.substring(0, this.input.indexOf("\n"));
+                this.input = this.input.substring(remaining.length);
 
-        return { key: token.data, value: valueToken.data };
+                return { key: token.data, value: valueToken.data + " " + remaining };
+            case TokenType.Text:
+                return { key: token.data, value: valueToken.data };
+            default:
+                console.error(valueToken);
+                throw new Error("Wrong data: " + valueToken.type);
+        }
     }
 
     private ParseNextTopLevelElement()

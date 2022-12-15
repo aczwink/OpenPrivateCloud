@@ -34,15 +34,27 @@ export class TempFilesManager
         await this.remoteRootFileSystemManager.RemoveDirectoryRecursive(hostId, tempPath);
     }
 
+    public async CreateFile(hostId: number, data: Buffer)
+    {
+        const tempPath = await this.CreateUniqueTempPath(hostId);
+        await this.remoteFileSystemManager.WriteFile(hostId, tempPath, data);
+        return tempPath;
+    }
+
     public async CreateSecretFile(hostId: number, secret: string): Promise<string>
+    {
+        const secretPath = await this.CreateUniqueTempPath(hostId);
+        await this.remoteFileSystemManager.WriteTextFile(hostId, secretPath, secret, 0o600);
+
+        return secretPath;
+    }
+
+    //Private methods
+    private async CreateUniqueTempPath(hostId: number)
     {
         const tempRootPath = "/tmp/opc";
         await this.remoteFileSystemManager.CreateDirectory(hostId, tempRootPath);
 
-        const secretPath = path.join(tempRootPath, crypto.pseudoRandomBytes(16).toString("hex"));
-        await this.remoteFileSystemManager.WriteTextFile(hostId, secretPath, secret, 0o600);
-        console.log(secretPath);
-
-        return secretPath;
+        return path.join(tempRootPath, crypto.pseudoRandomBytes(16).toString("hex"));
     }
 }

@@ -16,27 +16,36 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, FormField, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, BodyProp, Common, FormField, Get, NotFound, Path, Post } from "acts-util-apilib";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 import { resourceProviders } from "openprivatecloud-common";
-import { c_staticWebsiteResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
+import { c_nodeAppServiceResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { HostsController } from "../../data-access/HostsController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
-import { StaticWebsitesManager } from "./StaticWebsitesManager";
+import { NodeAppServiceManager } from "./NodeAppServiceManager";
 
-interface StaticWebsiteInfoDto
+interface NodeAppServiceInfoDto
 {
     hostName: string;
     storagePath: string;
-    port: number;
+    isRunning: boolean;
 }
 
-@APIController(`resourceProviders/${c_webServicesResourceProviderName}/${c_staticWebsiteResourceTypeName}/{instanceName}`)
-class StaticWebsiteAPIController
+interface NodeAppServiceStatus
 {
-    constructor(private instancesManager: InstancesManager, private instancesController: InstancesController, private staticWebsitesManager: StaticWebsitesManager,
+    isRunning: boolean;
+    /**
+     * @format multi-line
+     */
+    status: string;
+}
+
+@APIController(`resourceProviders/${c_webServicesResourceProviderName}/${c_nodeAppServiceResourceTypeName}/{instanceName}`)
+class NodeAppServiceAPIController
+{
+    constructor(private instancesManager: InstancesManager, private instancesController: InstancesController, private nodeAppServiceManager: NodeAppServiceManager,
         private hostStoragesController: HostStoragesController, private hostsController: HostsController)
     {
     }
@@ -46,7 +55,7 @@ class StaticWebsiteAPIController
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.staticWebsiteResourceType.name, instanceName);
+        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.nodeAppServiceResourceType.name, instanceName);
         const instance = await this.instancesController.QueryInstance(fullInstanceName);
         if(instance === undefined)
             return NotFound("instance not found");
@@ -63,12 +72,39 @@ class StaticWebsiteAPIController
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
         const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
             
-        const result: StaticWebsiteInfoDto = {
+        const result: NodeAppServiceInfoDto = {
             hostName: host!.hostName,
             storagePath: storage!.path,
-            port: await this.staticWebsitesManager.QueryPort(storage!.hostId, instance!.fullName)
+            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(storage!.hostId, instance!.fullName),
         };
         return result;
+    }
+
+    @Get("status")
+    public async QueryStatus(
+        @Common instanceId: number,
+    )
+    {
+        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+            
+        const result: NodeAppServiceStatus = {
+            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(storage!.hostId, instance!.fullName),
+            status: await this.nodeAppServiceManager.QueryStatus(storage!.hostId, instance!.fullName)
+        };
+        return result;
+    }
+
+    @Post("startStop")
+    public async StartOrStopService(
+        @Common instanceId: number,
+        @BodyProp action: "start" | "stop"
+    )
+    {
+        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+
+        await this.nodeAppServiceManager.ExecuteAction(storage!.hostId, instance!.fullName, action);
     }
 
     @Post()
@@ -77,6 +113,6 @@ class StaticWebsiteAPIController
         @FormField file: UploadedFile
     )
     {
-        await this.staticWebsitesManager.UpdateContent(instanceId, file.buffer);
+        await this.nodeAppServiceManager.UpdateContent(instanceId, file.buffer);
     }
 }

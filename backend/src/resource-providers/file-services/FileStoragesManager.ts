@@ -25,6 +25,7 @@ import { InstancesManager } from "../../services/InstancesManager";
 import { SambaSharesManager } from "./SambaSharesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { permissions } from "openprivatecloud-common";
 
 @Injectable
 export class FileStoragesManager
@@ -106,11 +107,11 @@ export class FileStoragesManager
         const instance = await this.instancesController.QueryInstance(fullInstanceName);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instance!.id, "/data/read");
+        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instance!.id, permissions.data.read);
         await this.hostUsersManager.SyncSambaGroupsMembers(hostId, readGroups.ToArray());
         const readGroupsLinux = readGroups.Map(x => "@" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
-        const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instance!.id, "/data/write");
+        const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instance!.id, permissions.data.write);
         await this.hostUsersManager.SyncSambaGroupsMembers(hostId, writeGroups.ToArray());
         const writeGroupsLinux = writeGroups.Map(x => "@" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 

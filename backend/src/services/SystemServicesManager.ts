@@ -85,6 +85,12 @@ WantedBy=multi-user.target
         return exitCode === 0;
     }
 
+    public async QueryStatus(hostId: number, serviceName: string)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "systemctl", "status", serviceName + ".service", "--lines", "100"], hostId);
+        return result.stdOut;
+    }
+
     public async Reload(hostId: number)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "systemctl", "daemon-reload"], hostId);

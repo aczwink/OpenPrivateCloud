@@ -173,6 +173,8 @@ export class SSHCommandExecutor
         await shell.ExecuteCommand(command as string[]);
 
         await shell.Close();
+
+        return 0;
     }
 
     private ParseExitCode(exitCodeString: string)

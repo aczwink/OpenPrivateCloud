@@ -37,6 +37,7 @@ import "./resource-providers/file-services/FileStorageAPIController";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";
 import "./resource-providers/web-services/JdownloaderAPIController";
+import "./resource-providers/web-services/NodeAppServiceAPIController";
 import "./resource-providers/web-services/StaticWebsiteAPIController";
 
 async function LoadAPIControllers()

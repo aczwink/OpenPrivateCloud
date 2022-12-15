@@ -17,9 +17,9 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { PageNotFoundComponent } from "../../PageNotFoundComponent";
-import { MultiPageViewModel } from "../../UI/ViewModel";
-import { UploadContentComponent } from "../../Views/static-website/UploadContentComponent";
+import { StaticWebsiteInfoDto } from "../../../dist/api";
+import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { UploadStaticWebsiteContentComponent } from "../../Views/static-website/UploadStaticWebsiteContentComponent";
 
 type InstanceId = { instanceName: string };
 
@@ -27,6 +27,14 @@ function BuildFullInstanceName(instanceName: string)
 {
     return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.staticWebsiteResourceType.name + "/" + instanceName;
 }
+
+const overviewViewModel: ObjectViewModel<StaticWebsiteInfoDto, InstanceId> = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "Overview",
+    requestObject: (service, ids) => service.resourceProviders.webservices.staticwebsite._any_.info.get(ids.instanceName),
+    schemaName: "StaticWebsiteInfoDto"
+};
 
 export const staticWebsiteViewModel: MultiPageViewModel<InstanceId> = {
     actions: [
@@ -39,17 +47,14 @@ export const staticWebsiteViewModel: MultiPageViewModel<InstanceId> = {
         {
             key: "overview",
             displayName: "Overview",
-            child: {
-                type: "component",
-                component: PageNotFoundComponent
-            }
+            child: overviewViewModel
         },
         {
             key: "content",
             displayName: "Content",
             child: {
                 type: "component",
-                component: UploadContentComponent
+                component: UploadStaticWebsiteContentComponent
             }
         }
     ],

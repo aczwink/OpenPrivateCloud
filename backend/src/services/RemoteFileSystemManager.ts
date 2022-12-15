@@ -139,6 +139,13 @@ export class RemoteFileSystemManager
         conn.Release();
     }
 
+    public async WriteFile(hostId: number, filePath: string, content: Buffer)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        await conn.value.WriteFile(filePath, content);
+        conn.Release();
+    }
+
     public async WriteTextFile(hostId: number, filePath: string, text: string, mode?: number)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);

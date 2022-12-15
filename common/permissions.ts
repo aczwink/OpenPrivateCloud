@@ -19,7 +19,8 @@
 export const permissions =
 {
     data: {
-        read: "/data/read"
+        read: "/data/read",
+        write: "/data/write"
     },
 
     /**

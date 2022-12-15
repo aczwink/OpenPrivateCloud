@@ -134,6 +134,8 @@ class DebianPackageManager implements DistroPackageManager
                 return ["mariadb-server"];
             case "nextcloud-dependencies":
                 return ["php", "php-mysql", "php-zip", "php-xml", "php-mbstring", "php-gd", "php-curl"];
+            case "node":
+                return ["nodejs"];
             case "openvpn":
                 return ["openvpn", "easy-rsa"];
             case "samba":
