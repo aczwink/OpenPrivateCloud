@@ -32,6 +32,7 @@ import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager"
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { VirtualMachineManager } from "./VirtualMachineManager";
 import { InstanceContext } from "../../common/InstanceContext";
+import { linuxSystemGroupsWithPrivileges, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
  
 @Injectable
 export class ComputeServicesResourceProvider implements ResourceProvider<VirtualMachineProperties>
@@ -97,7 +98,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
     public async ProvideResource(instanceProperties: VirtualMachineProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "libvirt");
-        //await this.hostUsersManager.EnsureHostUserIsInNativeGroup("opc", "kvm");
+        //await this.hostUsersManager.EnsureHostUserIsInNativeGroup(opcSpecialUsers.host, linuxSystemGroupsWithPrivileges.kvm);
 
         const osInfo = await this.osQueryService.FindOSInfo(context.hostId, instanceProperties);
         const vmImagesDirPath = await this.EnsureVMImagesDirIsCreated(context.hostId);
@@ -139,8 +140,8 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
         const hostId = context.hostId;
 
         const vmDir = await this.instancesManager.CreateInstanceStorageDirectory(hostId, context.storagePath, context.fullInstanceName);
-        const uid = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
-        const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, "kvm");
+        const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
+        const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, linuxSystemGroupsWithPrivileges.kvm);
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, vmDir, uid, gid);
 
         return vmDir;
@@ -155,8 +156,8 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
         const result = await this.remoteFileSystemManager.CreateDirectory(hostId, vmImagesDirPath);
         if(result === null)
         {
-            const uid = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
-            const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, "kvm");
+            const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
+            const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, linuxSystemGroupsWithPrivileges.kvm);
             await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, vmImagesDirPath, uid, gid);
             await this.remoteFileSystemManager.ChangeMode(hostId, vmImagesDirPath, 0o755);
         }

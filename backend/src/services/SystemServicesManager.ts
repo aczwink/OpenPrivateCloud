@@ -73,6 +73,11 @@ WantedBy=multi-user.target
         return this.ExecuteServiceAction(hostId, serviceName, "disable");
     }
 
+    public EnableService(hostId: number, serviceName: string)
+    {
+        return this.ExecuteServiceAction(hostId, serviceName, "enable");
+    }
+
     public async IsServiceActive(hostId: number, serviceName: string)
     {
         const exitCode = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["systemctl", "is-active", serviceName + ".service"], hostId);

@@ -21,6 +21,7 @@ import { Injectable } from "acts-util-node";
 import { HostUsersManager } from "./HostUsersManager";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
+import { opcSpecialUsers } from "../common/UserAndGroupDefinitions";
 
  
 @Injectable
@@ -31,6 +32,11 @@ export class RemoteRootFileSystemManager
     }
 
     //Public methods
+    public async ChangeMode(hostId: number, remotePath: string, mode: number)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chmod", mode.toString(8), remotePath], hostId);
+    }
+
     public async ChangeOwnerAndGroup(hostId: number, remotePath: string, uid: number, gid: number)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", uid + ":" + gid, remotePath], hostId);
@@ -88,7 +94,7 @@ export class RemoteRootFileSystemManager
     private async RequestTempPath(hostId: number)
     {
         const tempRootPath = "/tmp/opc";
-        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
+        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
         await this.remoteFileSystemManager.CreateDirectory(hostId, tempRootPath, {
             uid: hostOPCUserId
         });

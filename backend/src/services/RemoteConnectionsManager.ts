@@ -17,6 +17,7 @@
  * */
  import { Dictionary } from "acts-util-core";
  import { Injectable, LockedProperty } from "acts-util-node";
+import { opcSpecialUsers } from "../common/UserAndGroupDefinitions";
  import { HostsController } from "../data-access/HostsController";
  import { SSHConnection, SSHService } from "./SSHService";
  
@@ -57,6 +58,6 @@ export class RemoteConnectionsManager
         if(creds === undefined)
             throw new Error("unknown host");
 
-        return await this.sshService.ConnectWithCredentials(creds.hostName, "opc", creds.password);
+        return await this.sshService.ConnectWithCredentials(creds.hostName, opcSpecialUsers.host, creds.password);
     }
 }

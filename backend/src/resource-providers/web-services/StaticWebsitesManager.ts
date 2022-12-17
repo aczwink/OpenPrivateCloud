@@ -32,6 +32,7 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { InstancesController } from "../../data-access/InstancesController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { TempFilesManager } from "../../services/TempFilesManager";
+import { linuxSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
 
 @Injectable
 export class StaticWebsitesManager
@@ -65,8 +66,8 @@ export class StaticWebsitesManager
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "apache");
 
-        const gid = await this.hostUsersManager.ResolveHostGroupId(context.hostId, "www-data");
-        const uid = await this.hostUsersManager.ResolveHostUserId(context.hostId, "opc");
+        const gid = await this.hostUsersManager.ResolveHostGroupId(context.hostId, linuxSpecialGroups["www-data"]);
+        const uid = await this.hostUsersManager.ResolveHostUserId(context.hostId, opcSpecialUsers.host);
 
         const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, uid, gid);
@@ -131,8 +132,8 @@ export class StaticWebsitesManager
 
     private async SetPermissionsRecursive(hostId: number, dirPath: string)
     {
-        const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, "www-data");
-        const uid = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
+        const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, linuxSpecialGroups["www-data"]);
+        const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
 
         const children = await this.remoteFileSystemManager.ListDirectoryContents(hostId, dirPath);
         for (const child of children)

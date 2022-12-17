@@ -1,6 +1,7 @@
 ./apache2/dev_setup.sh
 
-sudo useradd -r -m -g nogroup opc-controller
+sudo groupadd -r opc-controller-group
+sudo useradd -r -m -g opc-controller-group opc-controller
 sudo adduser opc-controller %YOUR_USERS_PRIMARY_GROUP%
 
 #generate ssl

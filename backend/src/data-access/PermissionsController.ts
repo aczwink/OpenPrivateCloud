@@ -103,18 +103,18 @@ export class PermissionsController
         return rows.Values().Map(x => x.userGroupId as number).ToSet();
     }
 
-    public async QueryGroupsWithPermission(instanceId: number, permission: string)
+    public async QueryGroupsWithPermission(instanceId: number, permissions: string[])
     {
         let query = `
         SELECT ira.userGroupId
         FROM instances_roleAssignments ira
         INNER JOIN roles_permissions rp
             ON rp.roleId = ira.roleId
-        WHERE ira.instanceId = ? AND rp.permission = ?
+        WHERE ira.instanceId = ? AND rp.permission IN (?)
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, instanceId, permission);
+        const rows = await conn.Select(query, instanceId, permissions);
 
         return rows.Values().Map(x => x.userGroupId as number);
     }

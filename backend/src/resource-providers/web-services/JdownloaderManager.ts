@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
+import { permissions } from "openprivatecloud-common";
 import path from "path";
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
@@ -27,6 +28,7 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
+import { SharedFolderPermissionsManager } from "../file-services/SharedFolderPermissionsManager";
 import { SingleSMBSharePerInstanceProvider } from "../file-services/SingleSMBSharePerInstanceProvider";
 import { DeploymentContext } from "../ResourceProvider";
 import { JdownloaderProperties } from "./Properties";
@@ -34,6 +36,9 @@ import { JdownloaderProperties } from "./Properties";
 export interface MyJDownloaderCredentials
 {
     email: string;
+    /**
+     * @format secret
+     */
     password: string;
 }
    
@@ -44,7 +49,8 @@ export class JdownloaderManager
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private instancesController: InstancesController, private hostStoragesController: HostStoragesController,
-        private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
+        private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider,
+        private sharedFolderPermissionsManager: SharedFolderPermissionsManager)
     {
     }
 
@@ -63,7 +69,7 @@ export class JdownloaderManager
 
         await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
 
-        await this.hostUsersManager.DeleteHostServicePrinciple(hostId, "jdownloader");
+        await this.hostUsersManager.DeleteHostServicePrincipal(hostId, "jdownloader");
     }
 
     public async GetSMBConnectionInfo(data: InstanceContext, userId: number)
@@ -84,13 +90,11 @@ export class JdownloaderManager
         const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o775);
 
+        const authority = await this.hostUsersManager.CreateHostServicePrincipal(context.hostId, "jdownloader");
+        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, authority.hostUserId, authority.hostGroupId);
+
         const downloadsPath = path.join(instanceDir, "Downloads");
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, downloadsPath);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, downloadsPath, 0o750);
-
-        const authority = await this.hostUsersManager.CreateHostServicePrinciple(context.hostId, "jdownloader");
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, authority.hostUserId, authority.hostGroupId);
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, downloadsPath, authority.hostUserId, await this.hostUsersManager.ResolveHostGroupId(context.hostId, "nogroup"));
 
         const shell = await this.remoteCommandExecutor.SpawnShell(context.hostId);
         await shell.ChangeUser(authority.linuxUserName);
@@ -124,9 +128,12 @@ export class JdownloaderManager
         };
     }
 
-    public async RefreshSMBConfig(instanceContext: InstanceContext)
+    public async RefreshPermissions(instanceContext: InstanceContext)
     {
         const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+
+        const downloadsPath = path.join(instanceDir, "Downloads");
+        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, downloadsPath, true, [permissions.data.read]);
 
         await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
             enabled: true,

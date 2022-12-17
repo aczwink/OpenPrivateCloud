@@ -70,7 +70,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
 
     public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
-        await this.fileStoragesManager.RefreshSMBConfig(instanceContext);
+        await this.fileStoragesManager.RefreshPermissions(instanceContext);
     }
 
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<DeploymentResult>

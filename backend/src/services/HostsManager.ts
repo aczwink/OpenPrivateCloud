@@ -23,6 +23,7 @@ import { SSHConnection, SSHService } from "./SSHService";
 import { HostsController } from "../data-access/HostsController";
 import { ModulesManager } from "./ModulesManager";
 import { SSHCommandExecutor } from "./SSHCommandExecutor";
+import { opcSpecialUsers } from "../common/UserAndGroupDefinitions";
 
 @Injectable
 export class HostsManager
@@ -37,8 +38,8 @@ export class HostsManager
     {
         const pw = crypto.randomBytes(32).toString("hex");
 
-        const conn = await this.sshService.ConnectWithCredentials(hostName, "opc", "opc");
-        await this.ChangeUserPassword(conn, "opc", pw);
+        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host, "opc");
+        await this.ChangeUserPassword(conn, opcSpecialUsers.host, pw);
         conn.Close();
 
         const hostId = await this.hostsController.AddHost(hostName, pw);
@@ -69,11 +70,11 @@ export class HostsManager
     {
         //await this.localCommandExecutor.ExecuteCommand(["ssh-copy-id", "-i", "$HOME/.ssh/" + keyName + ".pub", "opc@" + hostName]);
         const pubKey = await fs.promises.readFile("/home/opc-controller/.ssh/" + keyName + ".pub", "utf-8");
-        const conn = await this.sshService.ConnectWithCredentials(hostName, "opc", "opc");
+        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host, "opc");
         await conn.AppendFile("/home/opc/.ssh/authorized_keys", pubKey);
 
-        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-d", "opc"], { hostId: -1 }); //TODO: hostid
-        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-l", "opc"], { hostId: -1 }); //TODO: hostid
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-d", opcSpecialUsers.host], { hostId: -1 }); //TODO: hostid
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-l", opcSpecialUsers.host], { hostId: -1 }); //TODO: hostid
 
         conn.Close();
     }

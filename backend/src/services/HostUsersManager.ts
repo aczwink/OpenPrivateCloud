@@ -17,6 +17,7 @@
  * */
 
 import { Injectable } from "acts-util-node";
+import { opcGroupPrefixes, opcUserPrefixes } from "../common/UserAndGroupDefinitions";
 import { HostsController } from "../data-access/HostsController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { UsersController } from "../data-access/UsersController";
@@ -37,26 +38,26 @@ export class HostUsersManager
     }
 
     //Public methods
-    public async CreateHostServicePrinciple(hostId: number, name: string)
+    public async CreateHostServicePrincipal(hostId: number, name: string)
     {
-        const linuxGroupName = "opc-sg-" + name;
+        const linuxGroupName = opcGroupPrefixes.daemon + name;
         await this.CreateHostGroup(hostId, linuxGroupName);
 
-        const linuxUserName = "opc-su-" + name;
+        const linuxUserName = opcUserPrefixes.daemon + name;
         await this.CreateHostUser(hostId, linuxUserName, linuxGroupName);
 
         return this.ResolveHostServicePrinciple(hostId, name);
     }
 
-    public async DeleteHostServicePrinciple(hostId: number, name: string)
+    public async DeleteHostServicePrincipal(hostId: number, name: string)
     {
-        await this.DeleteHostUser(hostId, "opc-su-" + name);
-        await this.DeleteHostGroup(hostId, "opc-sg-" + name);
+        await this.DeleteHostUser(hostId, opcUserPrefixes.daemon + name);
+        await this.DeleteHostGroup(hostId, opcGroupPrefixes.daemon + name);
     }
 
     public MapGroupToLinuxGroupName(userGroupId: number)
     {
-        return "opc-g" + userGroupId;
+        return opcGroupPrefixes.group + userGroupId;
     }
 
     public async MapHostUserIdToLinuxUserName(hostId: number, hostUserId: number)
@@ -67,13 +68,13 @@ export class HostUsersManager
 
     public MapLinuxUserNameToUserId(linuxUserName: string)
     {
-        const idPart = linuxUserName.substring("opc-u".length);
+        const idPart = linuxUserName.substring(opcUserPrefixes.user.length);
         return parseInt(idPart);
     }
 
     public MapUserToLinuxUserName(userId: number)
     {
-        return "opc-u" + userId;
+        return opcUserPrefixes.user + userId;
     }
 
     public async RemoveGroupFromHost(hostId: number, userGroupId: number)
@@ -98,8 +99,8 @@ export class HostUsersManager
 
     public async ResolveHostServicePrinciple(hostId: number, name: string)
     {
-        const linuxGroupName = "opc-sg-" + name;
-        const linuxUserName = "opc-su-" + name;
+        const linuxGroupName = opcGroupPrefixes.daemon + name;
+        const linuxUserName = opcUserPrefixes.daemon + name;
 
         return {
             hostGroupId: await this.ResolveHostGroupId(hostId, linuxGroupName),
@@ -117,14 +118,14 @@ export class HostUsersManager
 
     public async SyncGroupToHost(hostId: number, userGroupId: number)
     {
-        const members = await this.usersController.QueryMembersOfGroup(userGroupId);
-        for (const member of members)
-            await this.SyncUserToHost(hostId, member.id);
-
         const linuxGroupName = this.MapGroupToLinuxGroupName(userGroupId);
         const gid = await this.TryResolveHostUserGroupId(hostId, linuxGroupName);
         if(gid === undefined)
             await this.CreateHostGroup(hostId, linuxGroupName);
+
+        const members = await this.usersController.QueryMembersOfGroup(userGroupId);
+        for (const member of members)
+            await this.SyncUserToHost(hostId, member.id, linuxGroupName);
 
         await this.SyncGroupMembersToHost(hostId, linuxGroupName, members.Values().Map(x => x.id).Map(this.MapUserToLinuxUserName.bind(this)).ToSet());
     }
@@ -152,21 +153,6 @@ export class HostUsersManager
             const privateData = await this.usersController.QueryPrivateData(userId);
             await this.AddSambaUser(hostId, this.MapUserToLinuxUserName(userId), privateData!.sambaPW);
         }
-    }
-
-    /**
-     * @returns The host user id
-     */
-    public async SyncUserToHost(hostId: number, userId: number)
-    {
-        const linuxUserName = this.MapUserToLinuxUserName(userId);
-        const uid = await this.TryResolveHostUserId(hostId, linuxUserName);
-        if(uid === undefined)
-        {
-            await this.CreateHostUser(hostId, linuxUserName, "nogroup");
-            return await this.ResolveHostUserId(hostId, linuxUserName);
-        }
-        return uid;
     }
     
     public async UpdateSambaPasswordOnAllHosts(userId: number, newPw: string)
@@ -273,6 +259,21 @@ export class HostUsersManager
         for (const linuxUserName of toAdd)
             await this.remoteCommandExecutor.ExecuteCommand(["sudo", "usermod", "-a", "-G", linuxGroupName, linuxUserName], hostId);
     }
+
+    /**
+     * @returns The host user id
+     */
+     private async SyncUserToHost(hostId: number, userId: number, linuxGroupName: string)
+     {
+         const linuxUserName = this.MapUserToLinuxUserName(userId);
+         const uid = await this.TryResolveHostUserId(hostId, linuxUserName);
+         if(uid === undefined)
+         {
+             await this.CreateHostUser(hostId, linuxUserName, linuxGroupName);
+             return await this.ResolveHostUserId(hostId, linuxUserName);
+         }
+         return uid;
+     }
 
     private async TryResolveHostUserGroupId(hostId: number, linuxGroupName: string)
     {

@@ -17,6 +17,7 @@
  * */
 
 import { Injectable } from "acts-util-node";
+import { opcSpecialGroups, opcSpecialUsers } from "../common/UserAndGroupDefinitions";
 import { HostsController } from "../data-access/HostsController";
 import { HostStorage, HostStorageCreationProperties } from "../data-access/HostStoragesController";
 import { FileSystemInfoService } from "./FileSystemInfoService";
@@ -38,9 +39,9 @@ export class HostStoragesManager
     {
         const fsType = await this.fileSystemInfoService.QueryFileSystemInfoForDirectory(hostId, props.path);
 
-        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, "opc");
-        const hostNoGroupId = await this.hostUsersManager.ResolveHostGroupId(hostId, "nogroup");
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, props.path, hostOPCUserId, hostNoGroupId);
+        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
+        const hostOPCGroupId = await this.hostUsersManager.ResolveHostGroupId(hostId, opcSpecialGroups.host);
+        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, props.path, hostOPCUserId, hostOPCGroupId);
 
         await this.remoteFileSystemManager.ChangeMode(hostId, props.path, 0o775);
 

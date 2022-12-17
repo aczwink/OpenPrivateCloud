@@ -1,7 +1,8 @@
 sudo apt update
 sudo apt install unzip
 
-sudo useradd -r -m -g nogroup opc-controller
+sudo groupadd -r opc-controller-group
+sudo useradd -r -m -g opc-controller-group opc-controller
 
 
 

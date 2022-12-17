@@ -17,13 +17,14 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
 import { InstanceContext } from "../../common/InstanceContext";
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
+import { permissions } from "openprivatecloud-common";
+import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
 
 export interface SMBConfig
 {
@@ -38,7 +39,7 @@ interface FileStorageConfig
 @Injectable
 export class FileStoragesManager
 {
-    constructor(private instancesManager: InstancesManager, private instancesController: InstancesController,
+    constructor(private instancesManager: InstancesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
         private remoteFileSystemManager: RemoteFileSystemManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: InstanceConfigController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
@@ -94,8 +95,10 @@ export class FileStoragesManager
         return snapshots.Values().Map(x => x.filename).OrderBy(x => x);
     }
 
-    public async RefreshSMBConfig(instanceContext: InstanceContext)
+    public async RefreshPermissions(instanceContext: InstanceContext)
     {
+        const dataPath = this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, dataPath, false, [permissions.data.read, permissions.data.write]);
         await this.UpdateSMBConfig(instanceContext, await this.QuerySMBConfig(instanceContext.instanceId));
     }
     

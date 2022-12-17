@@ -25,6 +25,7 @@ import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager"
 import { DeploymentContext } from "../ResourceProvider";
 import { NodeAppServiceProperties } from "./Properties";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
+import { opcSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
 
 @Injectable
 export class NodeAppServiceManager
@@ -70,9 +71,9 @@ export class NodeAppServiceManager
         await this.systemServicesManager.CreateService(context.hostId, {
             command: "node " + path.join(instancesDir, "index.js"),
             environment: {},
-            groupName: "nogroup",
+            groupName: opcSpecialGroups.host,
             name: this.MapFullInstanceNameToSystemDName(context.fullInstanceName),
-            userName: "opc"
+            userName: opcSpecialUsers.host
         });
     }
 

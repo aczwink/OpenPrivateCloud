@@ -124,7 +124,7 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
         switch(parts.resourceTypeName)
         {
             case resourceProviders.webServices.jdownloaderResourceType.name:
-                await this.jdownloaderManager.RefreshSMBConfig(instanceContext);
+                await this.jdownloaderManager.RefreshPermissions(instanceContext);
                 break;
         }
     }

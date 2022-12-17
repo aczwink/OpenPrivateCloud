@@ -52,7 +52,7 @@ export class SingleSMBSharePerInstanceProvider
         const hostId = instanceContext.hostId;
         const fullInstanceName = instanceContext.fullInstanceName;
 
-        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.read);
+        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, [permissions.data.read]);
         const readGroupsLinux = readGroups.Map(x => "+" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
         const shareName = this.MapFullInstanceNameToSMBShareName(fullInstanceName);
@@ -70,7 +70,7 @@ export class SingleSMBSharePerInstanceProvider
             let writeGroupsLinux: string[] = [];
             if(!shareConfig.readOnly)
             {
-                const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.write);
+                const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, [permissions.data.write]);
                 await this.hostUsersManager.SyncSambaGroupsMembers(hostId, writeGroups.ToArray());
                 writeGroupsLinux = writeGroups.Map(x => "+" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
             }
