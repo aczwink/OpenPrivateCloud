@@ -72,21 +72,26 @@ export class ResourceProviderManager
     public async DeleteInstance(fullInstanceName: string)
     {
         const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        if(instanceContext === undefined)
+            return null;
 
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+        const instanceId = instanceContext.instanceId;
 
-        const result = await resourceProvider.DeleteResource(storage!.hostId, storage!.path, fullInstanceName);
+        //first everything that the user is also able to do himself
+        const roleAssignments = await this.roleAssignmentsController.QueryInstanceRoleAssignments(fullInstanceName);
+        for (const roleAssignment of roleAssignments)
+            await this.permissionsManager.DeleteInstanceRoleAssignment(instanceId, roleAssignment);
+
+        //delete the resource
+        const result = await resourceProvider.DeleteResource(instanceContext);
         if(result !== null)
             return result;
 
-        await this.instanceConfigController.DeleteConfig(instance!.id);
-        await this.healthController.DeleteInstanceHealthData(instance!.id);
-        await this.instanceLogsController.DeleteLogsAssociatedWithInstance(instance!.id);
-
-        const roleAssignments = await this.roleAssignmentsController.QueryInstanceRoleAssignments(fullInstanceName);
-        for (const roleAssignment of roleAssignments)
-            await this.permissionsManager.DeleteInstanceRoleAssignment(instance!.id, roleAssignment);
+        //the resource is now degraded and should not be queried anymore. simply clean up
+        await this.instanceConfigController.DeleteConfig(instanceId);
+        await this.healthController.DeleteInstanceHealthData(instanceId);
+        await this.instanceLogsController.DeleteLogsAssociatedWithInstance(instanceId);
 
         await this.instancesController.DeleteInstance(fullInstanceName);
         
@@ -108,11 +113,10 @@ export class ResourceProviderManager
     public async InstancePermissionsChanged(fullInstanceName: string)
     {
         const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
 
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-
-        await resourceProvider.InstancePermissionsChanged(storage!.hostId, fullInstanceName);
+        if(instanceContext !== undefined)
+            await resourceProvider.InstancePermissionsChanged(instanceContext);
     }
 
     public Register(resourceProviderClass: Instantiatable<ResourceProvider<any>>)

@@ -22,6 +22,7 @@ import { BackupVaultProperties } from "./BackupVaultProperties";
 import { resourceProviders } from "openprivatecloud-common";
 import { ModulesManager } from "../../services/ModulesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
+import { InstanceContext } from "../../common/InstanceContext";
 
 @Injectable
 export class BackupServicesResourceProvider implements ResourceProvider<BackupVaultProperties>
@@ -57,12 +58,12 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     {
     }
     
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
         return null;
     }
 
-    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
     }
 

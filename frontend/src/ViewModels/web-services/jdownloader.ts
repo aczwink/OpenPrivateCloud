@@ -17,8 +17,9 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { JdownloaderInfoDto, MyJDownloaderCredentials } from "../../../dist/api";
+import { JdownloaderInfoDto, MyJDownloaderCredentials, SMBConnectionInfo } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
 
 type InstanceId = { instanceName: string };
 
@@ -63,6 +64,14 @@ const myjdcredentialsViewModel: ObjectViewModel<MyJDownloaderCredentials, Instan
     schemaName: "MyJDownloaderCredentials"
 };
 
+const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId>  = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "SMB connection information",
+    requestObject: (service, ids) => service.resourceProviders.webservices.jdownloader._any_.smbconnect.get(ids.instanceName),
+    schemaName: "SMBConnectionInfo",
+};
+
 export const jdownloaderViewModel: MultiPageViewModel<InstanceId> = {
     actions: [
         {
@@ -76,11 +85,17 @@ export const jdownloaderViewModel: MultiPageViewModel<InstanceId> = {
             displayName: "Overview",
             child: overviewViewModel,
         },
+        BuildAccessControlPageEntry(BuildFullInstanceName),
         {
             key: "credentials",
             displayName: "Credentials",
             child: myjdcredentialsViewModel
-        }
+        },
+        {
+            key: "smb-connection",
+            child: smbConnectionViewModel,
+            displayName: "SMB connection"
+        },
     ],
     formTitle: ids => ids.instanceName,
     type: "multiPage"

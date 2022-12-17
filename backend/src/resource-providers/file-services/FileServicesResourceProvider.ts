@@ -24,6 +24,7 @@ import { FileStorageProperties } from "./FileStorageProperties";
 import { FileStoragesManager } from "./FileStoragesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+import { InstanceContext } from "../../common/InstanceContext";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileStorageProperties>
@@ -59,17 +60,17 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     {
     }
     
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
-        await this.fileStoragesManager.DeleteSMBConfigIfExists(hostId, fullInstanceName);
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.fileStoragesManager.UpdateSMBConfig(instanceContext, { enabled: false });
+        await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
 
         return null;
     }
 
-    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
-        await this.fileStoragesManager.UpdateSMBConfig(hostId, fullInstanceName);
+        await this.fileStoragesManager.RefreshSMBConfig(instanceContext);
     }
 
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<DeploymentResult>

@@ -25,6 +25,7 @@ import { LetsEncryptManager } from "./LetsEncryptManager";
 import { JdownloaderManager } from "./JdownloaderManager";
 import { StaticWebsitesManager } from "./StaticWebsitesManager";
 import { NodeAppServiceManager } from "./NodeAppServiceManager";
+import { InstanceContext } from "../../common/InstanceContext";
 
 @Injectable
 export class WebServicesResourceProvider implements ResourceProvider<JdownloaderProperties | LetsEncryptProperties | NextcloudProperties | NodeAppServiceProperties | StaticWebsiteProperties>
@@ -90,8 +91,12 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
         }
     }
     
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
+        const hostId = instanceContext.hostId;
+        const hostStoragePath = instanceContext.hostStoragePath;
+        const fullInstanceName = instanceContext.fullInstanceName;
+
         const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
         switch(parts.resourceTypeName)
         {
@@ -113,8 +118,15 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
         return null;
     }
 
-    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
+        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
+        switch(parts.resourceTypeName)
+        {
+            case resourceProviders.webServices.jdownloaderResourceType.name:
+                await this.jdownloaderManager.RefreshSMBConfig(instanceContext);
+                break;
+        }
     }
 
     public async ProvideResource(instanceProperties: JdownloaderProperties | LetsEncryptProperties | NextcloudProperties | NodeAppServiceProperties | StaticWebsiteProperties, context: DeploymentContext): Promise<DeploymentResult>

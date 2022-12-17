@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { InstanceContext } from "../common/InstanceContext";
 import { TimeSchedule } from "../common/TimeSchedule";
 
 export interface BaseResourceProperties
@@ -63,7 +64,7 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
 
     CheckInstanceAvailability(hostId: number, fullInstanceName: string): Promise<void>;
     CheckInstanceHealth(hostId: number, fullInstanceName: string): Promise<void>;
-    DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>;
-    InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>;
+    DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>;
+    InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
 }

@@ -26,6 +26,7 @@ import { OpenVPNGatewayConfig, OpenVPNGatewayManager } from "./OpenVPNGatewayMan
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { SysCtlConfService } from "./SysCtlConfService";
+import { InstanceContext } from "../../common/InstanceContext";
  
 @Injectable
 export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPNGatewayProperties>
@@ -62,15 +63,15 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
     {
     }
     
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
-        await this.remoteRootFileSystemManager.RemoveFile(hostId, this.openVPNGatwayManager.BuildConfigPath(fullInstanceName));
-        await this.systemServicesManager.Reload(hostId);
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.remoteRootFileSystemManager.RemoveFile(instanceContext.hostId, this.openVPNGatwayManager.BuildConfigPath(instanceContext.fullInstanceName));
+        await this.systemServicesManager.Reload(instanceContext.hostId);
+        await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
         return null;
     }
 
-    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
     }
 

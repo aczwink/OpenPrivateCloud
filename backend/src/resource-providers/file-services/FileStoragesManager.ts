@@ -17,23 +17,31 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
-import { PermissionsController } from "../../data-access/PermissionsController";
-import { HostUsersManager } from "../../services/HostUsersManager";
 import { InstancesManager } from "../../services/InstancesManager";
-import { SambaSharesManager } from "./SambaSharesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { permissions } from "openprivatecloud-common";
+import { InstanceConfigController } from "../../data-access/InstanceConfigController";
+import { InstanceContext } from "../../common/InstanceContext";
+import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
+
+export interface SMBConfig
+{
+    enabled: boolean;
+}
+
+interface FileStorageConfig
+{
+    smb: SMBConfig;
+};
 
 @Injectable
 export class FileStoragesManager
 {
-    constructor(private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
-        private sambaSharesManager: SambaSharesManager, private instancesManager: InstancesManager, private instancesController: InstancesController,
-        private hostStoragesController: HostStoragesController, private remoteFileSystemManager: RemoteFileSystemManager,
-        private remoteCommandExecutor: RemoteCommandExecutor)
+    constructor(private instancesManager: InstancesManager, private instancesController: InstancesController,
+        private remoteFileSystemManager: RemoteFileSystemManager,
+        private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: InstanceConfigController,
+        private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
     {
     }
     
@@ -49,17 +57,15 @@ export class FileStoragesManager
         await this.remoteCommandExecutor.ExecuteCommand(["sync"], hostId);
     }
 
-    public async DeleteSMBConfigIfExists(hostId: number, fullInstanceName: string)
-    {
-        const share = await this.QuerySMBConfig(hostId, fullInstanceName);
-        if(share !== undefined)
-            await this.sambaSharesManager.DeleteShare(hostId, share.name);
-    }
-
     public GetDataPath(storagePath: string, fullInstanceName: string)
     {
         const instancePath = this.instancesManager.BuildInstanceStoragePath(storagePath, fullInstanceName);
         return path.join(instancePath, "data");
+    }
+
+    public async GetSMBConnectionInfo(data: InstanceContext, userId: number)
+    {
+        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(data, userId);
     }
 
     public GetSnapshotsPath(storagePath: string, fullInstanceName: string)
@@ -68,17 +74,10 @@ export class FileStoragesManager
         return path.join(instancePath, "snapshots");
     }
 
-    public MapToSMBShareName(fullInstanceName: string)
+    public async QuerySMBConfig(instanceId: number)
     {
-        return fullInstanceName.substring(1).ReplaceAll("/", "_");
-    }
-
-    public async QuerySMBConfig(hostId: number, fullInstanceName: string)
-    {
-        const shareName = this.MapToSMBShareName(fullInstanceName);
-        const cfg = await this.sambaSharesManager.QueryShareSettings(hostId, shareName);
-
-        return cfg;
+        const cfg = await this.ReadConfig(instanceId);
+        return cfg.smb;
     }
 
     public async QuerySnapshots(hostId: number, storagePath: string, fullInstanceName: string)
@@ -95,31 +94,43 @@ export class FileStoragesManager
         return snapshots.Values().Map(x => x.filename).OrderBy(x => x);
     }
 
-    public async UpdateSMBConfigIfExists(hostId: number, fullInstanceName: string)
+    public async RefreshSMBConfig(instanceContext: InstanceContext)
     {
-        const share = await this.QuerySMBConfig(hostId, fullInstanceName);
-        if(share !== undefined)
-            await this.UpdateSMBConfig(hostId, fullInstanceName);
+        await this.UpdateSMBConfig(instanceContext, await this.QuerySMBConfig(instanceContext.instanceId));
     }
     
-    public async UpdateSMBConfig(hostId: number, fullInstanceName: string)
+    public async UpdateSMBConfig(instanceContext: InstanceContext, smbConfig: SMBConfig)
     {
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+        const result = await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
+            enabled: smbConfig.enabled,
+            sharePath: this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName),
+            readOnly: false
+        }, instanceContext);
+        if(result !== undefined)
+            return result;
 
-        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instance!.id, permissions.data.read);
-        await this.hostUsersManager.SyncSambaGroupsMembers(hostId, readGroups.ToArray());
-        const readGroupsLinux = readGroups.Map(x => "@" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
+        const config = await this.ReadConfig(instanceContext.instanceId);
+        config.smb = smbConfig;
+        await this.WriteConfig(instanceContext.instanceId, config);
+    }
 
-        const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instance!.id, permissions.data.write);
-        await this.hostUsersManager.SyncSambaGroupsMembers(hostId, writeGroups.ToArray());
-        const writeGroupsLinux = writeGroups.Map(x => "@" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
+    //Private methods
+    private async ReadConfig(instanceId: number): Promise<FileStorageConfig>
+    {
+        const config = await this.instanceConfigController.QueryConfig<FileStorageConfig>(instanceId);
+        if(config === undefined)
+        {
+            return {
+                smb: {
+                    enabled: false
+                }
+            };
+        }
+        return config;
+    }
 
-        await this.sambaSharesManager.SetShare(hostId, {
-            readUsers: readGroupsLinux,
-            writeUsers: writeGroupsLinux,
-            shareName: this.MapToSMBShareName(fullInstanceName),
-            sharePath: this.GetDataPath(storage!.path, fullInstanceName)
-        });
+    private async WriteConfig(instanceId: number, config: FileStorageConfig)
+    {
+        await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
     }
 }

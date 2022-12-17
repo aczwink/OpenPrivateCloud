@@ -32,6 +32,7 @@ import { MariadbProperties } from "./MariadbProperties";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { HostMySQLQueryService } from "./HostMySQLQueryService";
+import { InstanceContext } from "../../common/InstanceContext";
 
 interface MysqldSettings
 {
@@ -123,17 +124,19 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
         }
     }
     
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
+        const hostId = instanceContext.hostId;
+
         await this.systemServicesManager.StopService(hostId, "mariadb");
         await this.modulesManager.Uninstall(hostId, "mariadb");
 
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
 
         return null;
     }
 
-    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
     }
 

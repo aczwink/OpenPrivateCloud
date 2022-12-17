@@ -17,6 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import path from "path";
+import { InstanceContext } from "../../common/InstanceContext";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
@@ -26,6 +27,7 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
+import { SingleSMBSharePerInstanceProvider } from "../file-services/SingleSMBSharePerInstanceProvider";
 import { DeploymentContext } from "../ResourceProvider";
 import { JdownloaderProperties } from "./Properties";
 
@@ -41,7 +43,8 @@ export class JdownloaderManager
     constructor(private modulesManager: ModulesManager, private hostUsersManager: HostUsersManager, private instancesManager: InstancesManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private instancesController: InstancesController, private hostStoragesController: HostStoragesController)
+        private instancesController: InstancesController, private hostStoragesController: HostStoragesController,
+        private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
     {
     }
 
@@ -63,6 +66,11 @@ export class JdownloaderManager
         await this.hostUsersManager.DeleteHostServicePrinciple(hostId, "jdownloader");
     }
 
+    public async GetSMBConnectionInfo(data: InstanceContext, userId: number)
+    {
+        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(data, userId);
+    }
+
     public async IsActive(instanceId: number)
     {
         const instanceData = await this.QueryInstanceData(instanceId);
@@ -74,9 +82,15 @@ export class JdownloaderManager
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "java");
 
         const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o775);
+
+        const downloadsPath = path.join(instanceDir, "Downloads");
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, downloadsPath);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, downloadsPath, 0o750);
 
         const authority = await this.hostUsersManager.CreateHostServicePrinciple(context.hostId, "jdownloader");
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, authority.hostUserId, authority.hostGroupId);
+        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, downloadsPath, authority.hostUserId, await this.hostUsersManager.ResolveHostGroupId(context.hostId, "nogroup"));
 
         const shell = await this.remoteCommandExecutor.SpawnShell(context.hostId);
         await shell.ChangeUser(authority.linuxUserName);
@@ -108,6 +122,17 @@ export class JdownloaderManager
             email: myjd.email,
             password: myjd.password,
         };
+    }
+
+    public async RefreshSMBConfig(instanceContext: InstanceContext)
+    {
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+
+        await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
+            enabled: true,
+            sharePath: path.join(instanceDir, "Downloads"),
+            readOnly: true
+        }, instanceContext);
     }
 
     public async SetCredentials(instanceId: number, settings: MyJDownloaderCredentials)

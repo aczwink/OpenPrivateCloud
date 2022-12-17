@@ -30,9 +30,11 @@ export class SessionComponent extends Component
     
     protected Render(): RenderValue
     {
-        const li = this.authService.loginInfo.Get()!;
+        const li = this.authService.loginInfo.Get();
+        if(li === undefined)
+            return null;
 
-        const left = new Duration(Math.max(li.expiryDateTime.valueOf() - Date.now(), 0));
+        const left = this.authService.GetRemainingLoginTime();
 
         return <div className="d-flex align-items-center">
             <Anchor route="/usersettings"><MatIcon>account_circle</MatIcon></Anchor>

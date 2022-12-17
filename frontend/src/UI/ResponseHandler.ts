@@ -31,6 +31,7 @@ function ExtractDataOrErrorFromResponse<ObjectType>(response: ResponseData<numbe
             return { ok: true, value: (response as any).data };
         case 204:
             return { ok: true, value: undefined as any };
+        case 400:
         case 409:
         case 500:
             return { ok: false, error: response.rawBody };

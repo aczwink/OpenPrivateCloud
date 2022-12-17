@@ -24,6 +24,7 @@ import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourcePro
 import { AVTranscoderProperties } from "./AVTranscoderProperties";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { AVTranscoderConfig, AVTranscoderQuality } from "./AVTranscoderConfig";
+import { InstanceContext } from "../../common/InstanceContext";
 
 @Injectable
 export class MultimediaServicesResourceProvider implements ResourceProvider<AVTranscoderProperties>
@@ -58,13 +59,13 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     {
     }
     
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
         return null;
     }
 
-    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
     }
 

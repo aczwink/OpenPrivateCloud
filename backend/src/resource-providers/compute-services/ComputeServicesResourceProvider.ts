@@ -31,6 +31,7 @@ import { HostStoragesController } from "../../data-access/HostStoragesController
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { VirtualMachineManager } from "./VirtualMachineManager";
+import { InstanceContext } from "../../common/InstanceContext";
  
 @Injectable
 export class ComputeServicesResourceProvider implements ResourceProvider<VirtualMachineProperties>
@@ -68,8 +69,11 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
     {
     }
     
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
+        const fullInstanceName = instanceContext.fullInstanceName;
+        const hostId = instanceContext.hostId;
+
         const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
         const state = await this.virtualMachineManager.QueryVMState(hostId, parts.instanceName);
         if(state === "running")
@@ -81,12 +85,12 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Virtual
         }
 
         await this.virtualMachineManager.DeleteVM(hostId, parts.instanceName);
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, instanceContext.hostStoragePath, fullInstanceName);
 
         return null;
     }
 
-    public async InstancePermissionsChanged(hostId: number, fullInstanceName: string): Promise<void>
+    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
     {
     }
 

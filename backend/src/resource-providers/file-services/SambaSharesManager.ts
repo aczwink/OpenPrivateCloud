@@ -28,6 +28,14 @@ import { Share } from "./models";
 
 type GlobalSettings = Dictionary<boolean | number | string | null>;
 
+export interface SMBConnectionInfo
+{
+    /**
+     * @format multi-line
+     */
+    fstab: string;
+}
+
 interface ShareData
 {
     readUsers: string[];
@@ -61,6 +69,26 @@ export class SambaSharesManager
         settings.shares.Remove(idx);
 
         await this.WriteSettings(hostId, settings.global!, settings.shares);
+    }
+
+    public GetConnectionInfo(hostName: string, shareName: string, userName: string)
+    {
+        const result: SMBConnectionInfo = {
+            fstab: `
+for /etc/fstab:
+//${hostName}/${shareName} /<some/local/path> cifs noauto,user,_netdev,credentials=/home/<your user>/.smbcredentials/${hostName} 0 0
+
+for /home/<your user>/.smbcredentials/${hostName}:
+username=${userName}
+password=<your samba pw>
+domain=WORKGROUP
+
+protect /home/<your user>/.smbcredentials/${hostName} appropriatly!:
+chmod 600 /home/<your user>/.smbcredentials/${hostName}
+            `.trim()
+        };
+
+        return result;
     }
 
     public async QueryShareSettings(hostId: number, shareName: string)

@@ -19,11 +19,15 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
+import { InstanceContext } from "../common/InstanceContext";
+import { HostStoragesController } from "../data-access/HostStoragesController";
+import { InstancesController } from "../data-access/InstancesController";
  
 @Injectable
 export class InstancesManager
 {
-    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager)
+    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
+        private hostStoragesController: HostStoragesController, private instancesController: InstancesController)
     {
     }
     
@@ -31,6 +35,22 @@ export class InstancesManager
     public BuildInstanceStoragePath(hostStoragePath: string, fullInstanceName: string)
     {
         return path.join(hostStoragePath, this.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName));
+    }
+
+    public async CreateInstanceContext(fullInstanceName: string): Promise<InstanceContext | undefined>
+    {
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        if(instance === undefined)
+            return undefined;
+
+        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+
+        return {
+            fullInstanceName,
+            hostId: storage!.hostId,
+            hostStoragePath: storage!.path,
+            instanceId: instance!.id,
+        };
     }
     
     public async CreateInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string)

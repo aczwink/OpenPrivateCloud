@@ -16,13 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Get, Header, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { resourceProviders } from "openprivatecloud-common";
 import { c_jdownloaderResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
+import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
+import { SessionsManager } from "../../services/SessionsManager";
 import { JdownloaderManager, MyJDownloaderCredentials } from "./JdownloaderManager";
 
 interface JdownloaderInfoDto
@@ -35,8 +35,8 @@ interface JdownloaderInfoDto
 @APIController(`resourceProviders/${c_webServicesResourceProviderName}/${c_jdownloaderResourceTypeName}/{instanceName}`)
 class JdownloaderAPIController
 {
-    constructor(private jdownloaderManager: JdownloaderManager, private instancesManager: InstancesManager, private instancesController: InstancesController,
-        private hostsController: HostsController, private hostStoragesController: HostStoragesController)
+    constructor(private jdownloaderManager: JdownloaderManager, private instancesManager: InstancesManager,
+        private hostsController: HostsController, private sessionsManager: SessionsManager)
     {
     }
 
@@ -46,53 +46,60 @@ class JdownloaderAPIController
     )
     {
         const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.jdownloaderResourceType.name, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        if(instance === undefined)
+        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        if(instanceContext === undefined)
             return NotFound("instance not found");
 
-        return instance.id;
+        return instanceContext;
     }
 
     @Post()
     public async StartStop(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
         @BodyProp action: "start" | "stop"
     )
     {
-        await this.jdownloaderManager.StartOrStopService(instanceId, action);
+        await this.jdownloaderManager.StartOrStopService(instanceContext.instanceId, action);
     }
 
     @Get("credentials")
     public async QueryCredentials(
-        @Common instanceId: number
+        @Common instanceContext: InstanceContext,
     )
     {
-        return await this.jdownloaderManager.QueryCredentials(instanceId);
+        return await this.jdownloaderManager.QueryCredentials(instanceContext.instanceId);
     }
 
     @Put("credentials")
     public async UpdateCredentials(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
         @Body credentials: MyJDownloaderCredentials
     )
     {
-        return await this.jdownloaderManager.SetCredentials(instanceId, credentials);
+        return await this.jdownloaderManager.SetCredentials(instanceContext.instanceId, credentials);
     }
 
     @Get("info")
     public async QueryInfo(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-        const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
+        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
             
         const result: JdownloaderInfoDto = {
             hostName: host!.hostName,
-            isActive: await this.jdownloaderManager.IsActive(instanceId),
-            storagePath: storage!.path
+            isActive: await this.jdownloaderManager.IsActive(instanceContext.instanceId),
+            storagePath: instanceContext.hostStoragePath
         };
         return result;
+    }
+
+    @Get("smbconnect")
+    public async QuerySMBConnectionInfo(
+        @Common instanceContext: InstanceContext,
+        @Header Authorization: string
+    )
+    {
+        return await this.jdownloaderManager.GetSMBConnectionInfo(instanceContext, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
     }
 }

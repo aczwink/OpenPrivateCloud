@@ -17,7 +17,7 @@
  * */
 
 import { Injectable, Router } from "acfrontend";
-import { Property } from "acts-util-core";
+import { Duration, Property } from "acts-util-core";
 import { APIService } from "./APIService";
 import { APIServiceInterceptor } from "./APIServiceInterceptor";
 
@@ -46,6 +46,15 @@ export class AuthenticationService
     }
     
     //Public methods
+    public GetRemainingLoginTime()
+    {
+        const li = this._loginInfo.Get();
+        if(li === undefined)
+            return new Duration(0);
+
+        return new Duration(Math.max(li.expiryDateTime.valueOf() - Date.now(), 0));
+    }
+
     public IsLoggedIn()
     {
         return this._loginInfo.Get() !== undefined;
@@ -66,6 +75,8 @@ export class AuthenticationService
                 emailAddress
             });
 
+            this.autoLogOutTimerId = setTimeout(this.Logout.bind(this), this.GetRemainingLoginTime().milliseconds);
+
             return true;
         }
 
@@ -74,11 +85,20 @@ export class AuthenticationService
 
     public async Logout()
     {
-        await this.apiService.sessions.delete();
-        this._loginInfo.Set(undefined);
-        this.router.RouteTo("/");
+        if(this.IsLoggedIn())
+        {
+            // to prevent loops, do this first
+            this._loginInfo.Set(undefined);
+            this.router.RouteTo("/");
+
+            clearTimeout(this.autoLogOutTimerId);
+            this.autoLogOutTimerId = undefined;
+
+            await this.apiService.sessions.delete();
+        }
     }
 
     //Private variables
     private _loginInfo: Property<LoginInfo | undefined>;
+    private autoLogOutTimerId?: any;
 }
