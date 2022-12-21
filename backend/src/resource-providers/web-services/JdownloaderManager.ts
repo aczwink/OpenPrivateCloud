@@ -16,7 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { permissions } from "openprivatecloud-common";
 import path from "path";
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
@@ -133,7 +132,7 @@ export class JdownloaderManager
         const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
 
         const downloadsPath = path.join(instanceDir, "Downloads");
-        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, downloadsPath, true, [permissions.data.read]);
+        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, downloadsPath, true);
 
         await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
             enabled: true,

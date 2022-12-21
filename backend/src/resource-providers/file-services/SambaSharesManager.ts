@@ -105,7 +105,7 @@ chmod 600 /home/<your user>/.smbcredentials/${hostName}
         const newShare = oldShare === undefined ? this.CreateDefaultShare(data.shareName) : oldShare;
 
         newShare.properties.createMask = 0o770;
-        newShare.properties.directoryMask = 0o750;
+        newShare.properties.directoryMask = 0o770;
         newShare.properties.path = data.sharePath;
         newShare.properties.validUsers = data.readUsers;
         newShare.properties.writeList = data.writeUsers;

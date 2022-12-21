@@ -17,7 +17,7 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { opcGroupPrefixes, opcUserPrefixes } from "../common/UserAndGroupDefinitions";
+import { opcGroupPrefixes, opcSpecialGroups, opcUserPrefixes } from "../common/UserAndGroupDefinitions";
 import { HostsController } from "../data-access/HostsController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { UsersController } from "../data-access/UsersController";
@@ -125,7 +125,7 @@ export class HostUsersManager
 
         const members = await this.usersController.QueryMembersOfGroup(userGroupId);
         for (const member of members)
-            await this.SyncUserToHost(hostId, member.id, linuxGroupName);
+            await this.SyncUserToHost(hostId, member.id, opcSpecialGroups.userPrimaryGroup);
 
         await this.SyncGroupMembersToHost(hostId, linuxGroupName, members.Values().Map(x => x.id).Map(this.MapUserToLinuxUserName.bind(this)).ToSet());
     }

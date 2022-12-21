@@ -63,6 +63,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
         await this.fileStoragesManager.UpdateSMBConfig(instanceContext, { enabled: false });
+        await this.fileStoragesManager.DeleteAllSnapshots(instanceContext);
         await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
 
         return null;
@@ -76,14 +77,17 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
-        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instancePath = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, instancePath, 0o775);
 
         const dataPath = this.fileStoragesManager.GetDataPath(context.storagePath, context.fullInstanceName);
         const snapshotsPath = this.fileStoragesManager.GetSnapshotsPath(context.storagePath, context.fullInstanceName);
 
         await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "create", dataPath], context.hostId);
-        await this.remoteFileSystemManager.CreateDirectory(context.hostId, snapshotsPath);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, dataPath, 0o770);
+
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, snapshotsPath);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, snapshotsPath, 0o750);
 
         return {};
     }

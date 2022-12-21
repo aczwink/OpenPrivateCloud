@@ -17,44 +17,43 @@
  * */
 
 import { Injectable } from "acts-util-node";
+import { permissions } from "openprivatecloud-common";
 import { InstanceContext } from "../../common/InstanceContext";
-import { opcSpecialGroups } from "../../common/UserAndGroupDefinitions";
 import { PermissionsController } from "../../data-access/PermissionsController";
 import { HostUsersManager } from "../../services/HostUsersManager";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
+import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 
 @Injectable
 export class SharedFolderPermissionsManager
 {
-    constructor(private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
 
     //Public methods
-    public async SetPermissions(instanceContext: InstanceContext, dirPath: string, readOnly: boolean, permissions: string[])
+    public async SetPermissions(instanceContext: InstanceContext, dirPath: string, readOnly: boolean)
     {
-        const groups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions);
-        const linuxGroups = groups.Map(x => this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
+        const acl = ["u::rwX", "g::rwX", "o::-"];
 
-        const primaryLinuxGroupName = (linuxGroups.length > 0) ? linuxGroups.shift()! : opcSpecialGroups.host;
-        const gid = await this.hostUsersManager.ResolveHostGroupId(instanceContext.hostId, primaryLinuxGroupName);
+        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.read);
+        const readLinuxGroups = readGroups.Map(x => this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
-        await this.SetPermissionsInternal(instanceContext.hostId, dirPath, readOnly, gid, linuxGroups);
-    }
+        for (const readLinuxGroup of readLinuxGroups)
+            acl.push("g:" + readLinuxGroup + ":rX");
 
-    //Private methods
-    private async SetPermissionsInternal(hostId: number, filePath: string, readOnly: boolean, primaryGid: number, supplementalLinuxGroups: string[])
-    {
-        const stats = await this.remoteFileSystemManager.QueryStatus(hostId, filePath);
+        if(!readOnly)
+        {
+            const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.write);
+            const writeLinuxGroups = writeGroups.Map(x => this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, filePath, stats.uid, primaryGid);
+            for (const writeLinuxGroup of writeLinuxGroups)
+                acl.push("g:" + writeLinuxGroup + ":rwX");
+        }
 
-        const mode = readOnly ? 0o750 : 0o770;
-        await this.remoteRootFileSystemManager.ChangeMode(hostId, filePath, mode);
+        const aclString = acl.join(",");
 
-        //TODO: recursive?
-        //TODO: set supplemental groups with ACLs?
+        //TODO: without the "-R" and without the default acl every user can only edit his own files inside the share. Maybe this is desired some day
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "setfacl", "-R", "--set", aclString, dirPath], instanceContext.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "setfacl", "-R", "-d", "--set", aclString, dirPath], instanceContext.hostId);
     }
 }

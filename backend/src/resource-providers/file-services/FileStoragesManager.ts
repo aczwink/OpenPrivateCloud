@@ -23,7 +23,6 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
 import { InstanceContext } from "../../common/InstanceContext";
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
-import { permissions } from "openprivatecloud-common";
 import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
 
 export interface SMBConfig
@@ -56,6 +55,13 @@ export class FileStoragesManager
         
         await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "snapshot", "-r", dataPath, fullSnapPath], hostId);
         await this.remoteCommandExecutor.ExecuteCommand(["sync"], hostId);
+    }
+
+    public async DeleteAllSnapshots(instanceContext: InstanceContext)
+    {
+        const snapshots = await this.QuerySnapshotsRawOrdered(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        for (const snapshot of snapshots)
+            await this.DeleteSnapshot(instanceContext, snapshot);
     }
 
     public GetDataPath(storagePath: string, fullInstanceName: string)
@@ -98,7 +104,7 @@ export class FileStoragesManager
     public async RefreshPermissions(instanceContext: InstanceContext)
     {
         const dataPath = this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
-        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, dataPath, false, [permissions.data.read, permissions.data.write]);
+        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, dataPath, false);
         await this.UpdateSMBConfig(instanceContext, await this.QuerySMBConfig(instanceContext.instanceId));
     }
     
@@ -118,6 +124,13 @@ export class FileStoragesManager
     }
 
     //Private methods
+    private async DeleteSnapshot(instanceContext: InstanceContext, snapshotName: string)
+    {
+        const snapshotsPath = this.GetSnapshotsPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const snapshotPath = path.join(snapshotsPath, snapshotName);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "btrfs", "subvolume", "delete", snapshotPath], instanceContext.hostId);
+    }
+
     private async ReadConfig(instanceId: number): Promise<FileStorageConfig>
     {
         const config = await this.instanceConfigController.QueryConfig<FileStorageConfig>(instanceId);

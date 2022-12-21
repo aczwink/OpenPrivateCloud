@@ -57,7 +57,13 @@ export const opcSpecialGroups = {
     /**
      * A private group for the host user. No other user should be in this group.
      */
-    host: "opc-hg"
+    host: "opc-hg",
+
+    /**
+     * OpenPrivateCloud users that are synced to linux hosts need a primary group.
+     * This group should usually have no permissions/files except such ones that are granted to ALL OpenPrivateCloud users no matter what roles they have assigned.
+     */
+    userPrimaryGroup: "opc-upg"
 };
 
 export const opcSpecialUsers = {
