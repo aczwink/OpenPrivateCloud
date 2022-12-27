@@ -23,7 +23,7 @@ import { ProcessTracker } from "../../services/ProcessTrackerManager";
 import { BackupVaultTargetConfig, BackupVaultWebDAVTargetConfig } from "./models";
 
 export type TargetFileSystemType = "btrfs" | "linux" | "limited";
-interface MountedBackupTarget
+export interface MountedBackupTarget
 {
     encryptionPassphrase?: string;
     targetFileSystemType: TargetFileSystemType;
@@ -45,15 +45,16 @@ export class BackupTargetMountService
         switch(target.type)
         {
             case "storage-device":
-                return await this.MountStorageDeviceIfRequired(hostId, target.storageDevicePath, processTracker);
+                return await this.MountStorageDeviceIfRequired(hostId, target.storageDeviceUUID, processTracker);
             case "webdav":
                 return await this.MountWebDAVService(hostId, target, processTracker);
         }
     }
 
     //Private methods
-    private async MountStorageDeviceIfRequired(hostId: number, targetStorageDevicePath: string, processTracker: ProcessTracker): Promise<MountedBackupTarget>
+    private async MountStorageDeviceIfRequired(hostId: number, storageDeviceUUID: string, processTracker: ProcessTracker): Promise<MountedBackupTarget>
     {
+        const targetStorageDevicePath = this.mountsManager.CreateDevicePathForPartition(storageDeviceUUID);
         const mountPoint = await this.mountsManager.QueryMountPoint(hostId, targetStorageDevicePath);
         if(mountPoint === undefined)
         {
@@ -102,7 +103,7 @@ export class BackupTargetMountService
 
     private async UnmountSource(hostId: number, source: string, processTracker: ProcessTracker)
     {
-        await this.mountsManager.UnmountAndRemoveMountPoint(hostId, source);
+        await this.mountsManager.UnmountAndRemoveMountPointIfStandard(hostId, source);
         processTracker.Add("Device", source, "unmounted.");
     }
 }

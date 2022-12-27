@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Host, HostStorage, HostStorageCreationProperties, Partition, StorageDeviceDto } from "../../dist/api";
+import { Host, HostStorage, HostStorageCreationProperties, PartitionDto, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
@@ -79,18 +79,25 @@ const storagesViewModel: CollectionViewModel<HostStorage, HostId, HostStorageCre
 
 type StorageDeviceId = Host & { storageDevicePath: string };
 
-const partitionsViewModel: ListViewModel<Partition, StorageDeviceId> =
+const partitionsViewModel: ListViewModel<PartitionDto, StorageDeviceId> =
 {
     type: "list",
     actions: [],
     boundActions: [],
     displayName: "Partitions",
     requestObjects: (service, ids) => service.hosts._any_.storageDevices.partitions.get(ids.hostName, { devicePath: ids.storageDevicePath }),
-    schemaName: "Partition"
+    schemaName: "PartitionDto"
 }
 
 const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId> = {
-    actions: [],
+    actions: [
+        {
+            type: "activate",
+            execute: (service, ids) => service.hosts._any_.storageDevices.post(ids.hostName, { devicePath: ids.storageDevicePath }),
+            matIcon: "power_settings_new",
+            title: "Power-off"
+        }
+    ],
     entries: [
         {
             key: "partitions",

@@ -19,11 +19,13 @@
 import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
+import { MountsManager } from "./MountsManager";
 
 interface Partition
 {
     path: string;
-    mountPoint: string;
+    mountPoint: string | null;
+    uuid: string;
 }
 
 export interface SMART_Attribute
@@ -83,6 +85,10 @@ interface StorageDevice
     vendor: string;
     model: string;
     path: string;
+    /**
+     * Removable
+     */
+    rm: boolean;
 
     partitions: Partition[];
 }
@@ -90,11 +96,28 @@ interface StorageDevice
 @Injectable
 export class HostStorageDevicesManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private mountsManager: MountsManager)
     {
     }
 
     //Public methods
+    public async UnmountAndPowerOffDevice(hostId: number, devicePath: string)
+    {
+        const devices = await this.QueryStorageDevices(hostId);
+        const device = devices.find(x => x.path === devicePath);
+
+        if(device === undefined)
+            return;
+
+        for (const partition of device.partitions)
+        {
+            if(partition.mountPoint !== null)
+                await this.mountsManager.UnmountAndRemoveMountPointIfStandard(hostId, partition.path);
+        }
+
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "udisksctl", "power-off", "-b", devicePath], hostId);
+    }
+
     public async QuerySMARTInfo(hostId: number, devicePath: string)
     {
         const { stdOut } = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "smartctl", "-a", devicePath, "-j"], hostId);
@@ -125,15 +148,17 @@ export class HostStorageDevicesManager
             vendor: devInfo.vendor,
             model: devInfo.model,
             path: devInfo.name,
+            rm: devInfo.rm,
             partitions: this.MapChildren(devInfo.children)
         };
     }
 
     private MapPartition(partInfo: any): Partition[]
     {
-        const part = {
+        const part: Partition = {
             path: partInfo.name,
-            mountPoint: partInfo.mountpoint
+            mountPoint: partInfo.mountpoint,
+            uuid: partInfo.uuid,
         };
 
         return [part, ...this.MapChildren(partInfo.children)];

@@ -15,14 +15,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Common, Get, NotFound, Path, Query } from "acts-util-apilib";
+import { APIController, Common, Get, NotFound, Path, Post, Query } from "acts-util-apilib";
 import { HostsController } from "../data-access/HostsController";
 import { HostStorageDevicesManager } from "../services/HostStorageDevicesManager";
+
+interface PartitionDto
+{
+    devicePath: string;
+    mountPoint: string;
+    uuid: string;
+}
 
 interface StorageDeviceDto
 {
     devicePath: string;
     name: string;
+    removable: boolean;
 }
  
 @APIController("hosts/{hostName}/storageDevices")
@@ -53,7 +61,14 @@ class HostStorageDevicesAPIController
         const device = sds.find(x => x.path === devicePath);
         if(device === undefined)
             return NotFound("device does not exist");
-        return device.partitions;
+        return device.partitions.map(x => {
+            const res: PartitionDto = {
+                devicePath: x.path,
+                mountPoint: x.mountPoint ?? "",
+                uuid: x.uuid
+            };
+            return res;
+        });
     }
     
     @Get("smart")
@@ -74,9 +89,19 @@ class HostStorageDevicesAPIController
         return sds.map(x => {
             const res: StorageDeviceDto = {
                 name: x.vendor + " " + x.model,
-                devicePath: x.path
-            }
+                devicePath: x.path,
+                removable: x.rm
+            };
             return res;
         });
+    }
+
+    @Post()
+    public async UnmountAndPowerOffDevice(
+        @Common hostId: number,
+        @Query devicePath: string
+    )
+    {
+        await this.hostStorageDevicesManager.UnmountAndPowerOffDevice(hostId, devicePath);
     }
 }

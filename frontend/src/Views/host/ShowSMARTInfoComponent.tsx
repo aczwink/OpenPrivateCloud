@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterState } from "acfrontend";
+import { BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterState } from "acfrontend";
 import { SMART_Attribute, SMART_Result } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
 
@@ -76,23 +76,21 @@ export class ShowSMARTInfoComponent extends Component
         switch(attr.id)
         {
             case 5: //Reallocated Sectors Count
-                return (attr.raw.value == 0) ? AttrStatus.Ok : AttrStatus.Error;
             case 10: //Spin Retry Count
-                alert("10 NOT IMPLEMENTED");
+            case 187: //Reported Uncorrectable Errors
+            case 196: //Reallocation Event Count
+            case 197: //Current Pending Sector Count
+            case 198: //(Offline) Uncorrectable Sector Count
+                return (attr.raw.value == 0) ? AttrStatus.Ok : AttrStatus.Error;
             case 184: //End-to-End error / IOEDC
                 alert("184 NOT IMPLEMENTED");
-            case 187: //Reported Uncorrectable Errors
-                alert("187 NOT IMPLEMENTED");
+                break;
             case 188: //Command Timeout
                 alert("188 NOT IMPLEMENTED");
-            case 196: //Reallocation Event Count
-                alert("196 NOT IMPLEMENTED");
-            case 197: //Current Pending Sector Count
-                alert("197 NOT IMPLEMENTED");
-            case 198: //(Offline) Uncorrectable Sector Count
-                alert("198 NOT IMPLEMENTED");
+                break;
             case 201: //Soft Read Error Rate / TA Counter Detected
                 alert("201 NOT IMPLEMENTED");
+                break;
         }
         return AttrStatus.Unknown;
     }
@@ -101,23 +99,29 @@ export class ShowSMARTInfoComponent extends Component
     {
         return <fragment>
             <h2>Attributes</h2>
-            <table>
-                <tr>
-                    <th>Status</th>
-                    <th>Name</th>
-                    <th>Value</th>
-                    <th>Worst</th>
-                    <th>Threshold</th>
-                    <th>Raw</th>
-                </tr>
-                {table.map(attr => <tr>
-                    <td>{this.RenderStatus(attr)}</td>
-                    <td>{attr.name}</td>
-                    <td>{attr.value}</td>
-                    <td>{attr.worst}</td>
-                    <td>{attr.thresh}</td>
-                    <td>{attr.raw.value}</td>
-                </tr>)}
+            <table className="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Id</th>
+                        <th>Name</th>
+                        <th>Value</th>
+                        <th>Worst</th>
+                        <th>Threshold</th>
+                        <th>Raw</th>
+                    </tr>
+                </thead>
+                <tbody className="table-group-divider">
+                    {table.map(attr => <tr>
+                        <td>{this.RenderStatus(attr)}</td>
+                        <td>{attr.id}</td>
+                        <td>{attr.name}</td>
+                        <td>{attr.value}</td>
+                        <td>{attr.worst}</td>
+                        <td>{attr.thresh}</td>
+                        <td>{attr.raw.value}</td>
+                    </tr>)}
+                </tbody>
             </table>
         </fragment>;
     }
@@ -138,13 +142,13 @@ export class ShowSMARTInfoComponent extends Component
         switch(this.FindAttributeStatus(attr))
         {
             case AttrStatus.Ok:
-                return <MatIcon className="success">done</MatIcon>;
+                return <div className="text-success"><BootstrapIcon>check2</BootstrapIcon></div>;
             case AttrStatus.Error:
                 return <MatIcon className="danger">error</MatIcon>;
             case AttrStatus.Warning:
                 return <MatIcon className="warning">warning</MatIcon>;
             case AttrStatus.Unknown:
-                return <MatIcon className="info">question_mark</MatIcon>;
+                return <div className="text-info"><BootstrapIcon>question</BootstrapIcon></div>;
         }
     }
 

@@ -66,9 +66,19 @@ export class RemoteFileSystemManager
     public async ListDirectoryContents(hostId: number, dirPath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.ListDirectoryContents(dirPath);
-        conn.Release();
-        return result;
+        try
+        {
+            const result = await conn.value.ListDirectoryContents(dirPath);
+            return result;
+        }
+        catch(e)
+        {
+            throw new Error("Listing contents of path " + dirPath + " on host " + hostId + " failed." + e);
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 
     public async MoveFile(hostId: number, sourcePath: string, targetPath: string)

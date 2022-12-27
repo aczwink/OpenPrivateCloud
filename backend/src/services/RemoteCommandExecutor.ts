@@ -37,12 +37,18 @@ export class RemoteCommandExecutor
     public async ExecuteCommand(command: Command, hostId: number, options?: CommandOptions)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await this.sshCommandExecutor.ExecuteCommand(conn.value, command, {
-            hostId,
-            stdin: options?.stdin,
-            workingDirectory: options?.workingDirectory,
-        });
-        conn.Release();
+        try
+        {
+            await this.sshCommandExecutor.ExecuteCommand(conn.value, command, {
+                hostId,
+                stdin: options?.stdin,
+                workingDirectory: options?.workingDirectory,
+            });
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 
     public async ExecuteBufferedCommand(command: string[], hostId: number)

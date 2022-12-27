@@ -27,7 +27,7 @@ import { BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultSou
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { BackupTargetMountService, TargetFileSystemType } from "./BackupTargetMountService";
+import { BackupTargetMountService, MountedBackupTarget, TargetFileSystemType } from "./BackupTargetMountService";
 import { Command } from "../../services/SSHService";
 import { TempFilesManager } from "../../services/TempFilesManager";
 
@@ -50,17 +50,17 @@ export class BackupProcessService
         const instance = await this.instancesController.QueryInstanceById(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        const hostId = storage!.hostId;
-
         const processTracker = this.processTrackerManager.Create("Backup of: " + instance!.fullName);
-        const mountStatus = await this.backupTargetMountService.MountTarget(hostId, target, processTracker);
-
-        for (const fileStorage of sources.fileStorages)
-            await this.BackupFileStorage(hostId, fileStorage, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
-        for (const database of sources.databases)
-            await this.BackupDatabase(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
-
-        await mountStatus.Unmount();
+        try
+        {
+            await this.MountAndDoBackup(storage!.hostId, sources, target, processTracker);
+        }
+        catch(e)
+        {
+            processTracker.Fail(e);
+            await this.instanceLogsController.AddInstanceLog(instanceId, processTracker);
+            throw e;
+        }
 
         processTracker.Add("Backup process finished");
         processTracker.Finish();
@@ -114,6 +114,8 @@ export class BackupProcessService
             processTracker.Add("Creating snapshot for FileStorage", fileStorage.fullInstanceName);
             await this.fileStoragesManager.CreateSnapshot(hostId, storagePath, fileStorage.fullInstanceName);
         }
+
+        processTracker.Add("Beginning to backup FileStorage", fileStorage.fullInstanceName);
 
         const sourceSnapshots = (await this.fileStoragesManager.QuerySnapshotsRawOrdered(hostId, storagePath, fileStorage.fullInstanceName)).ToArray();
 
@@ -236,6 +238,14 @@ export class BackupProcessService
         }
     }
 
+    private async DoBackup(hostId: number, sources: BackupVaultSourcesConfig, mountStatus: MountedBackupTarget, processTracker: ProcessTracker)
+    {
+        for (const fileStorage of sources.fileStorages)
+            await this.BackupFileStorage(hostId, fileStorage, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
+        for (const database of sources.databases)
+            await this.BackupDatabase(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
+    }
+
     private DoesTargetSnapshotExist(snapshotName: string, targetSnapshots: Set<string>, targetFileSystemType: TargetFileSystemType)
     {
         switch(targetFileSystemType)
@@ -245,6 +255,20 @@ export class BackupProcessService
                 return targetSnapshots.has(snapshotName);
             case "limited":
                 return targetSnapshots.has(this.ReplaceSpecialCharacters(snapshotName, targetFileSystemType) + ".tar.gz");
+        }
+    }
+
+    private async MountAndDoBackup(hostId: number, sources: BackupVaultSourcesConfig, target: BackupVaultTargetConfig, processTracker: ProcessTracker)
+    {
+        const mountStatus = await this.backupTargetMountService.MountTarget(hostId, target, processTracker);
+
+        try
+        {
+            await this.DoBackup(hostId, sources, mountStatus, processTracker);
+        }
+        finally
+        {
+            await mountStatus.Unmount();
         }
     }
 

@@ -36,6 +36,11 @@ export class MountsManager
     }
     
     //Public methods
+    public CreateDevicePathForPartition(diskUUID: string)
+    {
+        return "/dev/disk/by-uuid/" + diskUUID;
+    }
+
     public async CreateUniqueMountPointAndMount(hostId: number, devicePath: string)
     {
         const mountPoint = await this.CreateUniqueMountPoint(hostId);
@@ -74,23 +79,13 @@ export class MountsManager
         return parser.Parse(input).map(this.MapFSTabEntry.bind(this));
     }
 
-    public async UnmountAndRemoveMountPoint(hostId: number, devicePath: string)
+    public async UnmountAndRemoveMountPointIfStandard(hostId: number, devicePath: string)
     {
-        const pathToRemove = await this.QueryMountPoint(hostId, devicePath);
+        const mountPoint = await this.QueryMountPoint(hostId, devicePath);
+        await this.TryUnmountMultipleTimes(hostId, devicePath);
 
-        for(let i = 0; i < 120; i++)
-        {
-            await this.TryUnmount(hostId, devicePath);
-
-            const mountPoint = await this.QueryMountPoint(hostId, devicePath);
-            if(mountPoint === undefined)
-            {
-                await this.remoteRootFileSystemManager.RemoveDirectory(hostId, pathToRemove!);
-                return;
-            }
-            await new Promise<void>(resolve => setTimeout(resolve, i * 1000) );
-        }
-        throw new Error("Failed unmounting file system: " + devicePath);
+        if( (mountPoint !== undefined) && (mountPoint.startsWith("/media/opc")) )
+            await this.remoteRootFileSystemManager.RemoveDirectory(hostId, mountPoint);
     }
 
     //Private methods
@@ -149,5 +144,19 @@ export class MountsManager
 
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "sync", mountPoint], hostId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "umount", devicePath], hostId);
+    }
+
+    private async TryUnmountMultipleTimes(hostId: number, devicePath: string)
+    {
+        for(let i = 0; i < 120; i++)
+        {
+            await this.TryUnmount(hostId, devicePath);
+
+            const mountPoint = await this.QueryMountPoint(hostId, devicePath);
+            if(mountPoint === undefined)
+                return;
+            await new Promise<void>(resolve => setTimeout(resolve, i * 1000) );
+        }
+        throw new Error("Failed unmounting file system: " + devicePath);
     }
 }

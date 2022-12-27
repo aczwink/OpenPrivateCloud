@@ -69,7 +69,7 @@ export class BackupVaultManager
                 },
                 target: {
                     type: "storage-device",
-                    storageDevicePath: ""
+                    storageDeviceUUID: "",
                 },
                 trigger: {
                     type: "manual"

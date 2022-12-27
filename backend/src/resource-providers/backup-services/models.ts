@@ -51,7 +51,7 @@ export interface BackupVaultSourcesConfig
 interface BackupVaultStorageDeviceTargetConfig
 {
     type: "storage-device";
-    storageDevicePath: string;
+    storageDeviceUUID: string;
 }
 
 export interface BackupVaultWebDAVTargetConfig
