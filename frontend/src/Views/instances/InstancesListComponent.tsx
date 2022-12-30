@@ -18,7 +18,7 @@
 
 import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterButton } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common/resourceProviders";
-import { InstanceDto } from "../../../dist/api";
+import { HealthStatus, OverviewInstanceData } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
  
   
@@ -44,6 +44,7 @@ export class InstancesListComponent extends Component
                     <tr>
                         <th>Instance name</th>
                         <th>Instance type</th>
+                        <th>Status</th>
                         <th>Resource provider</th>
                     </tr>
                 </thead>
@@ -56,15 +57,16 @@ export class InstancesListComponent extends Component
     }
 
     //Private variables
-    private instances: InstanceDto[] | null;
+    private instances: OverviewInstanceData[] | null;
 
     //Private methods
-    private RenderInstance(instance: InstanceDto)
+    private RenderInstance(instance: OverviewInstanceData)
     {
         const parts = instance.fullName.substring(1).split("/");
         return <tr>
             <td>{this.RenderResourceIcon(parts[1])} <Anchor route={"/instances" + instance.fullName}>{parts[2]}</Anchor></td>
             <td>{parts[1]}</td>
+            <td>{this.RenderStatus(instance.status)}</td>
             <td>{parts[0]}</td>
         </tr>;
     }
@@ -75,6 +77,8 @@ export class InstancesListComponent extends Component
         {
             case resourceProviders.backupServices.backupVaultResourceType.name:
                 return <MatIcon>backup</MatIcon>;
+            case resourceProviders.computeServices.dockerContainerResourceType.name:
+                return <BootstrapIcon>box-seam-fill</BootstrapIcon>;
             case resourceProviders.computeServices.virtualMachineResourceType.name:
                 return <MatIcon>dvr</MatIcon>;
             case resourceProviders.databaseServices.mariadbResourceType.name:
@@ -95,6 +99,19 @@ export class InstancesListComponent extends Component
                 return <BootstrapIcon>file-richtext</BootstrapIcon>;
         }
         return null;
+    }
+
+    private RenderStatus(status: HealthStatus)
+    {
+        switch(status)
+        {
+            case HealthStatus.Corrupt:
+                return <div className="text-danger"><BootstrapIcon>x-circle-fill</BootstrapIcon></div>;
+            case HealthStatus.Down:
+                return <div className="text-warning"><BootstrapIcon>exclamation-circle-fill</BootstrapIcon></div>;
+            case HealthStatus.Up:
+                return <div className="text-success"><BootstrapIcon>check-circle-fill</BootstrapIcon></div>;
+        }
     }
 
     //Event handlers

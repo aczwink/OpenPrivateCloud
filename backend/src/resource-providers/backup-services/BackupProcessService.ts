@@ -50,7 +50,7 @@ export class BackupProcessService
         const instance = await this.instancesController.QueryInstanceById(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        const processTracker = this.processTrackerManager.Create("Backup of: " + instance!.fullName);
+        const processTracker = await this.processTrackerManager.Create(storage!.hostId, "Backup of: " + instance!.fullName);
         try
         {
             await this.MountAndDoBackup(storage!.hostId, sources, target, processTracker);

@@ -30,7 +30,7 @@ interface StorageDeviceDto
 {
     devicePath: string;
     name: string;
-    removable: boolean;
+    hotplug: boolean;
 }
  
 @APIController("hosts/{hostName}/storageDevices")
@@ -90,7 +90,7 @@ class HostStorageDevicesAPIController
             const res: StorageDeviceDto = {
                 name: x.vendor + " " + x.model,
                 devicePath: x.path,
-                removable: x.rm
+                hotplug: x.hotplug
             };
             return res;
         });

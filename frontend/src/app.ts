@@ -22,12 +22,18 @@ import { LoginComponent } from "./LoginComponent";
 import { PageNotFoundComponent } from "./PageNotFoundComponent";
 import { RootComponent } from "./RootComponent";
 import { ViewModelsManager } from "./UI/ViewModelsManager";
+import { ViewProcessesListComponent } from "./Views/activitymonitor/ViewProcessesListComponent";
+import { ViewProcessComponent } from "./Views/activitymonitor/ViewProcessComponent";
 
 function BuildRoutes()
 {
     const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
     
     const staticRoutes : Routes = [
+        { path: "activitymonitor", guards: [AuthGuard], children: [
+            { path: ":processId", component: ViewProcessComponent },
+            { path: "", component: ViewProcessesListComponent }
+        ] },
         { path: "login", component: LoginComponent},
         { path: "", component: DashboardComponent, guards: [AuthGuard] },
         { path: "*", component: PageNotFoundComponent},
@@ -41,7 +47,7 @@ async function LoadViewModels()
     const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
 
     const viewModelNames = [
-        "activitymonitor", "hosts", "instances", "settings", "usersandgroups", "usersettings"
+        "hosts", "instances", "settings", "usersandgroups", "usersettings"
     ];
 
     for (const viewModelName of viewModelNames)

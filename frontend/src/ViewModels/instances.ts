@@ -31,6 +31,7 @@ import { jdownloaderViewModel } from "./web-services/jdownloader";
 import { avTranscoderViewModel } from "./multimedia-services/av-transcoder";
 import { staticWebsiteViewModel } from "./web-services/staticWebsite";
 import { nodeAppServiceViewodel } from "./web-services/nodeAppService";
+import { dockerContainerViewModel } from "./compute-services/docker-container";
 
 const root: RoutingViewModel = {
     type: "routing",
@@ -52,6 +53,10 @@ const root: RoutingViewModel = {
         {
             key: `instances/${resourceProviders.backupServices.name}/${resourceProviders.backupServices.backupVaultResourceType.name}/:instanceName`,
             viewModel: backupVaultViewModel
+        },
+        {
+            key: `instances/${resourceProviders.computeServices.name}/${resourceProviders.computeServices.dockerContainerResourceType.name}/:instanceName`,
+            viewModel: dockerContainerViewModel
         },
         {
             key: `instances/${resourceProviders.computeServices.name}/${resourceProviders.computeServices.virtualMachineResourceType.name}/:instanceName`,

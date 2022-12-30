@@ -30,6 +30,12 @@ export interface FullInstance extends Instance
     id: number;
 }
 
+interface OverviewInstanceData
+{
+    fullName: string;
+    status: number;
+}
+
 @Injectable
 export class InstancesController
 {
@@ -113,6 +119,19 @@ export class InstancesController
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         const rows = await conn.Select(query, hostId);
         return rows.map(x => x.id as number);
+    }
+
+    public async QueryOverviewInstanceData(instanceId: number)
+    {
+        const query = `
+        SELECT i.fullName, ih.status
+        FROM instances i
+        INNER JOIN instances_health ih
+            ON ih.instanceId = i.id
+        WHERE i.id = ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        return await conn.SelectOne<OverviewInstanceData>(query, instanceId);
     }
 
     public async Search(hostName: string, fullNamePattern: string)

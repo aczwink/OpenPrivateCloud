@@ -21,6 +21,7 @@ import { ProcessTrackerManager } from "../services/ProcessTrackerManager";
 
 interface ProcessDto
 {
+    hostName: string;
     id: number;
     startTime: Date;
     status: number;
@@ -39,6 +40,7 @@ class ProcessesAPIController
     {
         return this.processTrackerManager.processes.Map(x => {
             const res: ProcessDto = {
+                hostName: x.hostName,
                 id: x.id,
                 startTime: x.startTime,
                 status: x.status,

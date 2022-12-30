@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Host, HostStorage, HostStorageCreationProperties, PartitionDto, StorageDeviceDto } from "../../dist/api";
+import { Host, HostStorage, HostStorageCreationProperties, PartitionDto, PerformanceStats, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
@@ -43,6 +43,14 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
     formTitle: host => host.hostName,
     requestObject: async (service, ids) => service.hosts._any_.get(ids.hostName),
     schemaName: "Host",
+};
+
+const monitorViewModel: ObjectViewModel<PerformanceStats, HostId> = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "Monitor",
+    requestObject: (service, ids) => service.hosts._any_.performance.get(ids.hostName),
+    schemaName: "PerformanceStats"
 };
 
 const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storageId: number }> = {
@@ -142,6 +150,15 @@ const hostViewModel: MultiPageViewModel<HostId> = {
             child: hostOverviewViewModel,
             displayName: "Overview",
             key: "overview"
+        },
+        {
+            child: monitorViewModel,
+            displayName: "Monitor",
+            key: "monitor",
+            icon: {
+                type: "material",
+                name: "speed"
+            }
         },
         {
             key: "update",

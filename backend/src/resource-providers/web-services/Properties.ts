@@ -51,3 +51,9 @@ export interface StaticWebsiteProperties extends BaseResourceProperties
     
     port: number;
 }
+
+export type WebServicesResourceProperties = JdownloaderProperties
+    | LetsEncryptProperties
+    | NextcloudProperties
+    | NodeAppServiceProperties
+    | StaticWebsiteProperties;

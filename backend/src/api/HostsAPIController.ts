@@ -19,6 +19,7 @@ import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Pos
 import { HostsController } from "../data-access/HostsController";
 import { DistroInfoService } from "../services/DistroInfoService";
 import { HostAvailabilityManager } from "../services/HostAvailabilityManager";
+import { HostPerformanceMeasurementService } from "../services/HostPerformanceMeasurementService";
 import { HostsManager } from "../services/HostsManager";
 import { HostUpdateManager } from "../services/HostUpdateManager";
 import { RemoteCommandExecutor } from "../services/RemoteCommandExecutor";
@@ -61,7 +62,7 @@ class HostsAPIController
 @APIController("hosts/{hostName}")
 class HostAPIController
 {
-    constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor)
+    constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor, private hostPerformanceMeasurementService: HostPerformanceMeasurementService)
     {
     }
 
@@ -83,6 +84,18 @@ class HostAPIController
             return NotFound("host does not exist");
             
         return host;
+    }
+
+    @Get("performance")
+    public async QueryPerformanceStats(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+            
+        return await this.hostPerformanceMeasurementService.QueryPerformanceStats(hostId);
     }
 
     @Post("reboot")

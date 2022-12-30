@@ -15,12 +15,18 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
+import path from "path";
 import { GlobalInjector, Injectable } from "acts-util-node";
+import { HostStoragesController } from "../data-access/HostStoragesController";
 import { DistroPackageManager, ModuleName } from "../distro/DistroPackageManager";
 import { SambaSharesManager } from "../resource-providers/file-services/SambaSharesManager";
 import { ApacheManager } from "../resource-providers/web-services/ApacheManager";
 import { DistroInfoService } from "./DistroInfoService";
+import { HostStoragesManager } from "./HostStoragesManager";
+import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
+import { SystemServicesManager } from "./SystemServicesManager";
+import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
+import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
 
  
 @Injectable
@@ -92,6 +98,45 @@ export class ModulesManager
         {
             case "apache":
                 await GlobalInjector.Resolve(ApacheManager).DisableSite(hostId, "000-default");
+                break;
+            case "docker":
+                {
+                    const hostStoragesController = GlobalInjector.Resolve(HostStoragesController);
+                    const hostStoragesManager = GlobalInjector.Resolve(HostStoragesManager);
+                    const remoteCommandExecutor = GlobalInjector.Resolve(RemoteCommandExecutor);
+                    const remoteFileSystemManager = GlobalInjector.Resolve(RemoteFileSystemManager);
+                    const remoteRootFileSystemManager = GlobalInjector.Resolve(RemoteRootFileSystemManager);
+                    const systemServicesManager = GlobalInjector.Resolve(SystemServicesManager);
+
+                    const storageId = await hostStoragesManager.FindOptimalStorage(hostId, "ext4");
+                    const storage = await hostStoragesController.RequestHostStorage(storageId);
+                    const dockerDataPath = path.join(storage!.path, "docker");
+                    await remoteFileSystemManager.CreateDirectory(hostId, dockerDataPath);
+                    
+                    await systemServicesManager.StopService(hostId, "docker");
+
+                    const dockerDaemonConfigFile = "/etc/docker/daemon.json";
+                    let config;
+                    try
+                    {
+                        const data = await remoteFileSystemManager.ReadTextFile(hostId, dockerDaemonConfigFile);
+                        config = JSON.parse(data);
+                    }
+                    catch(_)
+                    {
+                        config = {};
+                    }
+
+                    config["data-root"] = dockerDataPath;
+                    await remoteRootFileSystemManager.WriteTextFile(hostId, dockerDaemonConfigFile, JSON.stringify(config));
+
+                    const oldDataPath = "/var/lib/docker/";
+                    await remoteCommandExecutor.ExecuteCommand(["sudo", "rsync", "-axS", oldDataPath, dockerDataPath], hostId);
+
+                    await remoteRootFileSystemManager.RemoveDirectoryRecursive(hostId, oldDataPath);
+
+                    await systemServicesManager.StartService(hostId, "docker");
+                }
                 break;
             case "samba":
                 const smbMgr = GlobalInjector.Resolve(SambaSharesManager)

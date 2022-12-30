@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { AutoCompleteSelectBox, CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select } from "acfrontend";
+import { AutoCompleteSelectBox, BootstrapIcon, CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select } from "acfrontend";
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { APIService } from "../../Services/APIService";
@@ -70,6 +70,29 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
         if(this.input.onObjectUpdated !== undefined)
             this.input.onObjectUpdated(newValue);
         this.Update();
+    }
+
+    private RenderArray(value: any[], schema: OpenAPI.ArraySchema, valueChanged: (newValue: any) => void, fallback: string): any
+    {
+        const context = this;
+
+        function OnAddItem()
+        {
+            const itemSchema = context.apiSchemaService.ResolveSchemaOrReference(schema.items);
+            const newItem = context.apiSchemaService.CreateDefault(itemSchema);
+            value.push(newItem);
+            valueChanged(value);
+        }
+
+        return <fragment>
+            <h5>{schema.title ?? fallback}</h5>
+            <p>{schema.description ?? ""}</p>
+            {value.map( (x, idx) => this.RenderValue(x, schema.items, newValue => {
+                value[idx] = newValue;
+                valueChanged(value);
+            }, ""))}
+            <button type="button" onclick={OnAddItem}><BootstrapIcon>plus</BootstrapIcon></button>
+        </fragment>
     }
 
     private RenderNumber(value: any, schema: OpenAPI.NumberSchema, valueChanged: (newValue: any) => void)
@@ -217,8 +240,8 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
 
         switch(schema.type)
         {
-            case "array": //TODO: implement this
-                return null;
+            case "array":
+                return this.RenderArray(value, schema, valueChanged, fallback);
 
             case "boolean":
                 return <FormField title={RenderTitle(schema, fallback)} description={schema.description}>

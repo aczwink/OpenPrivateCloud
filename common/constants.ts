@@ -20,6 +20,7 @@ export const c_backupServicesResourceProviderName = "backup-services";
 export const c_backupVaultResourceTypeName = "backup-vault";
 
 export const c_computeServicesResourceProviderName = "compute-services";
+export const c_dockerContainerResourceTypeName = "docker-container";
 export const c_virtualMachineResourceTypeName = "virtual-machine";
 
 export const c_databaseServicesResourceProviderName = "database-services";

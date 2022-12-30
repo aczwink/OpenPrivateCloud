@@ -24,7 +24,7 @@ import { SSHConnection, Command } from "./SSHService";
 
 interface CommandOptions
 {
-    hostId: number;
+    hostIdOrHostName: number | string;
     stdin?: string;
     workingDirectory?: string;
 }
@@ -46,7 +46,7 @@ export class SSHCommandExecutor
     //Public methods
     public async ExecuteBufferedCommand(connection: SSHConnection, command: string[], options: CommandOptions): Promise<CommandResult>
     {
-        const tracker = this.CreateTracker(command, options);
+        const tracker = await this.CreateTracker(command, options);
 
         const cmd = this.CommandToString(command);
         const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
@@ -89,7 +89,7 @@ export class SSHCommandExecutor
         if(options.workingDirectory !== undefined)
             return this.ExecuteCommandWithExitCodeUsingShell(connection, command, options);
 
-        const tracker = this.CreateTracker(command, options);
+        const tracker = await this.CreateTracker(command, options);
 
         const cmd = this.CommandToString(command);
         const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
@@ -160,14 +160,14 @@ export class SSHCommandExecutor
         }
     }
 
-    private CreateTracker(command: Command, options: CommandOptions)
+    private async CreateTracker(command: Command, options: CommandOptions)
     {
-        return this.processTrackerManager.Create("Host: " + options.hostId + " | " + this.CommandToString(command).commandLine);
+        return await this.processTrackerManager.Create(options.hostIdOrHostName, this.CommandToString(command).commandLine);
     }
 
     private async ExecuteCommandWithExitCodeUsingShell(connection: SSHConnection, command: Command, options: CommandOptions)
     {
-        const shell = await this.SpawnShell(connection, () => null, options.hostId);
+        const shell = await this.SpawnShell(connection, () => null, options.hostIdOrHostName as number);
         await shell.ChangeDirectory(options.workingDirectory!);
 
         await shell.ExecuteCommand(command as string[]);

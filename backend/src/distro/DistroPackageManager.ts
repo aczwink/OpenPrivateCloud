@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-export type ModuleName = "apache" | "core" | "ffmpeg" | "java" | "letsencrypt" | "libvirt" | "mariadb" | "nextcloud-dependencies" | "node" | "openvpn" | "samba" | "webdav";
+export type ModuleName = "apache" | "core" | "docker" | "ffmpeg" | "java" | "letsencrypt" | "libvirt" | "mariadb" | "nextcloud-dependencies" | "node" | "openvpn" | "samba" | "webdav";
 
 export interface DistroPackageManager
 {

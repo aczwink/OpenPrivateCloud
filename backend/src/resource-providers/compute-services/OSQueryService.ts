@@ -18,7 +18,7 @@
 
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { VirtualMachineProperties } from "./VirtualMachineProperties";
+import { VirtualMachineProperties } from "./Properties";
 
 export interface OSInfo
 {

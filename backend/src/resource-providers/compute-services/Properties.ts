@@ -18,6 +18,11 @@
 
 import { BaseResourceProperties } from "../ResourceProvider";
 
+export interface DockerContainerProperties extends BaseResourceProperties
+{
+    type: "docker-container";
+}
+
 export interface VirtualMachineProperties extends BaseResourceProperties
 {
     type: "virtual-machine";
@@ -28,3 +33,5 @@ export interface VirtualMachineProperties extends BaseResourceProperties
      */
     osDiskSize: number;
 }
+
+export type ComputeServicesProperties = DockerContainerProperties | VirtualMachineProperties;

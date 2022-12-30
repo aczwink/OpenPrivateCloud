@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName, c_databaseServicesResourceProviderName, c_mariadbResourceTypeName, c_webServicesResourceProviderName, c_nextcloudResourceTypeName, c_letsencryptCertResourceTypeName, c_nodeAppServiceResourceTypeName, c_staticWebsiteResourceTypeName, c_jdownloaderResourceTypeName, c_multimediaServicesResourceProviderName, c_avTranscoderResourceTypeName } from "./constants";
+import { c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName, c_databaseServicesResourceProviderName, c_mariadbResourceTypeName, c_webServicesResourceProviderName, c_nextcloudResourceTypeName, c_letsencryptCertResourceTypeName, c_nodeAppServiceResourceTypeName, c_staticWebsiteResourceTypeName, c_jdownloaderResourceTypeName, c_multimediaServicesResourceProviderName, c_avTranscoderResourceTypeName, c_dockerContainerResourceTypeName } from "./constants";
 
 export const resourceProviders =
 {
@@ -29,6 +29,11 @@ export const resourceProviders =
 
     computeServices: {
         name: c_computeServicesResourceProviderName,
+
+        dockerContainerResourceType: {
+            name: c_dockerContainerResourceTypeName,
+        },
+        
         virtualMachineResourceType: {
             name: c_virtualMachineResourceTypeName
         }

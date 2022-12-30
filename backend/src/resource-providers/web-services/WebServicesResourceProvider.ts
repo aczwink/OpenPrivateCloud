@@ -19,16 +19,16 @@ import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
 import { InstancesManager } from "../../services/InstancesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
-import { JdownloaderProperties, LetsEncryptProperties, NextcloudProperties, NodeAppServiceProperties, StaticWebsiteProperties } from "./Properties";
 import { NextcloudManager } from "./NextcloudManager";
 import { LetsEncryptManager } from "./LetsEncryptManager";
 import { JdownloaderManager } from "./JdownloaderManager";
 import { StaticWebsitesManager } from "./StaticWebsitesManager";
 import { NodeAppServiceManager } from "./NodeAppServiceManager";
 import { InstanceContext } from "../../common/InstanceContext";
+import { WebServicesResourceProperties } from "./Properties";
 
 @Injectable
-export class WebServicesResourceProvider implements ResourceProvider<JdownloaderProperties | LetsEncryptProperties | NextcloudProperties | NodeAppServiceProperties | StaticWebsiteProperties>
+export class WebServicesResourceProvider implements ResourceProvider<WebServicesResourceProperties>
 { 
     constructor(private instancesManager: InstancesManager, private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager,
         private jdownloaderManager: JdownloaderManager, private staticWebsitesManager: StaticWebsitesManager, private nodeAppServiceManager: NodeAppServiceManager)
@@ -129,7 +129,7 @@ export class WebServicesResourceProvider implements ResourceProvider<Jdownloader
         }
     }
 
-    public async ProvideResource(instanceProperties: JdownloaderProperties | LetsEncryptProperties | NextcloudProperties | NodeAppServiceProperties | StaticWebsiteProperties, context: DeploymentContext): Promise<DeploymentResult>
+    public async ProvideResource(instanceProperties: WebServicesResourceProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         switch(instanceProperties.type)
         {

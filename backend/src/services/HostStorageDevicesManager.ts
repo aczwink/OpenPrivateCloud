@@ -82,13 +82,21 @@ interface SMART_Result extends ATA_SMART_Info
 
 interface StorageDevice
 {
-    vendor: string;
+    /**
+     * true if the device can be removed while the pc is running
+     */
+    hotplug: boolean;
     model: string;
     path: string;
     /**
-     * Removable
+     * Removable media like optical disc
      */
     rm: boolean;
+    /**
+     * "usb" for USB devices
+     */
+    tran: string | null;
+    vendor: string;
 
     partitions: Partition[];
 }
@@ -145,10 +153,12 @@ export class HostStorageDevicesManager
     private MapDevice(devInfo: any): StorageDevice
     {
         return {
-            vendor: devInfo.vendor,
+            hotplug: devInfo.hotplug,
             model: devInfo.model,
+            vendor: devInfo.vendor,
             path: devInfo.name,
             rm: devInfo.rm,
+            tran: devInfo.tran,
             partitions: this.MapChildren(devInfo.children)
         };
     }

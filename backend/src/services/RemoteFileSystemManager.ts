@@ -113,9 +113,19 @@ export class RemoteFileSystemManager
     public async ReadTextFile(hostId: number, filePath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await conn.value.ReadTextFile(filePath);
-        conn.Release();
-        return result;
+        try
+        {
+            const result = await conn.value.ReadTextFile(filePath);
+            return result;
+        }
+        catch(e)
+        {
+            throw new Error("Reading text file at path " + filePath + " on host " + hostId + " failed." + e);
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 
     public async RemoveDirectory(hostId: number, path: string)
@@ -159,7 +169,17 @@ export class RemoteFileSystemManager
     public async WriteTextFile(hostId: number, filePath: string, text: string, mode?: number)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.WriteFile(filePath, Buffer.from(text, "utf-8"), mode);
-        conn.Release();
+        try
+        {
+            await conn.value.WriteFile(filePath, Buffer.from(text, "utf-8"), mode);
+        }
+        catch(e)
+        {
+            throw new Error("Writing text file at path " + filePath + " on host " + hostId + " failed." + e);
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 }

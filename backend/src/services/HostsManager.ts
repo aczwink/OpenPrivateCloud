@@ -61,7 +61,7 @@ export class HostsManager
         stdin += ("\n"); //in case the user had a password but oldPassword.length == 0, this will terminate passwd
 
         await this.sshCommandExecutor.ExecuteCommand(conn, ["passwd"], {
-            hostId: -1,
+            hostIdOrHostName: "TODO: Unknown",
             stdin,
         }); //TODO: hostid
     }
@@ -73,8 +73,8 @@ export class HostsManager
         const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host, "opc");
         await conn.AppendFile("/home/opc/.ssh/authorized_keys", pubKey);
 
-        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-d", opcSpecialUsers.host], { hostId: -1 }); //TODO: hostid
-        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-l", opcSpecialUsers.host], { hostId: -1 }); //TODO: hostid
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-d", opcSpecialUsers.host], { hostIdOrHostName: hostName });
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-l", opcSpecialUsers.host], { hostIdOrHostName: hostName });
 
         conn.Close();
     }

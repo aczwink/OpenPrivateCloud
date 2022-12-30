@@ -18,6 +18,7 @@
 
 import { Dictionary } from "acts-util-core";
 import { GlobalInjector, Injectable } from "acts-util-node";
+import { HostsController } from "../data-access/HostsController";
 import { ErrorService } from "./ErrorService";
 
 enum Status
@@ -33,6 +34,7 @@ interface ProcessTrackerReadOnly
      * @format multi-line
      */
     readonly fullText: string;
+    readonly hostName: string;
     readonly startTime: Date;
     readonly status: Status;
     readonly title: string;
@@ -52,7 +54,7 @@ export interface ProcessTracker extends ProcessTrackerReadOnly
 
 class ProcessTrackerImpl implements ProcessTracker
 {
-    constructor(private _title: string, private finalizer: () => void)
+    constructor(private _hostName: string, private _title: string, private finalizer: () => void)
     {
         this._startTime = new Date;
         this._status = Status.Running;
@@ -63,6 +65,11 @@ class ProcessTrackerImpl implements ProcessTracker
     public get fullText()
     {
         return this.entries.Values().Map(x => x.timeStamp.toISOString() + ": " + x.text).Join("\n");
+    }
+
+    public get hostName(): string
+    {
+        return this._hostName;
     }
 
     public get startTime(): Date
@@ -112,7 +119,7 @@ class ProcessTrackerImpl implements ProcessTracker
 @Injectable
 export class ProcessTrackerManager
 {
-    constructor()
+    constructor(private hostsController: HostsController)
     {
         this.trackerCounter = 0;
         this.trackers = {};
@@ -126,6 +133,7 @@ export class ProcessTrackerManager
             const res: ProcessTrackerReadOnlyWithId = {
                 id: kv.key as number,
                 fullText: x.fullText,
+                hostName: x.hostName,
                 startTime: x.startTime,
                 status: x.status,
                 title: x.title
@@ -135,11 +143,20 @@ export class ProcessTrackerManager
     }
 
     //Public methods
-    public Create(title: string): ProcessTracker
+    public async Create(hostIdOrHostName: number | string, title: string): Promise<ProcessTracker>
     {
         const id = this.trackerCounter++;
 
-        const tracker = new ProcessTrackerImpl(title, this.OnTrackerFinished.bind(this, id));
+        let hostName;
+        if(typeof hostIdOrHostName === "number")
+        {
+            const host = await this.hostsController.RequestHostCredentials(hostIdOrHostName);
+            hostName = host!.hostName;
+        }
+        else
+            hostName = hostIdOrHostName;
+
+        const tracker = new ProcessTrackerImpl(hostName, title, this.OnTrackerFinished.bind(this, id));
         this.trackers[id] = tracker;
 
         return tracker;
@@ -153,6 +170,7 @@ export class ProcessTrackerManager
         return {
             id: processId,
             fullText: tracker.fullText,
+            hostName: tracker.hostName,
             startTime: tracker.startTime,
             status: tracker.status,
             title: tracker.title,

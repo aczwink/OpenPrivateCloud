@@ -71,7 +71,7 @@ class InstancesAPIController
     @Get()
     public async QueryInstances(
         @Header Authorization: string
-    ): Promise<InstanceDto[]>
+    )
     {
         const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
 
@@ -81,10 +81,8 @@ class InstancesAPIController
         else
             instanceIds = await this.permissionsController.QueryInstanceIdsThatUserHasAccessTo(userId);
 
-        const instances = await instanceIds.Map(x => this.instancesController.QueryInstanceById(x)).PromiseAll();
-        return instances.Values().NotUndefined().Map(x => ({
-            fullName: x.fullName
-        })).ToArray();
+        const instances = await instanceIds.Map(x => this.instancesController.QueryOverviewInstanceData(x)).PromiseAll();
+        return instances.Values().NotUndefined().ToArray();
     }
 
     @Get("logs/{logId}")

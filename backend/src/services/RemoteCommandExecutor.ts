@@ -40,7 +40,7 @@ export class RemoteCommandExecutor
         try
         {
             await this.sshCommandExecutor.ExecuteCommand(conn.value, command, {
-                hostId,
+                hostIdOrHostName: hostId,
                 stdin: options?.stdin,
                 workingDirectory: options?.workingDirectory,
             });
@@ -54,7 +54,7 @@ export class RemoteCommandExecutor
     public async ExecuteBufferedCommand(command: string[], hostId: number)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await this.sshCommandExecutor.ExecuteBufferedCommand(conn.value, command, { hostId });
+        const result = await this.sshCommandExecutor.ExecuteBufferedCommand(conn.value, command, { hostIdOrHostName: hostId });
         conn.Release();
 
         return result;
@@ -64,7 +64,7 @@ export class RemoteCommandExecutor
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
         const exitCode = await this.sshCommandExecutor.ExecuteCommandWithExitCode(conn.value, command, {
-            hostId,
+            hostIdOrHostName: hostId,
             stdin: options?.stdin,
             workingDirectory: options?.workingDirectory
         });

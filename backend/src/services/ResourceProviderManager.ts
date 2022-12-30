@@ -28,7 +28,7 @@ import { InstancesManager } from "./InstancesManager";
 import { PermissionsManager } from "./PermissionsManager";
 import { InstanceLogsController } from "../data-access/InstanceLogsController";
 import { ProcessTrackerManager } from "./ProcessTrackerManager";
-import { HealthController } from "../data-access/HealthController";
+import { HealthController, HealthStatus } from "../data-access/HealthController";
 import { RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 
 @Injectable
@@ -151,6 +151,7 @@ export class ResourceProviderManager
         {
             await this.instanceConfigController.UpdateOrInsertConfig(instanceId, result.config);
         }
+        await this.healthController.UpdateInstanceAvailability(instanceId, HealthStatus.Up);
     }
 
     private ExtractTypeNameFromResourceTypeDefinition(resourceTypeDef: ResourceTypeDefinition): string
@@ -179,7 +180,7 @@ export class ResourceProviderManager
 
     private async TryDeployInstance(resourceProvider: ResourceProvider<any>, instanceProperties: BaseResourceProperties, fullInstanceName: string, hostId: number, storage: HostStorage, userId: number)
     {
-        const tracker = this.processTrackerManager.Create("Deployment of: " + fullInstanceName);
+        const tracker = await this.processTrackerManager.Create(hostId, "Deployment of: " + fullInstanceName);
         try
         {
             await this.DeployInstance(resourceProvider, instanceProperties, fullInstanceName, hostId, storage, userId);
