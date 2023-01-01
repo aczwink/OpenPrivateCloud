@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,6 @@ import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystem
 import { BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig } from "./models";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { BackupTargetMountService, MountedBackupTarget, TargetFileSystemType } from "./BackupTargetMountService";
 import { Command } from "../../services/SSHService";
 import { TempFilesManager } from "../../services/TempFilesManager";
@@ -39,7 +38,7 @@ export class BackupProcessService
         private hostStoragesController: HostStoragesController, private instanceLogsController: InstanceLogsController,
         private instancesManager: InstancesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private fileStoragesManager: FileStoragesManager,
-        private remoteFileSystemManager: RemoteFileSystemManager, private tempFilesManager: TempFilesManager,
+        private tempFilesManager: TempFilesManager,
         private backupTargetMountService: BackupTargetMountService)
     {
     }
@@ -122,8 +121,8 @@ export class BackupProcessService
         const targetDir = this.instancesManager.BuildInstanceStoragePath(backupTargetPath, fileStorage.fullInstanceName);
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetDir);
         
-        const targetSnapshots = (await this.remoteFileSystemManager.ListDirectoryContents(hostId, targetDir))
-            .Values().Map(x => x.filename).ToSet();
+        const targetSnapshots = (await this.remoteRootFileSystemManager.ListDirectoryContents(hostId, targetDir))
+            .Values().ToSet();
 
         const toBeSynced = sourceSnapshots.Values().Filter(x => !this.DoesTargetSnapshotExist(x, targetSnapshots, targetFileSystemType)).OrderBy(x => x).ToArray();
         for (const snapshotName of toBeSynced)

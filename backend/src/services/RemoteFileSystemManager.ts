@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -69,7 +69,7 @@ export class RemoteFileSystemManager
         try
         {
             const result = await conn.value.ListDirectoryContents(dirPath);
-            return result;
+            return result.map(x => x.filename);
         }
         catch(e)
         {
@@ -140,7 +140,7 @@ export class RemoteFileSystemManager
         const contents = await this.ListDirectoryContents(hostId, dirPath);
         for (const child of contents)
         {
-            const childPath = path.join(dirPath, child.filename);
+            const childPath = path.join(dirPath, child);
             const status = await this.QueryStatus(hostId, childPath);
 
             if(status.isDirectory())

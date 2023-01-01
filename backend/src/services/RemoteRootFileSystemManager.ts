@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -46,6 +46,13 @@ export class RemoteRootFileSystemManager
     {
         const exitCode = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["sudo", "mkdir", remotePath], hostId);
         return exitCode === 0;
+    }
+
+    public async ListDirectoryContents(hostId: number, remotePath: string)
+    {
+        const pythonCode = "import os, json; print(json.dumps(os.listdir('" + remotePath + "')))";
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "python3", "-c", pythonCode], hostId);
+        return JSON.parse(result.stdOut.trim()) as string[];
     }
 
     public async MoveFile(hostId: number, sourcePath: string, targetPath: string)

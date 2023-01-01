@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -131,12 +131,25 @@ export class SSHCommandExecutor
     {
         if(Array.isArray(command))
         {
+            function EscapeArg(part: string)
+            {
+                if(part.includes(" "))
+                {
+                    if(!(part.startsWith('"') && part.endsWith('"')))
+                    {
+                        return '"' + part.ReplaceAll('"', '\\"') + '"';
+                    }
+                }
+
+                return part;
+            }
+
             if(command[0] === "sudo")
             {
                 command.splice(1, 0, "--stdin");
             }
             return {
-                commandLine: command.join(" "),
+                commandLine: command.map(EscapeArg).join(" "),
                 sudo: command[0] === "sudo"
             };
         }

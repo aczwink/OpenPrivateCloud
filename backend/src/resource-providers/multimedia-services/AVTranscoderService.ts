@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2022-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -171,7 +171,7 @@ export class AVTranscoderService
         const dirPath = path.join(dataPath, localPath);
 
         const children = await this.remoteFileSystemManager.ListDirectoryContents(storage.hostId, dirPath);
-        return children.map(x => path.join(dirPath, x.filename));
+        return children.map(x => path.join(dirPath, x));
     }
 
     private async TranscodeFile(hostId: number, filePath: string, targetFormat: AVTranscoderFormat, instanceDir: string, targetDirPath: string)

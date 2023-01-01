@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -121,7 +121,7 @@ export class StaticWebsitesManager
         const children = await this.remoteFileSystemManager.ListDirectoryContents(hostId, directoryPath);
         for (const child of children)
         {
-            const childPath = path.join(directoryPath, child.filename);
+            const childPath = path.join(directoryPath, child);
             const status = await this.remoteFileSystemManager.QueryStatus(hostId, childPath);
             if(status.isDirectory())
                 await this.remoteFileSystemManager.RemoveDirectoryRecursive(hostId, childPath);
@@ -138,7 +138,7 @@ export class StaticWebsitesManager
         const children = await this.remoteFileSystemManager.ListDirectoryContents(hostId, dirPath);
         for (const child of children)
         {
-            const childPath = path.join(dirPath, child.filename);
+            const childPath = path.join(dirPath, child);
             const status = await this.remoteFileSystemManager.QueryStatus(hostId, childPath);
 
             await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, childPath, uid, gid);

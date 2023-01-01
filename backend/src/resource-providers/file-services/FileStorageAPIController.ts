@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,6 @@
 
 import { APIController, Common, Body, Forbidden, Get, Header, NotFound, Path, Put, Query, Post, BadRequest } from "acts-util-apilib";
 import path from "path";
-import ssh2 from "ssh2";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
@@ -155,13 +154,13 @@ class FileStorageAPIController
     }
 
     //Private methods
-    private async MapEntry(hostId: number, remoteDirPath: string, sshEntry: ssh2.FileEntry): Promise<FileEntry>
+    private async MapEntry(hostId: number, remoteDirPath: string, fileName: string): Promise<FileEntry>
     {
-        const status = await this.remoteFileSystemManager.QueryStatus(hostId, path.join(remoteDirPath, sshEntry.filename));
+        const status = await this.remoteFileSystemManager.QueryStatus(hostId, path.join(remoteDirPath, fileName));
         const linuxUserName = await this.hostUsersManager.MapHostUserIdToLinuxUserName(hostId, status.uid);
 
         return {
-            fileName: sshEntry.filename,
+            fileName: fileName,
             type: status.isDirectory() ? "directory" : "file",
             size: status.size,
             userId: this.hostUsersManager.MapLinuxUserNameToUserId(linuxUserName)
