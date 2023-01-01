@@ -31,9 +31,13 @@ interface CommandOptions
 
 export interface CommandResult
 {
-    exitCode: number;
     stdErr: string;
     stdOut: string;
+}
+
+export interface CommandResultWithExitCode extends CommandResult
+{
+    exitCode: number;
 }
 
 @Injectable
@@ -46,68 +50,66 @@ export class SSHCommandExecutor
     //Public methods
     public async ExecuteBufferedCommand(connection: SSHConnection, command: string[], options: CommandOptions): Promise<CommandResult>
     {
-        const tracker = await this.CreateTracker(command, options);
-
-        const cmd = this.CommandToString(command);
-        const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
-
-        let stdOut = "";
-        let stdErr = "";
-
-        const exitCodeString = await new Promise<string>( (resolve, reject) => {
-            channel.stdout.setEncoding("utf-8");
-            channel.stderr.setEncoding("utf-8");
-
-            channel.stdout.on("data", (chunk: string) => {
-                stdOut += chunk;
-                tracker.Add(chunk);
-            });
-            channel.stderr.on("data", (chunk: string) => {
-                stdErr += chunk;
-                tracker.Add(chunk);
-            });
-            
-            this.RegisterExitEvents(channel, tracker, resolve, reject);
-        });
+        const result = await this.ExecuteBufferedCommandInternal(connection, command, options);
+        if(result.exitCode !== 0)
+        {
+            result.tracker.Fail(result.exitCode);
+            throw new Error("Command failed with exitCode: " + result.exitCode + ". Command: " + this.CommandToString(command).commandLine);
+        }
+        result.tracker.Finish();
 
         return {
-            exitCode: this.ParseExitCode(exitCodeString),
-            stdErr,
-            stdOut
+            stdErr: result.stdErr,
+            stdOut: result.stdOut
+        };
+    }
+
+    public async ExecuteBufferedCommandWithExitCode(connection: SSHConnection, command: string[], options: CommandOptions): Promise<CommandResultWithExitCode>
+    {
+        const result = await this.ExecuteBufferedCommandInternal(connection, command, options);
+        result.tracker.Finish();
+
+        return {
+            exitCode: result.exitCode,
+            stdErr: result.stdErr,
+            stdOut: result.stdOut
         };
     }
 
     public async ExecuteCommand(connection: SSHConnection, command: Command, options: CommandOptions)
     {
-        const exitCode = await this.ExecuteCommandWithExitCode(connection, command, options);
+        const tracker = await this.CreateTracker(command, options);
+
+        if(options.workingDirectory !== undefined)
+        {
+            await this.ExecuteCommandUsingShell(connection, command, options);
+            tracker.Finish();
+            return 0; //no exit code available :(
+        }
+
+        const exitCode = await this.ExecuteCommandAsSingleCommand(connection, command, options, tracker);
         if(exitCode !== 0)
+        {
+            tracker.Fail(exitCode);
             throw new Error("Command failed with exitCode: " + exitCode + ". Command: " + this.CommandToString(command).commandLine);
+        }
+        tracker.Finish();
     }
 
     public async ExecuteCommandWithExitCode(connection: SSHConnection, command: Command, options: CommandOptions)
     {
-        if(options.workingDirectory !== undefined)
-            return this.ExecuteCommandWithExitCodeUsingShell(connection, command, options);
-
         const tracker = await this.CreateTracker(command, options);
 
-        const cmd = this.CommandToString(command);
-        const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
+        if(options.workingDirectory !== undefined)
+        {
+            await this.ExecuteCommandUsingShell(connection, command, options);
+            tracker.Finish();
+            return 0; //no exit code available :(
+        }
 
-        if(options.stdin !== undefined)
-            channel.stdin.write(options.stdin);
-
-        const exitCodeString = await new Promise<string>( (resolve, reject) => {
-            channel.stdout.setEncoding("utf-8");
-            channel.stderr.setEncoding("utf-8");
-
-            channel.stdout.on("data", tracker.Add.bind(tracker));
-            channel.stderr.on("data", tracker.Add.bind(tracker));
-            
-            this.RegisterExitEvents(channel, tracker, resolve, reject);
-        });
-
-        return this.ParseExitCode(exitCodeString);
+        const exitCode = await this.ExecuteCommandAsSingleCommand(connection, command, options, tracker);
+        tracker.Finish();
+        return exitCode;
     }
 
     public async SpawnShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellWrapper>
@@ -129,27 +131,31 @@ export class SSHCommandExecutor
     //Private methods
     private CommandToString(command: Command): { commandLine: string; sudo: boolean }
     {
-        if(Array.isArray(command))
+        function EscapeArg(part: string)
         {
-            function EscapeArg(part: string)
+            if(part.includes(" "))
             {
-                if(part.includes(" "))
+                if(!(part.startsWith('"') && part.endsWith('"')))
                 {
-                    if(!(part.startsWith('"') && part.endsWith('"')))
-                    {
-                        return '"' + part.ReplaceAll('"', '\\"') + '"';
-                    }
+                    return '"' + part.ReplaceAll('"', '\\"') + '"';
                 }
-
-                return part;
             }
 
+            return part;
+        }
+        function AddSudoArgsIfRequired(command: string[])
+        {
             if(command[0] === "sudo")
             {
-                command.splice(1, 0, "--stdin");
+                return "sudo --stdin " + command.slice(1).map(EscapeArg).join(" ");
             }
+            return command.map(EscapeArg).join(" ");
+        }
+
+        if(Array.isArray(command))
+        {
             return {
-                commandLine: command.map(EscapeArg).join(" "),
+                commandLine: AddSudoArgsIfRequired(command),
                 sudo: command[0] === "sudo"
             };
         }
@@ -178,7 +184,62 @@ export class SSHCommandExecutor
         return await this.processTrackerManager.Create(options.hostIdOrHostName, this.CommandToString(command).commandLine);
     }
 
-    private async ExecuteCommandWithExitCodeUsingShell(connection: SSHConnection, command: Command, options: CommandOptions)
+    private async ExecuteBufferedCommandInternal(connection: SSHConnection, command: string[], options: CommandOptions)
+    {
+        const tracker = await this.CreateTracker(command, options);
+
+        const cmd = this.CommandToString(command);
+        const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
+
+        let stdOut = "";
+        let stdErr = "";
+
+        const exitCodeString = await new Promise<string>( (resolve, reject) => {
+            channel.stdout.setEncoding("utf-8");
+            channel.stderr.setEncoding("utf-8");
+
+            channel.stdout.on("data", (chunk: string) => {
+                stdOut += chunk;
+                tracker.Add(chunk);
+            });
+            channel.stderr.on("data", (chunk: string) => {
+                stdErr += chunk;
+                tracker.Add(chunk);
+            });
+            
+            this.RegisterExitEvents(channel, tracker, resolve, reject);
+        });
+
+        return {
+            exitCode: this.ParseExitCode(exitCodeString),
+            stdErr,
+            stdOut,
+            tracker
+        };
+    }
+
+    private async ExecuteCommandAsSingleCommand(connection: SSHConnection, command: Command, options: CommandOptions, tracker: ProcessTracker)
+    {
+        const cmd = this.CommandToString(command);
+        const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
+
+        if(options.stdin !== undefined)
+            channel.stdin.write(options.stdin);
+
+        const exitCodeString = await new Promise<string>( (resolve, reject) => {
+            channel.stdout.setEncoding("utf-8");
+            channel.stderr.setEncoding("utf-8");
+
+            channel.stdout.on("data", tracker.Add.bind(tracker));
+            channel.stderr.on("data", tracker.Add.bind(tracker));
+            
+            this.RegisterExitEvents(channel, tracker, resolve, reject);
+        });
+
+        return this.ParseExitCode(exitCodeString);
+    }
+
+    private async ExecuteCommandUsingShell(connection: SSHConnection, command: Command, options: CommandOptions)
     {
         const shell = await this.SpawnShell(connection, () => null, options.hostIdOrHostName as number);
         await shell.ChangeDirectory(options.workingDirectory!);
@@ -186,8 +247,6 @@ export class SSHCommandExecutor
         await shell.ExecuteCommand(command as string[]);
 
         await shell.Close();
-
-        return 0;
     }
 
     private ParseExitCode(exitCodeString: string)
@@ -201,12 +260,10 @@ export class SSHCommandExecutor
         channel.on("error", reject);
         channel.on("exit", code => {
             tracker.Add("Process exit code is:", code);
-            tracker.Finish();
             resolve(code);
         });
         channel.on("close", (code: any, signal: any) => {
             tracker.Add("Processed closed.", code, signal);
-            tracker.Finish();
             resolve(code);
         });
     }
