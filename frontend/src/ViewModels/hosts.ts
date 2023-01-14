@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,9 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Host, HostStorage, HostStorageCreationProperties, PartitionDto, PerformanceStats, StorageDeviceDto } from "../../dist/api";
+import { Host, HostStorage, HostStorageCreationProperties, PartitionDto, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
+import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
 
@@ -43,14 +44,6 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
     formTitle: host => host.hostName,
     requestObject: async (service, ids) => service.hosts._any_.get(ids.hostName),
     schemaName: "Host",
-};
-
-const monitorViewModel: ObjectViewModel<PerformanceStats, HostId> = {
-    type: "object",
-    actions: [],
-    formTitle: _ => "Monitor",
-    requestObject: (service, ids) => service.hosts._any_.performance.get(ids.hostName),
-    schemaName: "PerformanceStats"
 };
 
 const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storageId: number }> = {
@@ -152,7 +145,10 @@ const hostViewModel: MultiPageViewModel<HostId> = {
             key: "overview"
         },
         {
-            child: monitorViewModel,
+            child: {
+                type: "component",
+                component: HostMonitorComponent,
+            },
             displayName: "Monitor",
             key: "monitor",
             icon: {
