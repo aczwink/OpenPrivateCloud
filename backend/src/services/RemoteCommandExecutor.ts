@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -55,6 +55,15 @@ export class RemoteCommandExecutor
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
         const result = await this.sshCommandExecutor.ExecuteBufferedCommand(conn.value, command, { hostIdOrHostName: hostId });
+        conn.Release();
+
+        return result;
+    }
+
+    public async ExecuteBufferedCommandWithExitCode(command: string[], hostId: number)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        const result = await this.sshCommandExecutor.ExecuteBufferedCommandWithExitCode(conn.value, command, { hostIdOrHostName: hostId });
         conn.Release();
 
         return result;

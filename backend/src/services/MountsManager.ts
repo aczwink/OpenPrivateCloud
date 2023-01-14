@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
 
+const c_diskUUIDPrefix = "/dev/disk/by-uuid/";
 
 @Injectable
 export class MountsManager
@@ -38,7 +39,7 @@ export class MountsManager
     //Public methods
     public CreateDevicePathForPartition(diskUUID: string)
     {
-        return "/dev/disk/by-uuid/" + diskUUID;
+        return c_diskUUIDPrefix + diskUUID;
     }
 
     public async CreateUniqueMountPointAndMount(hostId: number, devicePath: string)
@@ -68,6 +69,13 @@ export class MountsManager
 
     public async QueryMountPoint(hostId: number, devicePath: string)
     {
+        if(devicePath.startsWith(c_diskUUIDPrefix))
+        {
+            const uuid = devicePath.substring(c_diskUUIDPrefix.length);
+            const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "blkid", "-U", uuid], hostId);
+            devicePath = result.stdOut.trimEnd();
+        }
+
         const mounted = await this.QueryMountedFileSystems(hostId);
         return mounted.find(x => x.source === devicePath)?.target;
     }
