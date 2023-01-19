@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,11 +21,12 @@ import { Dictionary, OpenAPI } from "acts-util-core";
 import { ResponseData } from "../../../dist/api";
 import { ExtractDataFromResponseOrShowErrorMessageOnError, ShowErrorMessageOnErrorFromResponse } from "../ResponseHandler";
 import { ReplaceRouteParams } from "../Shared";
-import { ObjectEditorComponent } from "./ObjectEditorComponent";
+import { ObjectEditorComponent, ObjectEditorContext } from "./ObjectEditorComponent";
 
 interface ObjectInput<ObjectType>
 {
     formTitle: (obj: any) => string;
+    loadContext?: (routeParams: Dictionary<string>) => Promise<ObjectEditorContext>;
     postUpdateUrl: string;
     requestObject: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType>>;
     schema: OpenAPI.ObjectSchema;
@@ -51,19 +52,23 @@ export class EditObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         return <fragment>
             <h1>{this.heading}</h1>
             <form onsubmit={this.OnSave.bind(this)}>
-                <ObjectEditorComponent object={this.data} schema={this.input.schema} onObjectUpdated={this.OnObjectUpdated.bind(this)} />
+                <ObjectEditorComponent context={this.context} object={this.data} schema={this.input.schema} onObjectUpdated={this.OnObjectUpdated.bind(this)} />
+                <br />
                 <button className="btn btn-primary" type="submit">Save</button>
             </form>
         </fragment>;
     }
 
     //Private variables
+    private context?: ObjectEditorContext;
     private data: any | null;
     private heading: string;
 
     //Event handlers
     override async OnInitiated(): Promise<void>
     {
+        this.context = await this.input.loadContext?.call(undefined, this.routerState.routeParams);
+
         const response = await this.input.requestObject(this.routerState.routeParams);
         const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)

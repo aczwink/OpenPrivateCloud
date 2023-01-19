@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ import { Anchor, JSX_CreateElement, MatIcon, RootInjector, RouterState } from "a
 import { Dictionary } from "acts-util-core";
 import { ResponseData } from "../../dist/api";
 import { APIService } from "../Services/APIService";
+import { ObjectEditorContext } from "./Components/ObjectEditorComponent";
 import { ShowErrorMessageOnErrorFromResponse } from "./ResponseHandler";
 
 interface IdBoundActivateAction<IdType>
@@ -49,6 +50,7 @@ interface ManagedEditResourceAction<IdType, ObjectType>
 {
     type: "edit";
     propertiesSchemaName: string;
+    loadContext?: (service: APIService, ids: IdType) => Promise<ObjectEditorContext>;
     requestObject: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType>>;
     updateResource: (service: APIService, ids: IdType, properties: ObjectType) => Promise<ResponseData<number, number, void>>;
 }

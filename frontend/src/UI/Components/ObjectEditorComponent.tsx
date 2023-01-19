@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -91,8 +91,37 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
                 value[idx] = newValue;
                 valueChanged(value);
             }, ""))}
-            <button type="button" onclick={OnAddItem}><BootstrapIcon>plus</BootstrapIcon></button>
+            <button type="button" className="btn btn-primary" onclick={OnAddItem}><BootstrapIcon>plus</BootstrapIcon></button>
         </fragment>
+    }
+
+    private RenderMember(value: any, required: boolean, schema: OpenAPI.Schema | OpenAPI.Reference, valueChanged: (newValue: any) => void, fallback: string)
+    {
+        if(required)
+            return this.RenderValue(value, schema, valueChanged, fallback);
+
+        const context = this;
+        if(value === undefined)
+        {
+            function SetDefaultValue()
+            {
+                const resolvedSchema = context.apiSchemaService.ResolveSchemaOrReference(schema);
+                const newValue = context.apiSchemaService.CreateDefault(resolvedSchema);
+                valueChanged(newValue);
+            }
+
+            return <FormField title={fallback} description="Press the button to define this property">
+                <button type="button" className="form-control btn btn-primary" onclick={SetDefaultValue}><BootstrapIcon>plus-slash-minus</BootstrapIcon></button>
+            </FormField>;
+        }
+        return <div className="row">
+            <div className="col">
+                {this.RenderValue(value, schema, valueChanged, fallback)}
+            </div>
+            <div className="col-auto">
+                <button type="button" className="form-control btn btn-danger" onclick={() => valueChanged(undefined)}><BootstrapIcon>plus-slash-minus</BootstrapIcon></button>
+            </div>
+        </div>;
     }
 
     private RenderNumber(value: any, schema: OpenAPI.NumberSchema, valueChanged: (newValue: any) => void)
@@ -120,12 +149,14 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
 
     private RenderObject(value: any, schema: OpenAPI.ObjectSchema, valueChanged: (newValue: any) => void, fallback: string)
     {
+        const required = schema.required.Values().ToSet();
+
         const keys = Object.keys(schema.properties);
         const children = [];
         for (const key of keys)
         {
             const prop = value[key];
-            const renderValue = this.RenderValue(prop, schema.properties[key]!, newValue => {
+            const renderValue = this.RenderMember(prop, required.has(key), schema.properties[key]!, newValue => {
                 value[key] = newValue;
                 valueChanged(value);
             }, key);

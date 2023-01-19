@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,13 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
+import { GlobalInjector, Injectable } from "acts-util-node";
 import { InstanceContext } from "../../common/InstanceContext";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
 import { InstancesManager } from "../../services/InstancesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { DeploymentContext, ResourceDeletionError } from "../ResourceProvider";
+import { LetsEncryptManager } from "../web-services/LetsEncryptManager";
 import { DockerContainerProperties } from "./Properties";
 
 interface EnvironmentVariableMapping
@@ -39,6 +40,12 @@ interface PortMapping
 
 export interface DockerContainerConfig
 {
+    /**
+     * @title Certificate
+     * @format instance-same-host[web-services/letsencrypt-cert]
+     */
+    certFullInstanceName?: string;
+
     env: EnvironmentVariableMapping[];
     imageName: string;
     portMap: PortMapping[];
@@ -128,7 +135,7 @@ export class DockerManager
 
     public async QueryLog(hostId: number, instanceName: string)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "docker", "container", "logs", instanceName], hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "docker", "container", "logs", instanceName], hostId);
         return result;
     }
 
@@ -145,11 +152,14 @@ export class DockerManager
 
     private async InspectContainer(hostId: number, instanceName: string)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "docker", "container", "inspect", instanceName], hostId);
-        const data = JSON.parse(result.stdOut) as any[];
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "docker", "container", "inspect", instanceName], hostId);
+        if(result.exitCode === 1)
+            return undefined;
 
+        const data = JSON.parse(result.stdOut) as any[];
         if(data.length === 0)
             return undefined;
+
         return data[0] as DockerContainerInfo;
     }
 
@@ -164,6 +174,16 @@ export class DockerManager
             await this.DeleteContainer(instanceContext.hostId, parts.instanceName);
         }
 
+        const readOnlyVolumes = [];
+        if(config.certFullInstanceName)
+        {
+            const lem = GlobalInjector.Resolve(LetsEncryptManager);
+            const cert = await lem.GetCert(instanceContext.hostId, config.certFullInstanceName);
+
+            readOnlyVolumes.push("-v", cert.certificatePath + ":/certs/public.crt:ro");
+            readOnlyVolumes.push("-v", cert.privateKeyPath + ":/certs/private.key:ro");
+        }
+
         const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
         const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort].Values()).Flatten().ToArray();
 
@@ -171,6 +191,7 @@ export class DockerManager
             "--name", parts.instanceName,
             ...envArgs,
             ...portArgs,
+            ...readOnlyVolumes,
             config.imageName
         ];
 

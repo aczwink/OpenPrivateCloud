@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@
 
 import { resourceProviders } from "openprivatecloud-common";
 import { DockerContainerConfig, DockerContainerInfo, DockerContainerLogDto } from "../../../dist/api";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 
 type InstanceId = { instanceName: string };
@@ -53,6 +54,15 @@ const configViewModel: ObjectViewModel<DockerContainerConfig, InstanceId> = {
         {
             type: "edit",
             propertiesSchemaName: "DockerContainerConfig",
+            loadContext: async (service, ids) => {
+                const response = await service.resourceProviders.computeservices.dockercontainer._any_.info.get(ids.instanceName);
+                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(result.ok)
+                    return result.value;
+                return {
+                    hostName: ""
+                };
+            },
             requestObject: async (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.config.get(ids.instanceName),
             updateResource: (service, ids, newValue) => service.resourceProviders.computeservices.dockercontainer._any_.config.put(ids.instanceName, newValue)
         }
