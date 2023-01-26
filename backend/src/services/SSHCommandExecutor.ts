@@ -123,7 +123,7 @@ export class SSHCommandExecutor
 
         channel.on("close", onClose);
         channel.stderr.on("data", chunk => process.stderr.write(chunk));
-        channel.stdout.on("data", (chunk: any) => process.stdout.write(chunk));
+        //channel.stdout.on("data", (chunk: any) => process.stdout.write(chunk));
 
         const shell = new SSHShellWrapper(channel, hostId);
         await shell.WaitForStandardPrompt();

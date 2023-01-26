@@ -21,6 +21,9 @@ import { GlobalInjector } from "acts-util-node";
 import { HostsController } from "../data-access/HostsController";
 import { ShellWrapper } from "./ShellWrapper";
 
+const colorCodeRegEx = new RegExp("\x1B\[[0-9;?]*[a-zA-Z]");
+const bashPrompt = new RegExp("[a-z\-]+@[a-z\-]+:~\\$ $");
+
 export class SSHShellWrapper implements ShellWrapper
 {
     constructor(private channel: ssh2.ClientChannel, private hostId: number)
@@ -45,8 +48,12 @@ export class SSHShellWrapper implements ShellWrapper
 
     public Close(): Promise<void>
     {
+        const promise = new Promise<void>( resolve => {
+            this.channel.on("exit", resolve);
+        });
         this.channel.end("exit\n");
-        return new Promise<void>( resolve => this.channel.on("exit", resolve) );
+        
+        return promise;
     }
 
     public async ExecuteCommand(command: string[]): Promise<void>
@@ -112,11 +119,30 @@ export class SSHShellWrapper implements ShellWrapper
     //Event handlers
     private OnNewChannelData(data: string)
     {
+        const bashMatch = data.match(bashPrompt);
+        if(bashMatch !== null)
+        {
+            this.standardPromptCounter.Set(true);
+            const remaining = data.substring(0, data.length - bashMatch[0].length);
+
+            const colMatch = remaining.match(colorCodeRegEx);
+            if( (colMatch !== null) && (remaining === colMatch[0]))
+                return;
+
+            this.dataCallback?.call(undefined, remaining);
+            return;
+        }
+
+        const colMatch = data.match(colorCodeRegEx);
+        if( (colMatch !== null) && (data === colMatch[0]))
+            return;
+
         if(data.endsWith("$ "))
         {
             this.standardPromptCounter.Set(true);
+            const remaining = data.substring(0, data.length - 2);
 
-            this.dataCallback?.call(undefined, data.substring(0, data.length - 2));
+            this.dataCallback?.call(undefined, remaining);
         }
         else
             this.dataCallback?.call(undefined, data);
