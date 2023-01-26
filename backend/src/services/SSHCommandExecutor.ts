@@ -18,7 +18,9 @@
 
 import { Injectable } from "acts-util-node";
 import { ClientChannel } from "ssh2";
-import { ShellWrapper, ShellWrapperImpl } from "../common/ShellWrapper";
+import { ShellWrapper } from "../common/ShellWrapper";
+import { SSHShellWrapper } from "../common/SSHShellWrapper";
+import { TracingShellWrapper } from "../common/TracingShellWrapper";
 import { ProcessTracker, ProcessTrackerManager } from "./ProcessTrackerManager";
 import { SSHConnection, Command } from "./SSHService";
 
@@ -123,9 +125,9 @@ export class SSHCommandExecutor
         channel.stderr.on("data", chunk => process.stderr.write(chunk));
         channel.stdout.on("data", (chunk: any) => process.stdout.write(chunk));
 
-        const shell = new ShellWrapperImpl(channel, hostId);
+        const shell = new SSHShellWrapper(channel, hostId);
         await shell.WaitForStandardPrompt();
-        return shell;
+        return new TracingShellWrapper(shell, hostId, this.processTrackerManager);
     }
 
     //Private methods

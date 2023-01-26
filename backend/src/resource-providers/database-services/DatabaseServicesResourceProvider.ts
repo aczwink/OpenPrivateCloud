@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -36,7 +36,8 @@ import { InstanceContext } from "../../common/InstanceContext";
 
 interface MysqldSettings
 {
-    datadir?: string;
+    "bind-address": string;
+    datadir: string;
     "default-time-zone"?: string;
 }
 
@@ -157,8 +158,9 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
 
 
         const config = await this.QueryMysqldSettings(context.hostId);
-        config["default-time-zone"] = '"+00:00"';
+        config["bind-address"] = "0.0.0.0";
         config["datadir"] = path.join(instanceDir, "mysql");
+        config["default-time-zone"] = '"+00:00"';
         await this.SetMysqldSettings(context.hostId, config);
 
 
@@ -176,11 +178,11 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
         return data;
     }
 
-    private async QueryMysqldSettings(hostId: number): Promise<MysqldSettings>
+    private async QueryMysqldSettings(hostId: number)
     {
         const settings = await this.QuerySettings(hostId);
 
-        return settings.mysqld!;
+        return settings.mysqld as unknown as MysqldSettings;
     }
     
     private async QuerySettings(hostId: number)
