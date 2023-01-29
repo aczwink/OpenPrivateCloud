@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -45,17 +45,22 @@ export const staticWebsiteViewModel: MultiPageViewModel<InstanceId> = {
     ],
     entries: [
         {
-            key: "overview",
-            displayName: "Overview",
-            child: overviewViewModel
-        },
-        {
-            key: "content",
-            displayName: "Content",
-            child: {
-                type: "component",
-                component: UploadStaticWebsiteContentComponent
-            }
+            displayName: "",
+            entries: [
+                {
+                    key: "overview",
+                    displayName: "Overview",
+                    child: overviewViewModel
+                },
+                {
+                    key: "content",
+                    displayName: "Content",
+                    child: {
+                        type: "component",
+                        component: UploadStaticWebsiteContentComponent
+                    }
+                }
+            ]
         }
     ],
     formTitle: ids => ids.instanceName,

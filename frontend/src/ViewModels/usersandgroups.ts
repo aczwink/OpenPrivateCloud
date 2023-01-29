@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -91,14 +91,19 @@ const userGroupViewModel: MultiPageViewModel<GroupIdRouteParams> = {
     actions: [],
     entries: [
         {
-            child: userGroupOverviewViewModel,
-            displayName: "Overview",
-            key: "overview"
-        },
-        {
-            child: userGroupMembersViewModel,
-            displayName: "Members",
-            key: "members"
+            displayName: "",
+            entries: [
+                {
+                    child: userGroupOverviewViewModel,
+                    displayName: "Overview",
+                    key: "overview"
+                },
+                {
+                    child: userGroupMembersViewModel,
+                    displayName: "Members",
+                    key: "members"
+                }
+            ]
         }
     ],
     formTitle: ids => "Group " + ids.groupId,
@@ -146,31 +151,36 @@ const usersAndGroupsViewModel: MultiPageViewModel<{}> = {
     actions: [],
     entries: [
         {
-            child: usersViewModel,
-            displayName: "Users",
-            key: "users",
-            icon: {
-                type: "bootstrap",
-                name: "person"
-            }
-        },
-        {
-            child: userGroupsViewModel,
-            displayName: "Groups",
-            key: "groups",
-            icon: {
-                type: "bootstrap",
-                name: "people"
-            }
-        },
-        {
-            child: clusterRoleAssignmentsViewModel,
-            displayName: "Cluster access control",
-            key: "clusteraccess",
-            icon: {
-                type: "bootstrap",
-                name: "lock-fill"
-            }
+            displayName: "",
+            entries: [
+                {
+                    child: usersViewModel,
+                    displayName: "Users",
+                    key: "users",
+                    icon: {
+                        type: "bootstrap",
+                        name: "person"
+                    }
+                },
+                {
+                    child: userGroupsViewModel,
+                    displayName: "Groups",
+                    key: "groups",
+                    icon: {
+                        type: "bootstrap",
+                        name: "people"
+                    }
+                },
+                {
+                    child: clusterRoleAssignmentsViewModel,
+                    displayName: "Cluster access control",
+                    key: "clusteraccess",
+                    icon: {
+                        type: "bootstrap",
+                        name: "lock-fill"
+                    }
+                }
+            ]
         }
     ],
     formTitle: _ => "Users and groups management",

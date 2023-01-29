@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ import { BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, NavIt
 import { Dictionary } from "acts-util-core";
 import { IdBoundResourceAction, RenderBoundAction } from "../IdBoundActions";
 
-export interface ObjectType
+interface ObjectType
 {
     key: string;
     displayName: string;
@@ -30,12 +30,18 @@ export interface ObjectType
     };
 }
 
+interface CatType
+{
+    catName: string;
+    objectTypes: ObjectType[];
+}
+
 interface SideNavComponentInput
 {
     actions: IdBoundResourceAction<any, any, any>[];
     baseRoute: string;
     formHeading: (routeParams: Dictionary<string>) => string;
-    objectTypes: ObjectType[];
+    cats: CatType[];
 }
 
 @Injectable
@@ -61,9 +67,7 @@ export class SideNavComponent extends Component<SideNavComponentInput>
             </div>
             <div className="row">
                 <div className="col-1">
-                    <ul className="nav nav-pills flex-column">
-                        {...this.input.objectTypes.map(x => <NavItem route={this.baseRoute + "/" + x.key}>{this.RenderIcon(x)}{x.displayName}</NavItem>)}
-                    </ul>
+                    {...this.input.cats.map(this.RenderCat.bind(this))}
                 </div>
                 <div className="col"><RouterComponent /></div>
             </div>
@@ -75,6 +79,21 @@ export class SideNavComponent extends Component<SideNavComponentInput>
     private title: string | null;
 
     //Private methods
+    private RenderCat(cat: CatType)
+    {
+        if(cat.catName !== "")
+        {
+            return <fragment>
+                <h5>{cat.catName}</h5>
+                {this.RenderCat({ catName: "", objectTypes: cat.objectTypes })}
+            </fragment>;
+        }
+
+        return <ul className="nav nav-pills flex-column">
+            {...cat.objectTypes.map(x => <NavItem route={this.baseRoute + "/" + x.key}>{this.RenderIcon(x)}{x.displayName}</NavItem>)}
+        </ul>;
+    }
+
     private RenderIcon(objectType: ObjectType)
     {
         const icon = objectType.icon;

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -32,6 +32,7 @@ import { avTranscoderViewModel } from "./multimedia-services/av-transcoder";
 import { staticWebsiteViewModel } from "./web-services/staticWebsite";
 import { nodeAppServiceViewodel } from "./web-services/nodeAppService";
 import { dockerContainerViewModel } from "./compute-services/docker-container";
+import { letsEncryptViewModel } from "./web-services/letsencrypt-cert";
 
 const root: RoutingViewModel = {
     type: "routing",
@@ -81,6 +82,10 @@ const root: RoutingViewModel = {
         {
             key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.jdownloaderResourceType.name}/:instanceName`,
             viewModel: jdownloaderViewModel,
+        },
+        {
+            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.letsencryptCertResourceType.name}/:instanceName`,
+            viewModel: letsEncryptViewModel,
         },
         {
             key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.nextcloudResourceType.name}/:instanceName`,

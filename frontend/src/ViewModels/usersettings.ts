@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,20 +25,25 @@ const userSettingsViewModel: MultiPageViewModel<{}> = {
     actions: [],
     entries: [
         {
-            key: "secret",
-            child: {
-                type: "component",
-                component: UserSecretComponent,
-            },
-            displayName: "Secret"
-        },
-        {
-            key: "pw",
-            child: {
-                type: "component",
-                component: ChangeUserPasswordComponent
-            },
-            displayName: "Change password"
+            displayName: "",
+            entries: [
+                {
+                    key: "secret",
+                    child: {
+                        type: "component",
+                        component: UserSecretComponent,
+                    },
+                    displayName: "Secret"
+                },
+                {
+                    key: "pw",
+                    child: {
+                        type: "component",
+                        component: ChangeUserPasswordComponent
+                    },
+                    displayName: "Change password"
+                }
+            ]
         }
     ],
     formTitle: _ => "User settings",

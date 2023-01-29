@@ -101,17 +101,22 @@ const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId> = {
     ],
     entries: [
         {
-            key: "partitions",
-            displayName: "Partitions",
-            child: partitionsViewModel,
-        },
-        {
-            key: "health",
-            displayName: "Health",
-            child: {
-                type: "component",
-                component: ShowSMARTInfoComponent
-            }
+            displayName: "",
+            entries: [
+                {
+                    key: "partitions",
+                    displayName: "Partitions",
+                    child: partitionsViewModel,
+                },
+                {
+                    key: "health",
+                    displayName: "Health",
+                    child: {
+                        type: "component",
+                        component: ShowSMARTInfoComponent
+                    }
+                }
+            ]
         }
     ],
     formTitle: x => x.storageDevicePath,
@@ -140,51 +145,56 @@ const hostViewModel: MultiPageViewModel<HostId> = {
     formTitle: ids => ids.hostName,
     entries: [
         {
-            child: hostOverviewViewModel,
-            displayName: "Overview",
-            key: "overview"
-        },
-        {
-            child: {
-                type: "component",
-                component: HostMonitorComponent,
-            },
-            displayName: "Monitor",
-            key: "monitor",
-            icon: {
-                type: "material",
-                name: "speed"
-            }
-        },
-        {
-            key: "update",
-            displayName: "Update",
-            child: {
-                type: "component",
-                component: HostUpdateComponent
-            },
-            icon: {
-                type: "material",
-                name: "update"
-            }
-        },
-        {
-            child: storagesViewModel,
-            displayName: "Storages",
-            key: "storages",
-            icon: {
-                type: "material",
-                name: "album"
-            }
-        },
-        {
-            child: storageDevicesViewModel,
-            displayName: "Storage devices",
-            key: "storage-devices",
-            icon: {
-                type: "material",
-                name: "storage"
-            }
+            displayName: "",
+            entries: [
+                {
+                    child: hostOverviewViewModel,
+                    displayName: "Overview",
+                    key: "overview"
+                },
+                {
+                    child: {
+                        type: "component",
+                        component: HostMonitorComponent,
+                    },
+                    displayName: "Monitor",
+                    key: "monitor",
+                    icon: {
+                        type: "material",
+                        name: "speed"
+                    }
+                },
+                {
+                    key: "update",
+                    displayName: "Update",
+                    child: {
+                        type: "component",
+                        component: HostUpdateComponent
+                    },
+                    icon: {
+                        type: "material",
+                        name: "update"
+                    }
+                },
+                {
+                    child: storagesViewModel,
+                    displayName: "Storages",
+                    key: "storages",
+                    icon: {
+                        type: "material",
+                        name: "album"
+                    }
+                },
+                {
+                    child: storageDevicesViewModel,
+                    displayName: "Storage devices",
+                    key: "storage-devices",
+                    icon: {
+                        type: "material",
+                        name: "storage"
+                    }
+                }
+            ]
         }
     ],
 };

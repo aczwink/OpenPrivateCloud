@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,6 @@
 
 import { resourceProviders } from "openprivatecloud-common";
 import { NodeAppServiceInfoDto, NodeAppServiceStatus } from "../../../dist/api";
-import { PageNotFoundComponent } from "../../PageNotFoundComponent";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadNodeAppServieContentComponent } from "../../Views/node-app-service/UploadNodeAppServieContentComponent";
 
@@ -67,22 +66,27 @@ export const nodeAppServiceViewodel: MultiPageViewModel<InstanceId> = {
     ],
     entries: [
         {
-            key: "overview",
-            displayName: "Overview",
-            child: overviewViewModel
-        },
-        {
-            key: "status",
-            displayName: "Status",
-            child: statusViewModel
-        },
-        {
-            key: "content",
-            displayName: "Content",
-            child: {
-                type: "component",
-                component: UploadNodeAppServieContentComponent
-            }
+            displayName: "",
+            entries: [
+                {
+                    key: "overview",
+                    displayName: "Overview",
+                    child: overviewViewModel
+                },
+                {
+                    key: "status",
+                    displayName: "Status",
+                    child: statusViewModel
+                },
+                {
+                    key: "content",
+                    displayName: "Content",
+                    child: {
+                        type: "component",
+                        component: UploadNodeAppServieContentComponent
+                    }
+                }
+            ]
         }
     ],
     formTitle: ids => ids.instanceName,

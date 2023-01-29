@@ -178,12 +178,23 @@ export class ViewModelsManager
             };
         }
 
-        const objectTypes = viewModel.entries.map(x => ({ key: x.key, displayName: x.displayName, icon: x.icon }));
+        const cats = viewModel.entries.map(x => (
+            {
+                catName: x.displayName,
+                objectTypes: x.entries.map(y => (
+                    {
+                        key: y.key,
+                        displayName: y.displayName,
+                        icon: y.icon
+                    }
+                ))
+            }
+        ));
 
         return {
             children: [
                 ...viewModel.actions.map(action => this.BuildBoundActionRoute(action, viewModel.formTitle, baseRoute)),
-                ...viewModel.entries.map(x => {
+                ...viewModel.entries.Values().Map(x => x.entries.Values()).Flatten().Map(x => {
                     const childRoute = this.BuildViewModelRoutes(x.child, baseRoute + "/" + x.key, baseRoute);
                 
                     return {
@@ -191,13 +202,13 @@ export class ViewModelsManager
                         children: childRoute.children,
                         component: childRoute.component,
                     };
-                }),
+                }).ToArray(),
                 {
                     path: "",
-                    redirect: viewModel.entries[0].key
+                    redirect: viewModel.entries[0].entries[0].key
                 }
             ],
-            component: <SideNavComponent actions={viewModel.actions} baseRoute={baseRoute} formHeading={viewModel.formTitle} objectTypes={objectTypes} />,
+            component: <SideNavComponent actions={viewModel.actions} baseRoute={baseRoute} formHeading={viewModel.formTitle} cats={cats} />,
             guards: [AuthGuard],
             path: "",
         };

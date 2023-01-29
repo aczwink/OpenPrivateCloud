@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,23 +17,27 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { PageNotFoundComponent } from "../../PageNotFoundComponent";
-import { MultiPageViewModel } from "../../UI/ViewModel";
+import { LetsEncryptCertInfoDto } from "../../../dist/api";
+import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { BuildInstanceGeneralPageGroupEntry } from "../shared/instancegeneral";
 
 type InstanceId = { instanceName: string };
 
 function BuildFullInstanceName(instanceName: string)
 {
-    return "/" + resourceProviders.databaseServices.name + "/" + resourceProviders.databaseServices.mariadbResourceType.name + "/" + instanceName;
+    return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.letsencryptCertResourceType.name + "/" + instanceName;
 }
 
-export const mariadbViewModel: MultiPageViewModel<InstanceId> = {
-    actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
-        }
-    ],
+const overviewViewModel: ObjectViewModel<LetsEncryptCertInfoDto, InstanceId> = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "Overview",
+    requestObject: (service, ids) => service.resourceProviders.webservices.letsencryptcert._any_.info.get(ids.instanceName),
+    schemaName: "LetsEncryptCertInfoDto"
+};
+
+export const letsEncryptViewModel: MultiPageViewModel<InstanceId> = {
+    actions: [],
     entries: [
         {
             displayName: "",
@@ -41,17 +45,11 @@ export const mariadbViewModel: MultiPageViewModel<InstanceId> = {
                 {
                     key: "overview",
                     displayName: "Overview",
-                    child: {
-                        type: "component",
-                        component: PageNotFoundComponent
-                    },
-                    icon: {
-                        name: "storage",
-                        type: "material"
-                    }
+                    child: overviewViewModel,
                 }
             ]
-        }
+        },
+        BuildInstanceGeneralPageGroupEntry(BuildFullInstanceName),
     ],
     formTitle: ids => ids.instanceName,
     type: "multiPage"

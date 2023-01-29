@@ -90,19 +90,24 @@ export const dockerContainerViewModel: MultiPageViewModel<InstanceId> = {
     ],
     entries: [
         {
-            key: "overview",
-            displayName: "Overview",
-            child: overviewViewModel
-        },
-        {
-            key: "config",
-            displayName: "Config",
-            child: configViewModel,
-        },
-        {
-            key: "logs",
-            displayName: "Live log",
-            child: logViewModel,
+            displayName: "",
+            entries: [
+                {
+                    key: "overview",
+                    displayName: "Overview",
+                    child: overviewViewModel
+                },
+                {
+                    key: "config",
+                    displayName: "Config",
+                    child: configViewModel,
+                },
+                {
+                    key: "logs",
+                    displayName: "Live log",
+                    child: logViewModel,
+                }
+            ]
         }
     ],
     formTitle: ids => ids.instanceName,

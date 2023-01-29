@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Get } from "acts-util-apilib";
+import { APIController, Get, NotFound, Query } from "acts-util-apilib";
 import { HealthController, HealthStats } from "../data-access/HealthController";
+import { InstancesController } from "../data-access/InstancesController";
 
 interface ClusterHealthStats
 {
@@ -28,7 +29,7 @@ interface ClusterHealthStats
 @APIController("health")
 class HealthAPIController
 {
-    constructor(private healthController: HealthController)
+    constructor(private healthController: HealthController, private instancesController: InstancesController)
     {
     }
 
@@ -40,5 +41,17 @@ class HealthAPIController
             instancesHealth: await this.healthController.QueryInstancesHealthStats()
         };
         return res;
+    }
+
+    @Get("instance")
+    public async QueueInstanceHealth(
+        @Query fullInstanceName: string
+    )
+    {
+        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        if(instance === undefined)
+            return NotFound("instance not found");
+
+        return this.healthController.QueryInstanceHealthData(instance.id);
     }
 }

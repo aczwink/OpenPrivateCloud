@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -180,34 +180,39 @@ export const backupVaultViewModel: MultiPageViewModel<InstanceId> = {
     ],
     entries: [
         {
-            key: "overview",
-            displayName: "Overview",
-            child: overviewViewModel,
-        },
-        {
-            key: "target",
-            displayName: "Target config",
-            child: targetConfigViewModel
-        },
-        {
-            key: "fileStorageSources",
-            displayName: "File storages",
-            child: fileStorageSourcesViewModel
-        },
-        {
-            key: "databaseSources",
-            displayName: "Databases",
-            child: databaseSourcesViewModel,
-        },
-        {
-            key: "trigger",
-            displayName: "Trigger config",
-            child: triggerConfigViewModel
-        },
-        {
-            key: "logs",
-            displayName: "Logs",
-            child: logsViewModel,
+            displayName: "",
+            entries: [
+                {
+                    key: "overview",
+                    displayName: "Overview",
+                    child: overviewViewModel,
+                },
+                {
+                    key: "target",
+                    displayName: "Target config",
+                    child: targetConfigViewModel
+                },
+                {
+                    key: "fileStorageSources",
+                    displayName: "File storages",
+                    child: fileStorageSourcesViewModel
+                },
+                {
+                    key: "databaseSources",
+                    displayName: "Databases",
+                    child: databaseSourcesViewModel,
+                },
+                {
+                    key: "trigger",
+                    displayName: "Trigger config",
+                    child: triggerConfigViewModel
+                },
+                {
+                    key: "logs",
+                    displayName: "Logs",
+                    child: logsViewModel,
+                }
+            ]
         }
     ],
     formTitle: ids => ids.instanceName,
