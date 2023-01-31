@@ -88,7 +88,7 @@ export class ApacheManager
 
     public async QueryModules(hostId: number)
     {
-        return this.QueryEntities("mods-available", "-m", hostId);
+        return this.QueryEntities("mods", hostId);
     }
 
     public async QuerySite(hostId: number, siteName: string)
@@ -101,7 +101,7 @@ export class ApacheManager
 
     public async QuerySites(hostId: number)
     {
-        return this.QueryEntities("sites-available", "-s", hostId);
+        return this.QueryEntities("sites", hostId);
     }
 
     public async SetSite(hostId: number, siteName: string, vHost: VirtualHost)
@@ -110,20 +110,18 @@ export class ApacheManager
     }
 
     //Private methods
-    private async QueryEntities(dir: string, argSwitch: string, hostId: number)
+    private async QueryEntities(dirPrefix: string, hostId: number)
     {
-        const files = await this.remoteFileSystemManager.ListDirectoryContents(hostId, "/etc/apache2/" + dir + "/");
+        const files = await this.remoteFileSystemManager.ListDirectoryContents(hostId, "/etc/apache2/" + dirPrefix + "-available/");
         const entities: EntityInfo[] = [];
-        for (const fileEntry of files)
+        for (const fileName of files)
         {
-            const fileName = fileEntry;
             if(!fileName.endsWith(".conf"))
                 continue;
 
             const modName = fileName.substring(0, fileName.lastIndexOf("."));
-            const exitCode = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["a2query", argSwitch, fileName], hostId);
-
-            let enabled = exitCode === 0; //0 if enabled, 1 if not
+            const enabled = await this.remoteFileSystemManager.Exists(hostId, "/etc/apache2/" + dirPrefix + "-enabled/" + fileName);
+            
             entities.push({ name: modName, enabled });
         }
         return entities;

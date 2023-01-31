@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,18 +19,33 @@
 import { Injectable } from "acts-util-node";
 import { opcSpecialGroups, opcSpecialUsers } from "../common/UserAndGroupDefinitions";
 import { HostsController } from "../data-access/HostsController";
-import { HostStorage, HostStorageCreationProperties } from "../data-access/HostStoragesController";
+import { HostStorage, HostStorageCreationProperties, HostStoragesController } from "../data-access/HostStoragesController";
 import { FileSystemInfoService } from "./FileSystemInfoService";
 import { HostUsersManager } from "./HostUsersManager";
+import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
+
+interface HostStorageWithInfo extends HostStorage
+{
+    /**
+     * @format multi-line
+     */
+    healthInfo: string;
+
+    /**
+     * @format multi-line
+     */
+    diskUsage: string;
+}
 
 @Injectable
 export class HostStoragesManager
 {
-    constructor(private hostsController: HostsController,
+    constructor(private hostsController: HostsController, private hostStoragesController: HostStoragesController,
         private remoteFileSystemManager: RemoteFileSystemManager, private hostUsersManager: HostUsersManager,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private fileSystemInfoService: FileSystemInfoService)
+        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private fileSystemInfoService: FileSystemInfoService,
+        private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
     
@@ -73,6 +88,30 @@ export class HostStoragesManager
             throw new Error("no storage could be found");
 
         return bestFS;
+    }
+
+    public async QueryStorage(storageId: number): Promise<HostStorageWithInfo | undefined>
+    {
+        const hostStorage = await this.hostStoragesController.RequestHostStorage(storageId);
+        if(hostStorage === undefined)
+            return undefined;
+
+        let diskUsage = "";
+        let healthInfo = "";
+        if(hostStorage.fileSystemType === "btrfs")
+        {
+            const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "btrfs", "filesystem", "df", hostStorage.path], hostStorage.hostId);
+            diskUsage = result.stdOut;
+
+            const result2 = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "btrfs", "device", "stats", hostStorage.path], hostStorage.hostId);
+            healthInfo = result2.stdOut;
+        }
+
+        return {
+            diskUsage,
+            healthInfo,
+            ...hostStorage
+        };
     }
 
     //Private methods

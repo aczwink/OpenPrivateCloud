@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,7 @@ class HostStoragesAPIController
 @APIController("hostStorages/{storageId}")
 class HostStorageAPIController
 {
-    constructor(private hostStoragesController: HostStoragesController)
+    constructor(private hostStoragesController: HostStoragesController, private hostStoragesManager: HostStoragesManager)
     {
     }
 
@@ -73,7 +73,7 @@ class HostStorageAPIController
         @Path storageId: number
     )
     {
-        const hostStorage = await this.hostStoragesController.RequestHostStorage(storageId);
+        const hostStorage = await this.hostStoragesManager.QueryStorage(storageId);
         if(hostStorage === undefined)
             return NotFound("host storage does not exist");
 

@@ -19,6 +19,7 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { PageNotFoundComponent } from "../../PageNotFoundComponent";
 import { MultiPageViewModel } from "../../UI/ViewModel";
+import { BuildInstanceGeneralPageGroupEntry } from "../shared/instancegeneral";
 
 type InstanceId = { instanceName: string };
 
@@ -51,7 +52,8 @@ export const mariadbViewModel: MultiPageViewModel<InstanceId> = {
                     }
                 }
             ]
-        }
+        },
+        BuildInstanceGeneralPageGroupEntry(BuildFullInstanceName),
     ],
     formTitle: ids => ids.instanceName,
     type: "multiPage"

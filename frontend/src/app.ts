@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,6 @@ import { LoginComponent } from "./LoginComponent";
 import { PageNotFoundComponent } from "./PageNotFoundComponent";
 import { RootComponent } from "./RootComponent";
 import { ViewModelsManager } from "./UI/ViewModelsManager";
-import { ViewProcessesListComponent } from "./Views/activitymonitor/ViewProcessesListComponent";
 import { ViewProcessComponent } from "./Views/activitymonitor/ViewProcessComponent";
 
 function BuildRoutes()
@@ -30,10 +29,7 @@ function BuildRoutes()
     const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
     
     const staticRoutes : Routes = [
-        { path: "activitymonitor", guards: [AuthGuard], children: [
-            { path: ":processId", component: ViewProcessComponent },
-            { path: "", component: ViewProcessesListComponent }
-        ] },
+        { path: "activitymonitor/:processId", guards: [AuthGuard], component: ViewProcessComponent },
         { path: "login", component: LoginComponent},
         { path: "", component: DashboardComponent, guards: [AuthGuard] },
         { path: "*", component: PageNotFoundComponent},

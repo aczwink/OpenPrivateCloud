@@ -16,9 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Host, HostStorage, HostStorageCreationProperties, PartitionDto, StorageDeviceDto } from "../../dist/api";
+import { Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, PartitionDto, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
+import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
 import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
@@ -46,7 +47,7 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
     schemaName: "Host",
 };
 
-const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storageId: number }> = {
+const storageViewModel: ObjectViewModel<HostStorageWithInfo, { hostName: string, storageId: number }> = {
     type: "object",
     actions: [
         {
@@ -56,7 +57,7 @@ const storageViewModel: ObjectViewModel<HostStorage, { hostName: string, storage
     ],
     formTitle: x => x.path,
     requestObject: (service, ids) => service.hostStorages._any_.get(ids.storageId),
-    schemaName: "HostStorage",
+    schemaName: "HostStorageWithInfo",
 };
 
 type HostId = { hostName: string };
@@ -162,6 +163,18 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     icon: {
                         type: "material",
                         name: "speed"
+                    }
+                },
+                {
+                    child: {
+                        type: "component",
+                        component: ViewProcessesListComponent
+                    },
+                    displayName: "Activity monitor",
+                    key: "activitymonitor",
+                    icon: {
+                        type: "bootstrap",
+                        name: "activity"
                     }
                 },
                 {
