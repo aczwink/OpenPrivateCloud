@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -62,8 +62,8 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
     readonly name: string;
     readonly resourceTypeDefinitions: ResourceTypeDefinition[];
 
-    CheckInstanceAvailability(hostId: number, fullInstanceName: string): Promise<void>;
-    CheckInstanceHealth(hostId: number, fullInstanceName: string): Promise<void>;
+    CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>;
+    CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>;
     DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>;
     InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;

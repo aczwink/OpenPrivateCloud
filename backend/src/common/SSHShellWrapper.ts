@@ -101,11 +101,16 @@ export class SSHShellWrapper implements ShellWrapper
     public WaitForStandardPrompt()
     {
         return new Promise<void>( resolve => {
+            let resolved = false;
+
             const subscription = this.standardPromptCounter.Subscribe(newValue => {
-                if(newValue)
+                if(newValue && !resolved)
                 {
-                    subscription.Unsubscribe();
+                    resolved = true;
                     this.standardPromptCounter.Set(false);
+
+                    setTimeout( () => subscription.Unsubscribe(), 10);
+                    
                     resolve();
                 }
             });

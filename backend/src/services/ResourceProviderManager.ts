@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -52,21 +52,17 @@ export class ResourceProviderManager
     public async CheckInstanceAvailability(fullInstanceName: string)
     {
         const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
 
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-
-        await resourceProvider.CheckInstanceAvailability(storage!.hostId, fullInstanceName);
+        await resourceProvider.CheckInstanceAvailability(instanceContext!);
     }
 
     public async CheckInstanceHealth(fullInstanceName: string)
     {
         const resourceProvider = this.FindInstanceProviderFromFullInstanceName(fullInstanceName);
+        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
 
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-
-        await resourceProvider.CheckInstanceHealth(storage!.hostId, fullInstanceName);
+        await resourceProvider.CheckInstanceHealth(instanceContext!);
     }
 
     public async DeleteInstance(fullInstanceName: string)

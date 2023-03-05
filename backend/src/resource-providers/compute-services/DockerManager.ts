@@ -15,16 +15,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
 import { GlobalInjector, Injectable } from "acts-util-node";
-import { InstanceContext } from "../../common/InstanceContext";
-import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ShellWrapper } from "../../common/ShellWrapper";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { DeploymentContext, ResourceDeletionError } from "../ResourceProvider";
 import { LetsEncryptManager } from "../web-services/LetsEncryptManager";
-import { DockerContainerProperties } from "./Properties";
 
 interface EnvironmentVariableMapping
 {
@@ -49,6 +44,7 @@ export interface DockerContainerConfig
     env: EnvironmentVariableMapping[];
     imageName: string;
     portMap: PortMapping[];
+    restartPolicy: "always" | "no";
 }
 
 interface DockerContainerInfo
@@ -66,93 +62,54 @@ interface DockerContainerInfo
 @Injectable
 export class DockerManager
 {
-    constructor(private modulesManager: ModulesManager, private remoteCommandExecutor: RemoteCommandExecutor,
-        private instanceConfigController: InstanceConfigController, private instancesManager: InstancesManager)
+    constructor(private modulesManager: ModulesManager, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
 
     //Public methods
-    public async DeleteResource(hostId: number, instanceName: string): Promise<ResourceDeletionError | null>
+    public async CreateContainerInstanceAndAutoStart(hostId: number, containerName: string, config: DockerContainerConfig)
     {
-        const containerInfo = await this.InspectContainer(hostId, instanceName);
-        if(containerInfo === undefined)
-            return null;
+        await this.EnsureDockerIsInstalled(hostId);
 
-        if(containerInfo.State.Running)
+        const readOnlyVolumes = [];
+        if(config.certFullInstanceName)
         {
-            return {
-                type: "ConflictingState",
-                message: "The container is running. Shut it down before deleting it."
-            };
-        }
-        await this.DeleteContainer(hostId, instanceName);
+            const lem = GlobalInjector.Resolve(LetsEncryptManager);
+            const cert = await lem.GetCert(hostId, config.certFullInstanceName);
 
-        return null;
-    }
-
-    public async ExecuteAction(instanceContext: InstanceContext, action: "start" | "shutdown")
-    {
-        switch(action)
-        {
-            case "shutdown":
-                const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-                await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "stop", parts.instanceName], instanceContext.hostId);
-                break;
-            case "start":
-                await this.StartContainer(instanceContext);
-                break;
-        }
-    }
-
-    public async ProvideResource(instanceProperties: DockerContainerProperties, context: DeploymentContext)
-    {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "docker");
-    }
-
-    public async QueryContainerConfig(instanceId: number): Promise<DockerContainerConfig>
-    {
-        const config = await this.instanceConfigController.QueryConfig<DockerContainerConfig>(instanceId);
-        if(config === undefined)
-        {
-            return {
-                env: [],
-                imageName: "",
-                portMap: []
-            };
+            readOnlyVolumes.push("-v", cert.certificatePath + ":/certs/public.crt:ro");
+            readOnlyVolumes.push("-v", cert.privateKeyPath + ":/certs/private.key:ro");
         }
 
-        return config;
+        const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
+        const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort].Values()).Flatten().ToArray();
+
+        const cmdArgs = [
+            "--name", containerName,
+            ...envArgs,
+            ...portArgs,
+            ...readOnlyVolumes,
+            "--restart", config.restartPolicy,
+            config.imageName
+        ];
+
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "create", ...cmdArgs], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "start", containerName], hostId);
     }
 
-    public async QueryContainerStatus(hostId: number, instanceName: string)
+    public async DeleteContainer(hostId: number, containerName: string)
     {
-        const containerData = await this.InspectContainer(hostId, instanceName);
-        if(containerData === undefined)
-            return "not created yet";
-
-        return containerData.State.Status;
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "rm", containerName], hostId);
     }
 
-    public async QueryLog(hostId: number, instanceName: string)
+    public async EnsureDockerIsInstalled(hostId: number)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "docker", "container", "logs", instanceName], hostId);
-        return result;
+        await this.modulesManager.EnsureModuleIsInstalled(hostId, "docker");
     }
 
-    public async UpdateContainerConfig(instanceId: number, config: DockerContainerConfig)
+    public async InspectContainer(hostId: number, containerName: string)
     {
-        await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
-    }
-
-    //Private methods
-    private async DeleteContainer(hostId: number, instanceName: string)
-    {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "rm", instanceName], hostId);
-    }
-
-    private async InspectContainer(hostId: number, instanceName: string)
-    {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "docker", "container", "inspect", instanceName], hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "docker", "container", "inspect", containerName], hostId);
         if(result.exitCode === 1)
             return undefined;
 
@@ -163,39 +120,28 @@ export class DockerManager
         return data[0] as DockerContainerInfo;
     }
 
-    private async StartContainer(instanceContext: InstanceContext)
+    public async SpawnShell(hostId: number, containerName: string, shellType: "sh" = "sh"): Promise<ShellWrapper>
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        const config = await this.QueryContainerConfig(instanceContext.instanceId);
+        const hostShell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        await hostShell.ExecuteCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", "PS1=$\\ ", containerName, shellType]);
 
-        const containerData = await this.InspectContainer(instanceContext.hostId, parts.instanceName);
-        if(containerData !== undefined)
-        {
-            await this.DeleteContainer(instanceContext.hostId, parts.instanceName);
-        }
+        return {
+            ChangeDirectory: targetDirectory => hostShell.ChangeDirectory(targetDirectory),
+            ChangeUser: linuxUserName => hostShell.ChangeUser(linuxUserName),
+            Close: async () => {
+                await hostShell.ExecuteCommand(["exit"]); //exit out of container
+                return hostShell.Close();
+            },
+            ExecuteCommand: command => hostShell.ExecuteCommand(command),
+            RegisterForDataEvents: callback => hostShell.RegisterForDataEvents(callback),
+            SendInput: data => hostShell.SendInput(data),
+            StartCommand: command => hostShell.StartCommand(command),
+            WaitForCommandToFinish: () => hostShell.WaitForCommandToFinish()
+        };
+    }
 
-        const readOnlyVolumes = [];
-        if(config.certFullInstanceName)
-        {
-            const lem = GlobalInjector.Resolve(LetsEncryptManager);
-            const cert = await lem.GetCert(instanceContext.hostId, config.certFullInstanceName);
-
-            readOnlyVolumes.push("-v", cert.certificatePath + ":/certs/public.crt:ro");
-            readOnlyVolumes.push("-v", cert.privateKeyPath + ":/certs/private.key:ro");
-        }
-
-        const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
-        const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort].Values()).Flatten().ToArray();
-
-        const cmdArgs = [
-            "--name", parts.instanceName,
-            ...envArgs,
-            ...portArgs,
-            ...readOnlyVolumes,
-            config.imageName
-        ];
-
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "create", ...cmdArgs], instanceContext.hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "start", parts.instanceName], instanceContext.hostId);
+    public async StopContainer(hostId: number, containerName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "stop", containerName], hostId);
     }
 }

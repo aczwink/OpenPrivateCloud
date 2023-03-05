@@ -34,6 +34,7 @@ import "./api/UsersAPIController";
 import "./resource-providers/backup-services/BackupVaultAPIController";
 import "./resource-providers/compute-services/DockerContainerAPIController";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
+import "./resource-providers/database-services/MariaDB/MariaDBAPIController";
 import "./resource-providers/file-services/FileStorageAPIController";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";

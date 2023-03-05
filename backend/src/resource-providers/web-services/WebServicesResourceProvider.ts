@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -76,17 +76,17 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     }
 
     //Public methods
-    public async CheckInstanceAvailability(hostId: number, fullInstanceName: string): Promise<void>
+    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
     {
     }
 
-    public async CheckInstanceHealth(hostId: number, fullInstanceName: string): Promise<void>
+    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
+        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
         switch(parts.resourceTypeName)
         {
             case resourceProviders.webServices.letsencryptCertResourceType.name:
-                await this.letsEncryptManager.RenewCertificateIfRequired(hostId, fullInstanceName);
+                await this.letsEncryptManager.RenewCertificateIfRequired(instanceContext.hostId, instanceContext.fullInstanceName);
                 break;
         }
     }

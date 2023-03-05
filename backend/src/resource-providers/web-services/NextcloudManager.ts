@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ import { InstancesManager } from "../../services/InstancesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
-import { HostMySQLQueryService } from "../database-services/HostMySQLQueryService";
+import { MySQLClient } from "../database-services/MySQLClient";
 import { DeploymentContext } from "../ResourceProvider";
 import { ApacheManager } from "./ApacheManager";
 import { UsersController } from "../../data-access/UsersController";
@@ -35,7 +35,7 @@ import { LetsEncryptManager } from "./LetsEncryptManager";
 export class NextcloudManager
 {
     constructor(private instancesManager: InstancesManager, private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager,
-        private hostMySQLQueryService: HostMySQLQueryService, private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager,
+        private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager,
         private usersController: UsersController, private remoteCommandExecutor: RemoteCommandExecutor, private letsEncryptManager: LetsEncryptManager)
     {
     }
@@ -51,8 +51,9 @@ export class NextcloudManager
 
         const dbName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
         const dbUser = dbName;
-        await this.hostMySQLQueryService.DropDatabase(hostId, dbName);
-        await this.hostMySQLQueryService.DropUser(hostId, dbUser);
+        const client = MySQLClient.CreateStandardHostClient(hostId);
+        await client.DropDatabase(dbName);
+        await client.DropUser(dbUser, "localhost");
 
         await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
     }
@@ -134,8 +135,14 @@ export class NextcloudManager
 
     private async SetupDatabase(hostId: number, dbName: string, dbUser: string, dbPw: string)
     {
-        await this.hostMySQLQueryService.CreateDatabase(hostId, dbName);
-        await this.hostMySQLQueryService.CreateUserAndGrantPrivileges(hostId, dbUser, dbPw, dbName);
+        const client = MySQLClient.CreateStandardHostClient(hostId);
+        await client.CreateDatabase(dbName);
+        await client.CreateUser(dbUser, "localhost", dbPw);
+        await client.GrantPrivileges(dbUser, "localhost", {
+            hasGrant: false,
+            privilegeTypes: ["ALL PRIVILEGES"],
+            scope: dbName + ".*"
+        });
     }
 
     private async SetupNextcloud(hostId: number, instanceDir: string, dbName: string, dbUser: string, dbPw: string, userId: number)
