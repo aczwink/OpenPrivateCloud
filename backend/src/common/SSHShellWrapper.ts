@@ -76,7 +76,7 @@ export class SSHShellWrapper implements ShellWrapper
     {
         if(command[0] === "sudo")
         {
-            command.splice(1, 0, "--stdin");
+            command.splice(1, 0, 'PS1="$ "', "--stdin");
         }
 
         const cmdLine = command.join(" ");

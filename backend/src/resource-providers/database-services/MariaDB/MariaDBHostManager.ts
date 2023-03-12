@@ -111,8 +111,7 @@ export class MariaDBHostManager implements MariaDBInterface
     {
         const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);
         const resultSet = await client.ExecuteSelectQuery(query);
-        console.log(resultSet);
-        throw new Error("HERE");
+        return resultSet;
     }
 
     public async ProvideResource(instanceProperties: MariadbProperties, context: DeploymentContext)

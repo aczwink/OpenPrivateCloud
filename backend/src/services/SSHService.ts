@@ -203,7 +203,11 @@ class SSHConnectionImpl implements SSHConnection
     public SpawnShell(): Promise<ssh2.ClientChannel>
     {
         return new Promise<ssh2.ClientChannel>( (resolve, reject) => {
-            this.conn.shell( (err, channel) => {
+            this.conn.shell({
+                env: {
+                    PS1: "$ "
+                }
+            }, (err, channel) => {
                 if(err !== undefined)
                     reject(err);
                 else
