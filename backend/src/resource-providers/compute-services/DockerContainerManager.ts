@@ -101,6 +101,17 @@ export class DockerContainerManager
         await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
     }
 
+    public async UpdateContainerImage(instanceContext: InstanceContext)
+    {
+        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
+        const containerData = await this.dockerManager.InspectContainer(instanceContext.hostId, parts.instanceName);
+        if(containerData?.State.Running)
+            throw new Error("Container is running");
+
+        const config = await this.QueryContainerConfig(instanceContext.instanceId);
+        await this.dockerManager.PullImage(instanceContext.hostId, config.imageName);
+    }
+
     //Private methods
     private async StartContainer(instanceContext: InstanceContext)
     {

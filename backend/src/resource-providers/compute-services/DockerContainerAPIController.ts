@@ -120,4 +120,12 @@ class DockerContainerAPIController
         };
         return result;
     }
+
+    @Post("update")
+    public async UpdateContainerImage(
+        @Common instanceContext: InstanceContext
+    )
+    {
+        await this.dockerManager.UpdateContainerImage(instanceContext);
+    }
 }

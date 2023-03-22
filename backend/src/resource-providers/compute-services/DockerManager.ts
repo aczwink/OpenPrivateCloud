@@ -120,6 +120,11 @@ export class DockerManager
         return data[0] as DockerContainerInfo;
     }
 
+    public async PullImage(hostId: number, imageName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "pull", imageName], hostId);
+    }
+
     public async SpawnShell(hostId: number, containerName: string, shellType: "sh" = "sh"): Promise<ShellWrapper>
     {
         const hostShell = await this.remoteCommandExecutor.SpawnShell(hostId);

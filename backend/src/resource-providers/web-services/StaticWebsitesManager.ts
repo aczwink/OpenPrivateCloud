@@ -33,6 +33,12 @@ import { InstancesController } from "../../data-access/InstancesController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { TempFilesManager } from "../../services/TempFilesManager";
 import { linuxSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
+import { InstanceContext } from "../../common/InstanceContext";
+
+export interface StaticWebsiteConfig
+{
+    defaultRoute?: string;
+}
 
 @Injectable
 export class StaticWebsitesManager
@@ -90,12 +96,33 @@ export class StaticWebsitesManager
         await this.systemServicesManager.RestartService(context.hostId, "apache2");
     }
 
+    public async QueryConfig(instanceContext: InstanceContext): Promise<StaticWebsiteConfig>
+    {
+        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(instanceContext.fullInstanceName);
+        const vHost = await this.apacheManager.QuerySite(instanceContext.hostId, siteName);
+
+        return {
+            defaultRoute: vHost.directories[0].fallbackResource
+        };
+    }
+
     public async QueryPort(hostId: number, fullInstanceName: string)
     {
         const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
         const vHost = await this.apacheManager.QuerySite(hostId, siteName);
 
         return parseInt(vHost.addresses.split(":")[1]);
+    }
+
+    public async UpdateConfig(instanceContext: InstanceContext, config: StaticWebsiteConfig)
+    {
+        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(instanceContext.fullInstanceName);
+        const vHost = await this.apacheManager.QuerySite(instanceContext.hostId, siteName);
+
+        vHost.directories[0].fallbackResource = config.defaultRoute;
+
+        this.apacheManager.SetSite(instanceContext.hostId, siteName, vHost);
+        await this.systemServicesManager.RestartService(instanceContext.hostId, "apache2");
     }
 
     public async UpdateContent(instanceId: number, buffer: Buffer)

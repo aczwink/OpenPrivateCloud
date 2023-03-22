@@ -42,6 +42,12 @@ const overviewViewModel: ObjectViewModel<DockerContainerInfo, InstanceId>  = {
             execute: (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.post(ids.instanceName, { action: "shutdown"}),
             matIcon: "power_settings_new",
             title: "Shutdown"
+        },
+        {
+            type: "activate",
+            execute: (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.update.post(ids.instanceName),
+            matIcon: "update",
+            title: "Update"
         }
     ],
     formTitle: _ => "Overview",

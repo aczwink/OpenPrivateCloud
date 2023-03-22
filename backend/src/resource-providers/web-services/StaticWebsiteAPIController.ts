@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,15 +16,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, FormField, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, Body, Common, FormField, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 import { resourceProviders } from "openprivatecloud-common";
 import { c_staticWebsiteResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
+import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
-import { StaticWebsitesManager } from "./StaticWebsitesManager";
+import { StaticWebsiteConfig, StaticWebsitesManager } from "./StaticWebsitesManager";
 
 interface StaticWebsiteInfoDto
 {
@@ -47,19 +48,36 @@ class StaticWebsiteAPIController
     )
     {
         const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.staticWebsiteResourceType.name, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        if(instance === undefined)
+        const instanceContext = this.instancesManager.CreateInstanceContext(fullInstanceName);
+        if(instanceContext === undefined)
             return NotFound("instance not found");
 
-        return instance.id;
+        return instanceContext;
+    }
+
+    @Get("config")
+    public async QueryConfig(
+        @Common instanceContext: InstanceContext,
+    )
+    {
+        return await this.staticWebsitesManager.QueryConfig(instanceContext);
+    }
+
+    @Put("config")
+    public async UpdateConfig(
+        @Common instanceContext: InstanceContext,
+        @Body config: StaticWebsiteConfig
+    )
+    {
+        return await this.staticWebsitesManager.UpdateConfig(instanceContext, config);
     }
 
     @Get("info")
     public async QueryInfo(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryInstanceById(instanceContext.instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
         const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
             
@@ -73,10 +91,10 @@ class StaticWebsiteAPIController
 
     @Post()
     public async UpdateContent(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
         @FormField file: UploadedFile
     )
     {
-        await this.staticWebsitesManager.UpdateContent(instanceId, file.buffer);
+        await this.staticWebsitesManager.UpdateContent(instanceContext.instanceId, file.buffer);
     }
 }

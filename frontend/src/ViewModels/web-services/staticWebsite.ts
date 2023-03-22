@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { StaticWebsiteInfoDto } from "../../../dist/api";
+import { StaticWebsiteConfig, StaticWebsiteInfoDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadStaticWebsiteContentComponent } from "../../Views/static-website/UploadStaticWebsiteContentComponent";
 
@@ -36,6 +36,21 @@ const overviewViewModel: ObjectViewModel<StaticWebsiteInfoDto, InstanceId> = {
     schemaName: "StaticWebsiteInfoDto"
 };
 
+const configViewModel: ObjectViewModel<StaticWebsiteConfig, InstanceId> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "StaticWebsiteConfig",
+            requestObject: (service, ids) => service.resourceProviders.webservices.staticwebsite._any_.config.get(ids.instanceName),
+            updateResource: (service, ids, config) => service.resourceProviders.webservices.staticwebsite._any_.config.put(ids.instanceName, config),
+        }
+    ],
+    formTitle: _ => "Config",
+    requestObject: (service, ids) => service.resourceProviders.webservices.staticwebsite._any_.config.get(ids.instanceName),
+    schemaName: "StaticWebsiteConfig"
+};
+
 export const staticWebsiteViewModel: MultiPageViewModel<InstanceId> = {
     actions: [
         {
@@ -51,6 +66,11 @@ export const staticWebsiteViewModel: MultiPageViewModel<InstanceId> = {
                     key: "overview",
                     displayName: "Overview",
                     child: overviewViewModel
+                },
+                {
+                    key: "config",
+                    displayName: "Config",
+                    child: configViewModel
                 },
                 {
                     key: "content",
