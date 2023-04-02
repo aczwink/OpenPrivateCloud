@@ -22,19 +22,13 @@ import { c_databaseServicesResourceProviderName, c_mariadbResourceTypeName } fro
 import { InstanceContext } from "../../../common/InstanceContext";
 import { InstancesManager } from "../../../services/InstancesManager";
 import { MySQLGrant } from "../MySQLClient";
-import { MariaDBManager } from "./MariaDBManager";
+import { MariaDBManager, MySQLDatabaseEntry } from "./MariaDBManager";
 
 interface MySQLUserCreationData
 {
     userName: string;
     hostName: string;
     password: string;
-}
-
-interface MySQLUserEntry
-{
-    Host: string;
-    User: string;
 }
 
 @APIController(`resourceProviders/${c_databaseServicesResourceProviderName}/${c_mariadbResourceTypeName}/{instanceName}`)
@@ -55,6 +49,24 @@ class MariaDBAPIController
             return NotFound("instance not found");
 
         return instanceContext;
+    }
+
+    @Post("databases")
+    public async AddDatabase(
+        @Common instanceContext: InstanceContext,
+        @Body data: MySQLDatabaseEntry,
+    )
+    {
+        await this.mariaDBManager.CreateDatabase(instanceContext, data.Database);
+    }
+
+    @Get("databases")
+    public async QueryDatabases(
+        @Common instanceContext: InstanceContext
+    )
+    {
+        const result = await this.mariaDBManager.QueryDatabases(instanceContext);
+        return result;
     }
 
     @Post("permissions")
@@ -104,6 +116,6 @@ class MariaDBAPIController
     )
     {
         const result = await this.mariaDBManager.QueryUsers(instanceContext);
-        return result as MySQLUserEntry[];
+        return result;
     }
 }

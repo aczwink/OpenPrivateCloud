@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,9 @@
 
 import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
+import { ConfigDialect } from "../common/config/ConfigDialect";
+import { ConfigModel } from "../common/config/ConfigModel";
+import { ConfigParser } from "../common/config/ConfigParser";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
 
@@ -40,7 +43,7 @@ export class SystemServicesManager
     }
 
     //Public methods
-    public async CreateService(hostId: number, props: ServiceProperties)
+    public async CreateOrUpdateService(hostId: number, props: ServiceProperties)
     {
         const env = props.environment.Entries().Map(x => "Environment=" + x.key + "=" + x.value).Join("\n");
         const text = `
@@ -92,8 +95,26 @@ WantedBy=multi-user.target
 
     public async QueryStatus(hostId: number, serviceName: string)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "systemctl", "status", serviceName + ".service", "--lines", "100"], hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "systemctl", "status", serviceName + ".service", "--lines", "100"], hostId);
         return result.stdOut;
+    }
+
+    public async ReadServiceUnit(hostId: number, serviceName: string): Promise<ServiceProperties>
+    {
+        const dialect: ConfigDialect = {
+            commentInitiators: [],
+        };
+        const parser = new ConfigParser(dialect);
+        const data = await parser.Parse(hostId, "/etc/systemd/system/" + serviceName + ".service");
+        const model = new ConfigModel(data);
+
+        return {
+            command: model.GetProperty("Service", "ExecStart")!.toString(),
+            environment: data.Values().Map(x => (x.type === "KeyValue" &&  x.key === "Environment") ? x : null).NotNull().Map(x => x.value!.toString().split("=")).ToDictionary(x => x[0], x => x[1]),
+            groupName: model.GetProperty("Service", "Group")!.toString(),
+            name: serviceName,
+            userName: model.GetProperty("Service", "User")!.toString(),
+        };
     }
 
     public async Reload(hostId: number)

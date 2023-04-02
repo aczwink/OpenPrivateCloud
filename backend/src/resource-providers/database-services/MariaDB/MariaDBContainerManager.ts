@@ -59,6 +59,12 @@ export class MariaDBContainerManager implements MariaDBInterface
         return data;
     }
 
+    public async CreateDatabase(instanceContext: InstanceContext, databaseName: string): Promise<void>
+    {
+        const client = this.CreateClient(instanceContext);
+        await client.CreateDatabase(databaseName);
+    }
+
     public async CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string): Promise<void>
     {
         const client = this.CreateClient(instanceContext);

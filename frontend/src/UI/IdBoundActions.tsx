@@ -61,7 +61,7 @@ export type IdBoundResourceAction<IdType, PropertiesType, ServiceType> =
     | ManagedDeleteResourceAction<IdType, ServiceType>
     | ManagedEditResourceAction<IdType, PropertiesType>;
 
-export function RenderBoundAction(baseRoute: string, routeParams: Dictionary<string>, action: IdBoundResourceAction<any, any, any>)
+export function RenderBoundAction(baseRoute: string, routeParams: Dictionary<string>, action: IdBoundResourceAction<any, any, any>, reloadData: (beginOrFinish: boolean) => void)
 {
     const varRoute = baseRoute + "/" + action.type;
     const route = RouterState.ReplaceRouteParams(varRoute, routeParams).join("/");
@@ -70,14 +70,18 @@ export function RenderBoundAction(baseRoute: string, routeParams: Dictionary<str
         case "activate":
             async function ExecuteAction(action: IdBoundActivateAction<any>)
             {
+                reloadData(true);
                 ShowErrorMessageOnErrorFromResponse(await action.execute(RootInjector.Resolve(APIService), routeParams));
+                reloadData(false);
             }
             return <a onclick={ExecuteAction.bind(undefined, action)} role="button" className="d-flex align-items-center text-decoration-none"><MatIcon>{action.matIcon}</MatIcon> {action.title}</a>;
         case "confirm":
             async function ConfirmAction(action: IdBoundConfirmAction<any>)
             {
+                reloadData(true);
                 if(confirm(action.confirmText))
                     ShowErrorMessageOnErrorFromResponse(await action.execute(RootInjector.Resolve(APIService), routeParams));
+                reloadData(false);
             }
             return <a onclick={ConfirmAction.bind(undefined, action)} role="button" className="d-flex align-items-center text-decoration-none"><MatIcon>{action.matIcon}</MatIcon> {action.title}</a>;
         case "delete":

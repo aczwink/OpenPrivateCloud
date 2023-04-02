@@ -22,6 +22,7 @@ export interface MariaDBInterface
 {
     AddUserPermission(instanceContext: InstanceContext, userName: string, hostName: string, permission: MySQLGrant): Promise<void>;
     CheckAllDatabases(instanceContext: InstanceContext): Promise<string>;
+    CreateDatabase(instanceContext: InstanceContext, databaseName: string): Promise<void>;
     CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string): Promise<void>;
     DeleteResource(instanceContext: InstanceContext): Promise<void>;
     DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string): Promise<void>;

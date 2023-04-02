@@ -95,7 +95,7 @@ export class ConfigParser
         if(parts.length === 1)
             value = null;
         else if(parts.length != 2)
-            throw new Error("Illegal data: " + line);
+            value = parts.slice(1).join("=");
         else
             value = parts[1].trimLeft();
 

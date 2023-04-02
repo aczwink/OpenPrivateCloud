@@ -85,6 +85,12 @@ export class MariaDBHostManager implements MariaDBInterface
         return result.stdOut;
     }
 
+    public async CreateDatabase(instanceContext: InstanceContext, databaseName: string): Promise<void>
+    {
+        const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);
+        await client.CreateDatabase(databaseName);
+    }
+
     public async CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string): Promise<void>
     {
         const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);

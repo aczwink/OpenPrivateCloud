@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { MySQLGrant, MySQLUserCreationData, MySQLUserEntry } from "../../../dist/api";
+import { MySQLDatabaseEntry, MySQLGrant, MySQLUserCreationData, MySQLUserEntry } from "../../../dist/api";
 import { PageNotFoundComponent } from "../../PageNotFoundComponent";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
@@ -118,6 +118,20 @@ const usersViewModel: CollectionViewModel<MySQLUserEntry, InstanceId, MySQLUserC
     schemaName: "MySQLUserEntry"
 };
 
+const databasesViewModel: ListViewModel<MySQLDatabaseEntry, InstanceId> = {
+    type: "list",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, resource) => service.resourceProviders.databaseservices.mariadb._any_.databases.post(ids.instanceName, resource),
+        }
+    ],
+    boundActions: [],
+    displayName: "Databases",
+    requestObjects: (service, ids) => service.resourceProviders.databaseservices.mariadb._any_.databases.get(ids.instanceName),
+    schemaName: "MySQLDatabaseEntry"
+};
+
 export const mariadbViewModel: MultiPageViewModel<InstanceId> = {
     actions: [
         {
@@ -145,6 +159,11 @@ export const mariadbViewModel: MultiPageViewModel<InstanceId> = {
                     key: "users",
                     displayName: "Users",
                     child: usersViewModel
+                },
+                {
+                    key: "databases",
+                    displayName: "Databases",
+                    child: databasesViewModel
                 }
             ]
         },

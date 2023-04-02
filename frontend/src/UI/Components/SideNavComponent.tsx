@@ -63,7 +63,7 @@ export class SideNavComponent extends Component<SideNavComponentInput>
         return <fragment>
             <div className="row align-items-center">
                 <div className="col-auto"><h2>{this.title}</h2></div>
-                {...this.input.actions.map(x => <div className="col-auto">{RenderBoundAction(this.input.baseRoute, this.routerState.routeParams, x)}</div>)}
+                {...this.input.actions.map(x => <div className="col-auto">{RenderBoundAction(this.input.baseRoute, this.routerState.routeParams, x, () => null)}</div>)}
             </div>
             <div className="row">
                 <div className="col-1">

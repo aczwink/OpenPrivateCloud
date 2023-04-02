@@ -30,6 +30,17 @@ interface MariaDBConfig
     deploymentType: "container" | "host";
 }
 
+export interface MySQLDatabaseEntry
+{
+    Database: string;
+}
+
+interface MySQLUserEntry
+{
+    Host: string;
+    User: string;
+}
+
 @Injectable
 export class MariaDBManager
 {
@@ -66,6 +77,12 @@ export class MariaDBManager
         }
     }
 
+    public async CreateDatabase(instanceContext: InstanceContext, databaseName: string)
+    {
+        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
+        await mariaDBInterface.CreateDatabase(instanceContext, databaseName);
+    }
+
     public async CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string)
     {
         const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
@@ -90,6 +107,13 @@ export class MariaDBManager
         return mariaDBInterface.ExecuteSelectQuery(instanceContext, query);
     }
 
+    public async QueryDatabases(instanceContext: InstanceContext)
+    {
+        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
+        const result = await mariaDBInterface.ExecuteSelectQuery(instanceContext, "SHOW DATABASES");
+        return result as MySQLDatabaseEntry[];
+    }
+
     public async QueryUserPermissions(instanceContext: InstanceContext, userName: string, hostName: string)
     {
         const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
@@ -109,7 +133,8 @@ export class MariaDBManager
     public async QueryUsers(instanceContext: InstanceContext)
     {
         const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        return await mariaDBInterface.ExecuteSelectQuery(instanceContext, "SELECT Host, User FROM mysql.user");
+        const result = await mariaDBInterface.ExecuteSelectQuery(instanceContext, "SELECT Host, User FROM mysql.user");
+        return result as MySQLUserEntry[];
     }
 
     public async ProvideResource(instanceProperties: MariadbProperties, context: DeploymentContext): Promise<DeploymentResult>

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,15 +16,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, BodyProp, Common, FormField, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, FormField, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 import { resourceProviders } from "openprivatecloud-common";
 import { c_nodeAppServiceResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
+import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
-import { NodeAppServiceManager } from "./NodeAppServiceManager";
+import { NodeAppConfig, NodeAppServiceManager } from "./NodeAppServiceManager";
 
 interface NodeAppServiceInfoDto
 {
@@ -56,63 +57,72 @@ class NodeAppServiceAPIController
     )
     {
         const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.nodeAppServiceResourceType.name, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        if(instance === undefined)
+        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        if(instanceContext === undefined)
             return NotFound("instance not found");
 
-        return instance.id;
+        return instanceContext;
+    }
+
+    @Get("config")
+    public async QueryConfig(
+        @Common instanceContext: InstanceContext,
+    )
+    {
+        return this.nodeAppServiceManager.QueryConfig(instanceContext);
+    }
+
+    @Put("config")
+    public async UpdateConfig(
+        @Common instanceContext: InstanceContext,
+        @Body config: NodeAppConfig
+    )
+    {
+        return this.nodeAppServiceManager.UpdateConfig(instanceContext, config);
     }
 
     @Get("info")
     public async QueryInfo(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-        const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
+        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
             
         const result: NodeAppServiceInfoDto = {
             hostName: host!.hostName,
-            storagePath: storage!.path,
-            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(storage!.hostId, instance!.fullName),
+            storagePath: instanceContext.hostStoragePath,
+            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(instanceContext.hostId, instanceContext.fullInstanceName),
         };
         return result;
     }
 
     @Get("status")
     public async QueryStatus(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-            
         const result: NodeAppServiceStatus = {
-            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(storage!.hostId, instance!.fullName),
-            status: await this.nodeAppServiceManager.QueryStatus(storage!.hostId, instance!.fullName)
+            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(instanceContext.hostId, instanceContext.fullInstanceName),
+            status: await this.nodeAppServiceManager.QueryStatus(instanceContext.hostId, instanceContext.fullInstanceName)
         };
         return result;
     }
 
     @Post("startStop")
     public async StartOrStopService(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
         @BodyProp action: "start" | "stop"
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-
-        await this.nodeAppServiceManager.ExecuteAction(storage!.hostId, instance!.fullName, action);
+        await this.nodeAppServiceManager.ExecuteAction(instanceContext.hostId, instanceContext.fullInstanceName, action);
     }
 
     @Post()
     public async UpdateContent(
-        @Common instanceId: number,
+        @Common instanceContext: InstanceContext,
         @FormField file: UploadedFile
     )
     {
-        await this.nodeAppServiceManager.UpdateContent(instanceId, file.buffer);
+        await this.nodeAppServiceManager.UpdateContent(instanceContext.instanceId, file.buffer);
     }
 }

@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { NodeAppServiceInfoDto, NodeAppServiceStatus } from "../../../dist/api";
+import { NodeAppConfig, NodeAppServiceInfoDto, NodeAppServiceStatus } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadNodeAppServieContentComponent } from "../../Views/node-app-service/UploadNodeAppServieContentComponent";
 
@@ -57,6 +57,21 @@ const statusViewModel: ObjectViewModel<NodeAppServiceStatus, InstanceId> = {
     schemaName: "NodeAppServiceStatus"
 };
 
+const configViewModel: ObjectViewModel<NodeAppConfig, InstanceId> = {
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "NodeAppConfig",
+            requestObject: async (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.config.get(ids.instanceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders.webservices.nodeappservice._any_.config.put(ids.instanceName, newValue)
+        }
+    ],
+    formTitle: _ => "Configuration",
+    requestObject: async (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.config.get(ids.instanceName),
+    schemaName: "NodeAppConfig",
+    type: "object"
+};
+
 export const nodeAppServiceViewodel: MultiPageViewModel<InstanceId> = {
     actions: [
         {
@@ -77,6 +92,11 @@ export const nodeAppServiceViewodel: MultiPageViewModel<InstanceId> = {
                     key: "status",
                     displayName: "Status",
                     child: statusViewModel
+                },
+                {
+                    key: "config",
+                    displayName: "Config",
+                    child: configViewModel,
                 },
                 {
                     key: "content",

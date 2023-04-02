@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,19 @@ import { DeploymentContext } from "../ResourceProvider";
 import { NodeAppServiceProperties } from "./Properties";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { opcSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
+import { InstanceContext } from "../../common/InstanceContext";
+import { Dictionary } from "acts-util-core";
+
+interface NodeEnvironmentVariableMapping
+{
+    varName: string;
+    value: string;
+}
+
+export interface NodeAppConfig
+{
+    env: NodeEnvironmentVariableMapping[];
+}
 
 @Injectable
 export class NodeAppServiceManager
@@ -66,21 +79,29 @@ export class NodeAppServiceManager
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "node");
 
-        const instancesDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        await this.UpdateService(context.hostId, context.storagePath, context.fullInstanceName, {});
+    }
 
-        await this.systemServicesManager.CreateService(context.hostId, {
-            command: "node " + path.join(instancesDir, "index.js"),
-            environment: {},
-            groupName: opcSpecialGroups.host,
-            name: this.MapFullInstanceNameToSystemDName(context.fullInstanceName),
-            userName: opcSpecialUsers.host
-        });
+    public async QueryConfig(instanceContext: InstanceContext): Promise<NodeAppConfig>
+    {
+        const serviceProps = await this.systemServicesManager.ReadServiceUnit(instanceContext.hostId, this.MapFullInstanceNameToSystemDName(instanceContext.fullInstanceName));
+
+        return {
+            env: serviceProps.environment.Entries().Map(kv => ({ varName: kv.key.toString(), value: kv.value! })).ToArray()
+        };
     }
 
     public async QueryStatus(hostId: number, fullInstanceName: string)
     {
         const serviceName = this.MapFullInstanceNameToSystemDName(fullInstanceName);
         return await this.systemServicesManager.QueryStatus(hostId, serviceName);
+    }
+
+    public async UpdateConfig(instanceContext: InstanceContext, config: NodeAppConfig)
+    {
+        const env = config.env.Values().ToDictionary(e => e.varName, e => e.value);
+        await this.UpdateService(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName, env);
     }
 
     public async UpdateContent(instanceId: number, buffer: Buffer)
@@ -97,5 +118,18 @@ export class NodeAppServiceManager
     private MapFullInstanceNameToSystemDName(fullInstanceName: string)
     {
         return this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+    }
+
+    private async UpdateService(hostId: number, storagePath: string, fullInstanceName: string, env: Dictionary<string>)
+    {
+        const instancesDir = await this.instancesManager.BuildInstanceStoragePath(storagePath, fullInstanceName);
+
+        await this.systemServicesManager.CreateOrUpdateService(hostId, {
+            command: "node " + path.join(instancesDir, "index.js"),
+            environment: env,
+            groupName: opcSpecialGroups.host,
+            name: this.MapFullInstanceNameToSystemDName(fullInstanceName),
+            userName: opcSpecialUsers.host
+        });
     }
 }

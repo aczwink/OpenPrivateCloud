@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,7 @@ export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         return <fragment>
             <div className="row align-items-center">
                 <div className="col-auto"><h2>{this.heading}</h2></div>
-                {...this.input.actions.map(x => <div className="col-auto">{RenderBoundAction(this.input.baseRoute, this.routerState.routeParams, x)}</div>)}
+                {...this.input.actions.map(x => <div className="col-auto">{RenderBoundAction(this.input.baseRoute, this.routerState.routeParams, x, this.LoadCallback.bind(this))}</div>)}
             </div>
             {tables}
         </fragment>;
@@ -67,6 +67,23 @@ export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<Objec
     private heading: string;
 
     //Private methods
+    private LoadCallback(beginOrFinish: boolean)
+    {
+        if(beginOrFinish)
+            this.data = null;
+        else
+            this.LoadData();
+    }
+
+    private async LoadData()
+    {
+        const response = await this.input.requestObject(this.routerState.routeParams);
+        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
+            this.data = result.value;
+        this.heading = this.input.heading(this.data);
+    }
+
     private RenderOneOf(value: any, oneOfSchema: OpenAPI.OneOfSchema, tables: SingleRenderValue[]): RenderValue
     {
         if(oneOfSchema.discriminator === undefined)
@@ -148,12 +165,8 @@ export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<Objec
     }
 
     //Event handlers
-    public override async OnInitiated()
+    public override OnInitiated()
     {
-        const response = await this.input.requestObject(this.routerState.routeParams);
-        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
-        if(result.ok)
-            this.data = result.value;
-        this.heading = this.input.heading(this.data);
+        this.LoadData();
     }
 }
