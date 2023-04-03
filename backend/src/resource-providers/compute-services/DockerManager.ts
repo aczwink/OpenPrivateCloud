@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { GlobalInjector, Injectable } from "acts-util-node";
+import { ShellFrontend } from "../../common/ShellFrontend";
 import { ShellWrapper } from "../../common/ShellWrapper";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
@@ -125,24 +126,25 @@ export class DockerManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "pull", imageName], hostId);
     }
 
-    public async SpawnShell(hostId: number, containerName: string, shellType: "sh" = "sh"): Promise<ShellWrapper>
+    public async SpawnShell(hostId: number, containerName: string, shellType: "sh" = "sh")
     {
-        const hostShell = await this.remoteCommandExecutor.SpawnShell(hostId);
-        await hostShell.ExecuteCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", "PS1=$\\ ", containerName, shellType]);
+        const hostShell = await this.remoteCommandExecutor.SpawnRawShell(hostId);
+        const hostShellFrontend = new ShellFrontend(hostShell);
+        await hostShellFrontend.ExecuteCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", "PS1=$\\ ", containerName, shellType]);
 
-        return {
-            ChangeDirectory: targetDirectory => hostShell.ChangeDirectory(targetDirectory),
-            ChangeUser: linuxUserName => hostShell.ChangeUser(linuxUserName),
+        const containerShell: ShellWrapper = {
             Close: async () => {
-                await hostShell.ExecuteCommand(["exit"]); //exit out of container
+                await hostShellFrontend.ExecuteCommand(["exit"]); //exit out of container
                 return hostShell.Close();
             },
-            ExecuteCommand: command => hostShell.ExecuteCommand(command),
             RegisterForDataEvents: callback => hostShell.RegisterForDataEvents(callback),
             SendInput: data => hostShell.SendInput(data),
             StartCommand: command => hostShell.StartCommand(command),
-            WaitForCommandToFinish: () => hostShell.WaitForCommandToFinish()
+            WaitForCommandToFinish: () => hostShell.WaitForCommandToFinish(),
+            WaitForStandardPrompt: () => hostShell.WaitForStandardPrompt(),
         };
+
+        return new ShellFrontend(containerShell);
     }
 
     public async StopContainer(hostId: number, containerName: string)

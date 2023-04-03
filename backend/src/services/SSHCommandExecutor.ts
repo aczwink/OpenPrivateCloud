@@ -18,6 +18,7 @@
 
 import { Injectable } from "acts-util-node";
 import { ClientChannel } from "ssh2";
+import { ShellFrontend } from "../common/ShellFrontend";
 import { ShellWrapper } from "../common/ShellWrapper";
 import { SSHShellWrapper } from "../common/SSHShellWrapper";
 import { TracingShellWrapper } from "../common/TracingShellWrapper";
@@ -114,7 +115,7 @@ export class SSHCommandExecutor
         return exitCode;
     }
 
-    public async SpawnShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellWrapper>
+    public async SpawnRawShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellWrapper>
     {
         const channel = await connection.SpawnShell();
 
@@ -125,9 +126,16 @@ export class SSHCommandExecutor
         channel.stderr.on("data", chunk => process.stderr.write(chunk));
         //channel.stdout.on("data", (chunk: any) => process.stdout.write(chunk));
 
-        const shell = new SSHShellWrapper(channel, hostId);
+        let shell: ShellWrapper = new SSHShellWrapper(channel, hostId);
         await shell.WaitForStandardPrompt();
-        return new TracingShellWrapper(shell, hostId, this.processTrackerManager);
+        shell = new TracingShellWrapper(shell, hostId, this.processTrackerManager);
+
+        return shell;
+    }
+
+    public async SpawnShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellFrontend>
+    {
+        return new ShellFrontend(await this.SpawnRawShell(connection, onClose, hostId));
     }
 
     //Private methods

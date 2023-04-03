@@ -33,19 +33,6 @@ export class SSHShellWrapper implements ShellWrapper
     }
 
     //Public methods
-    public async ChangeDirectory(targetDirectory: string): Promise<void>
-    {
-        this.channel.write("cd " + targetDirectory + "\n");
-
-        await this.WaitForStandardPrompt();
-    }
-
-    public async ChangeUser(linuxUserName: string): Promise<void>
-    {
-        await this.StartCommand(["sudo", "-i", "-u", linuxUserName]);
-        await this.WaitForStandardPrompt();
-    }
-
     public Close(): Promise<void>
     {
         const promise = new Promise<void>( resolve => {
@@ -54,12 +41,6 @@ export class SSHShellWrapper implements ShellWrapper
         this.channel.end("exit\n");
         
         return promise;
-    }
-
-    public async ExecuteCommand(command: string[]): Promise<void>
-    {
-        await this.StartCommand(command);
-        await this.WaitForCommandToFinish();
     }
 
     public RegisterForDataEvents(callback?: (data: string) => void): void

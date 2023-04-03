@@ -18,12 +18,10 @@
 
 export interface ShellWrapper
 {
-    ChangeDirectory(targetDirectory: string): Promise<void>;
-    ChangeUser(linuxUserName: string): Promise<void>;
     Close(): Promise<void>;
-    ExecuteCommand(command: string[]): Promise<void>;
     RegisterForDataEvents(callback?: (data: string) => void): void;
     StartCommand(command: string[]): Promise<void>;
     SendInput(data: string): void;
     WaitForCommandToFinish(): Promise<void>;
+    WaitForStandardPrompt(): Promise<void>;
 }

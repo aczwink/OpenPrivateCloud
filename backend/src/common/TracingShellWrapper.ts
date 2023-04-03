@@ -27,24 +27,9 @@ export class TracingShellWrapper implements ShellWrapper
     }
 
     //Public methods
-    public async ChangeDirectory(targetDirectory: string): Promise<void>
-    {
-        await this.shellWrapper.ChangeDirectory(targetDirectory);
-    }
-
-    public async ChangeUser(linuxUserName: string): Promise<void>
-    {
-        await this.shellWrapper.ChangeUser(linuxUserName);
-    }
-
     public async Close(): Promise<void>
     {
         await this.shellWrapper.Close();
-    }
-
-    public async ExecuteCommand(command: string[]): Promise<void>
-    {
-        await this.shellWrapper.ExecuteCommand(command);
     }
     
     public RegisterForDataEvents(callback?: ((data: string) => void) | undefined): void
@@ -77,6 +62,11 @@ export class TracingShellWrapper implements ShellWrapper
 
         const tracker = this.trackers.pop();
         tracker?.Finish();
+    }
+
+    public async WaitForStandardPrompt(): Promise<void>
+    {
+        await this.shellWrapper.WaitForStandardPrompt();
     }
 
     //Private variables

@@ -47,7 +47,7 @@ export class MariaDBContainerManager implements MariaDBInterface
         await new Promise( resolve => {
             setTimeout(resolve, 1000);
         }); //wait a little for the password prompt
-        shell.SendInput("openprivatecloud" /*TODO: PW*/ + "\n");
+        shell.SendInputLine("openprivatecloud" /*TODO: PW*/);
 
         let data = "";
         shell.RegisterForDataEvents(chunk => data += chunk);

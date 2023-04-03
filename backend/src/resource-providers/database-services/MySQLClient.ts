@@ -17,7 +17,7 @@
  * */
 import { GlobalInjector } from "acts-util-node";
 import xmljs from "xml-js";
-import { ShellWrapper } from "../../common/ShellWrapper";
+import { ShellFrontend } from "../../common/ShellFrontend";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 
 interface Field
@@ -50,7 +50,7 @@ export interface MySQLGrant
  
 export class MySQLClient
 {
-    constructor(private spawnShell: () => Promise<ShellWrapper>, private commandPrefix: string[], private rootPassword: string)
+    constructor(private spawnShell: () => Promise<ShellFrontend>, private commandPrefix: string[], private rootPassword: string)
     {
     }
 
@@ -124,12 +124,12 @@ export class MySQLClient
         await shell.Close();
     }
 
-    private async LogIn(shell: ShellWrapper)
+    private async LogIn(shell: ShellFrontend)
     {
         await new Promise( resolve => {
             setTimeout(resolve, 1000);
         }); //wait a little for the password prompt
-        shell.SendInput(this.rootPassword + "\n");
+        shell.SendInputLine(this.rootPassword);
     }
 
     //Class functions

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -32,7 +32,7 @@ class DebianPackageManager implements DistroPackageManager
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt-get", "update"], hostId);
         await this.DoDebConfig(hostId, moduleName);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "install", this.MapModuleToPackageList(moduleName).join(" ")], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "install", ...this.MapModuleToPackageList(moduleName)], hostId);
     }
 
     public async IsModuleInstalled(hostId: number, moduleName: ModuleName): Promise<boolean>
@@ -50,7 +50,7 @@ class DebianPackageManager implements DistroPackageManager
 
     public async Uninstall(hostId: number, moduleName: ModuleName)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "purge", this.MapModuleToPackageList(moduleName).join(" ")], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "purge", ...this.MapModuleToPackageList(moduleName)], hostId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "autoremove"], hostId);
     }
 

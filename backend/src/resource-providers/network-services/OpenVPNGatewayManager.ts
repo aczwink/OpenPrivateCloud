@@ -71,7 +71,7 @@ export class OpenVPNGatewayManager
 
     public async CreateServerConfig(hostId: number, serverDir: string, fullInstanceName: string, data: OpenVPNServerConfig, certKeyFiles: CertKeyFiles)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["openvpn", "--genkey", "--secret", serverDir + "/ta.key"], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", serverDir + "/ta.key"], hostId);
 
         const config = `
 dev tun

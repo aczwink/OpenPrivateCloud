@@ -81,6 +81,13 @@ export class RemoteCommandExecutor
         return exitCode;
     }
 
+    public async SpawnRawShell(hostId: number)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+
+        return this.sshCommandExecutor.SpawnRawShell(conn.value, () => conn.Release(), hostId);
+    }
+
     public async SpawnShell(hostId: number)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
