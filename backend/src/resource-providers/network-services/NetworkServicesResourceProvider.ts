@@ -22,7 +22,7 @@ import { ModulesManager } from "../../services/ModulesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { OpenVPNGatewayProperties } from "./OpenVPNGatewayProperties";
 import { EasyRSAManager } from "./EasyRSAManager";
-import { OpenVPNGatewayConfig, OpenVPNGatewayManager } from "./OpenVPNGatewayManager";
+import { OpenVPNGatewayInternalConfig, OpenVPNGatewayManager } from "./OpenVPNGatewayManager";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { SysCtlConfService } from "./SysCtlConfService";
@@ -83,15 +83,17 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
 
         await this.easyRSAManager.CreateCADir(context.hostId, instanceDir);
         await this.easyRSAManager.CreateCA(context.hostId, instanceDir, instanceProperties.name, instanceProperties.keySize);
-        await this.easyRSAManager.CreateServer(context.hostId, instanceDir, instanceProperties.domainName, instanceProperties.keySize);
+        await this.easyRSAManager.CreateServer(context.hostId, instanceDir, instanceProperties.publicEndpoint.domainName, instanceProperties.keySize);
 
-        const paths = this.easyRSAManager.GetCertPaths(instanceDir, instanceProperties.domainName);
+        const paths = this.easyRSAManager.GetCertPaths(instanceDir, instanceProperties.publicEndpoint.domainName);
         await this.openVPNGatwayManager.CreateServerConfig(context.hostId, instanceDir, context.fullInstanceName, this.openVPNGatwayManager.CreateDefaultConfig(), paths);
+        await this.openVPNGatwayManager.AutoStartServer(context.hostId, context.fullInstanceName);
 
-        const config: OpenVPNGatewayConfig = {
-            dnsServerAddress: instanceProperties.dnsServerAddress,
-            domainName: instanceProperties.domainName,
-            keySize: instanceProperties.keySize
+        const config: OpenVPNGatewayInternalConfig = {
+            pki: {
+                keySize: instanceProperties.keySize
+            },
+            publicEndpoint: instanceProperties.publicEndpoint,
         };
         return {
             config

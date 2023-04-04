@@ -60,6 +60,12 @@ export class RemoteRootFileSystemManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mv", sourcePath, targetPath], hostId);
     }
 
+    public async ReadTextFile(hostId: number, filePath: string)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "cat", filePath], hostId);
+        return result.stdOut;
+    }
+
     public async RemoveDirectory(hostId: number, remotePath: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rmdir", remotePath], hostId);

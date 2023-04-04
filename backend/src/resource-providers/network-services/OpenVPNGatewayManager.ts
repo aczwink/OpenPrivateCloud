@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import path from "path";
 import { Injectable } from "acts-util-node";
 import { InstancesManager } from "../../services/InstancesManager";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
@@ -28,12 +27,27 @@ import { ConfigParser, KeyValueEntry } from "../../common/config/ConfigParser";
 import { ConfigDialect } from "../../common/config/ConfigDialect";
 import { ConfigModel } from "../../common/config/ConfigModel";
 import { ConfigWriter } from "../../common/config/ConfigWriter";
+import { InstanceContext } from "../../common/InstanceContext";
+import path from "path";
 
-export interface OpenVPNGatewayConfig
+export interface OpenVPNGatewayPublicEndpointConfig
 {
-    dnsServerAddress: string;
     domainName: string;
-    keySize: number;   
+    dnsServerAddress: string;
+    port: number;
+}
+
+export interface OpenVPNGatewayInternalConfig
+{
+    pki: {
+        keySize: 2048 | 4096;
+    };
+    publicEndpoint: OpenVPNGatewayPublicEndpointConfig;
+}
+
+interface OpenVPNGatewayLogEntry
+{
+    message: string;
 }
 
 const openVPNConfigDialect: ConfigDialect = {
@@ -50,6 +64,14 @@ export class OpenVPNGatewayManager
     }
     
     //Public methods
+    public async AutoStartServer(hostId: number, fullInstanceName: string)
+    {
+        const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
+
+        await this.systemServicesManager.EnableService(hostId, serviceName);
+        await this.systemServicesManager.StartService(hostId, serviceName);
+    }
+
     public BuildConfigPath(fullInstanceName: string)
     {
         const name = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
@@ -107,9 +129,10 @@ crl-verify ${certKeyFiles.crlPath}
         await this.systemServicesManager.Reload(hostId);
     }
 
-    public async GenerateClientConfig(hostId: number, serverDir: string, remoteAddress: string, dnsRedirectAddress: string, fullInstanceName: string, clientCertKeyPaths: CertKeyFiles)
+    public async GenerateClientConfig(hostId: number, instanceId: number, serverDir: string, fullInstanceName: string, clientCertKeyPaths: CertKeyFiles)
     {
-        const cfg = await this.ReadServerConfig(hostId, fullInstanceName);
+        const serverConfig = await this.ReadServerConfig(hostId, fullInstanceName);
+        const instanceConfig = await this.ReadInstanceConfig(instanceId);
 
         const caCertData = await this.remoteFileSystemManager.ReadTextFile(hostId, clientCertKeyPaths.caCertPath);
         const certData = await this.remoteFileSystemManager.ReadTextFile(hostId, clientCertKeyPaths.certPath);
@@ -126,17 +149,17 @@ persist-tun
 remote-cert-tls server
 key-direction 1
 
-proto ${cfg.protocol}
-remote ${remoteAddress} ${cfg.port}
-cipher ${cfg.cipher}
-verb ${cfg.verbosity}
-auth ${cfg.authenticationAlgorithm}
+proto ${serverConfig.protocol}
+remote ${instanceConfig.publicEndpoint.domainName} ${instanceConfig.publicEndpoint.port}
+cipher ${serverConfig.cipher}
+verb ${serverConfig.verbosity}
+auth ${serverConfig.authenticationAlgorithm}
 auth-nocache
 key-direction 1
 
 redirect-gateway def1
 script-security 2
-dhcp-option DNS ${dnsRedirectAddress}
+dhcp-option DNS ${instanceConfig.publicEndpoint.dnsServerAddress}
 
 <ca>
 ${caCertData}
@@ -153,10 +176,25 @@ ${taData}
 `;
     }
 
-    public async ReadInstanceConfig(instanceId: number): Promise<OpenVPNGatewayConfig>
+    public async ReadInstanceConfig(instanceId: number): Promise<OpenVPNGatewayInternalConfig>
     {
-        const config = await this.instanceConfigController.QueryConfig<OpenVPNGatewayConfig>(instanceId);
+        const config = await this.instanceConfigController.QueryConfig<OpenVPNGatewayInternalConfig>(instanceId);
         return config!;
+    }
+
+    public async ReadInstanceLogs(instanceContext: InstanceContext)
+    {
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+
+        const log = await this.remoteRootFileSystemManager.ReadTextFile(instanceContext.hostId, path.join(instanceDir, "openvpn.log"));
+        return log.split("\n").map(this.ParseLogLine.bind(this));
+    }
+
+    public async ReadInstanceStatus(instanceContext: InstanceContext)
+    {
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+
+        return await this.remoteRootFileSystemManager.ReadTextFile(instanceContext.hostId, path.join(instanceDir, "openvpn-status.log"));
     }
 
     public async ReadServerConfig(hostId: number, fullInstanceName: string): Promise<OpenVPNServerConfig>
@@ -176,6 +214,21 @@ ${taData}
             virtualServerAddress: server[0],
             virtualServerSubnetMask: server[1],
         };
+    }
+
+    public async RestartServer(hostId: number, fullInstanceName: string)
+    {
+        const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
+        await this.systemServicesManager.RestartService(hostId, serviceName);
+    }
+
+    public async UpdateInstanceConfig(instanceId: number, publicEndpointConfig: OpenVPNGatewayPublicEndpointConfig)
+    {
+        const config = await this.ReadInstanceConfig(instanceId);
+
+        config.publicEndpoint = publicEndpointConfig;
+
+        await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
     }
 
     public async UpdateServerConfig(hostId: number, fullInstanceName: string, config: OpenVPNServerConfig)
@@ -206,6 +259,12 @@ ${taData}
     }
 
     //Private methods
+    private DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName: string)
+    {
+        const name = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        return "openvpn-server@" + name;
+    }
+
     private ParseConfig(hostId: number, fullInstanceName: string)
     {
         class OpenVPNConfigParser extends ConfigParser
@@ -239,5 +298,12 @@ ${taData}
 
         const cfgParser = new OpenVPNConfigParser(openVPNConfigDialect);
         return cfgParser.Parse(hostId, configPath);
+    }
+
+    private ParseLogLine(line: string): OpenVPNGatewayLogEntry
+    {
+        return {
+            message: line
+        };
     }
 }

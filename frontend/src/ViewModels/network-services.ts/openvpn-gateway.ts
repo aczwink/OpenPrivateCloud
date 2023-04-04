@@ -18,7 +18,7 @@
 
 import { FileDownloadService, RootInjector } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common";
-import { OpenVPNGatewayClient, OpenVPNGatewayInfo, OpenVPNServerConfig } from "../../../dist/api";
+import { OpenVPNGatewayClient, OpenVPNGatewayExternalConfig, OpenVPNGatewayInfo, OpenVPNGatewayLogEntry } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
@@ -39,19 +39,13 @@ const overviewViewModel: ObjectViewModel<OpenVPNGatewayInfo, InstanceId>  = {
     schemaName: "OpenVPNGatewayInfo",
 };
 
-const configViewModel: ObjectViewModel<OpenVPNServerConfig, InstanceId> = {
-    type: "object",
-    actions: [
-        {
-            type: "edit",
-            propertiesSchemaName: "OpenVPNServerConfig",
-            requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
-            updateResource: (service, ids, props) => service.resourceProviders.networkservices.openvpngateway._any_.config.put(ids.instanceName, props),
-        }
-    ],
-    formTitle: _ => "Server configuration",
-    requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
-    schemaName: "OpenVPNServerConfig"
+const logsViewModel: ListViewModel<OpenVPNGatewayLogEntry, InstanceId> = {
+    type: "list",
+    actions: [],
+    boundActions: [],
+    displayName: "Logs",
+    requestObjects: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.logs.get(ids.instanceName),
+    schemaName: "OpenVPNGatewayLogEntry"
 };
 
 const clientsViewModel: ListViewModel<OpenVPNGatewayClient, InstanceId> = {
@@ -86,6 +80,21 @@ const clientsViewModel: ListViewModel<OpenVPNGatewayClient, InstanceId> = {
     schemaName: "OpenVPNGatewayClient",
 };
 
+const configViewModel: ObjectViewModel<OpenVPNGatewayExternalConfig, InstanceId> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "OpenVPNGatewayExternalConfig",
+            requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
+            updateResource: (service, ids, props) => service.resourceProviders.networkservices.openvpngateway._any_.config.put(ids.instanceName, props),
+        }
+    ],
+    formTitle: _ => "Server configuration",
+    requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
+    schemaName: "OpenVPNGatewayExternalConfig"
+};
+
 export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
     actions: [
         {
@@ -103,15 +112,20 @@ export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
                     child: overviewViewModel,
                 },
                 {
-                    key: "config",
-                    displayName: "Config",
-                    child: configViewModel,
+                    child: logsViewModel,
+                    displayName: "Logs",
+                    key: "logs",
                 },
                 {
                     key: "clients",
                     displayName: "Clients",
                     child: clientsViewModel
-                }
+                },
+                {
+                    key: "config",
+                    displayName: "Config",
+                    child: configViewModel,
+                },
             ]
         }
     ],
