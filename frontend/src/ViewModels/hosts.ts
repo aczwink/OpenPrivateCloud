@@ -220,7 +220,7 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                         type: "material",
                         name: "storage"
                     }
-                }
+                },
             ]
         }
     ],

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -91,15 +91,33 @@ function RenderNumber(value: number, schema: OpenAPI.NumberSchema)
 
 export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleRenderValue
 {
+    const apiSchemaService = RootInjector.Resolve(APISchemaService);
+
     if("anyOf" in schema)
         throw new Error("anyof not implemented");
     if("oneOf" in schema)
-        throw new Error("oneof not implemented");
+    {
+        const discriminatorPropName = schema.discriminator!.propertyName;
+        const discriminator: string = value[discriminatorPropName];
+
+        function ExtractKeys(schema: OpenAPI.ObjectSchema)
+        {
+            const x = schema.properties[discriminatorPropName] as OpenAPI.StringSchema;
+            return x.enum!;
+        }
+
+        const matchedSchema = schema.oneOf.Values()
+            .Map(x => apiSchemaService.ResolveSchemaOrReference(x) as OpenAPI.ObjectSchema)
+            .Filter(x => ExtractKeys(x).Contains(discriminator))
+            .First();
+
+        return RenderReadOnlyValue(value, matchedSchema);
+    }
         
     switch(schema.type)
     {
         case "array":
-            const childSchema = RootInjector.Resolve(APISchemaService).ResolveSchemaOrReference(schema.items);
+            const childSchema = apiSchemaService.ResolveSchemaOrReference(schema.items);
             return <ol>{value.map( (x: any) => <li>{RenderReadOnlyValue(x, childSchema)}</li>)}</ol>;
         case "boolean":
             return <div className="form-check">
@@ -137,9 +155,8 @@ export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleR
 export function RenderTitle(schema: OpenAPI.Schema | OpenAPI.Reference, fallback: string)
 {
     if("anyOf" in schema)
-        throw new Error("anyof not implemented");
+        return fallback;
     if("oneOf" in schema)
-        throw new Error("oneof not implemented");
-
+        return fallback;
     return schema.title || fallback;
 }

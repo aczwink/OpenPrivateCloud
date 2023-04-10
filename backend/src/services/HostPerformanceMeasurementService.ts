@@ -18,6 +18,7 @@
 
 import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
+import { HostMetricsService, NetworkStat } from "./HostMetricsService";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 
@@ -40,13 +41,6 @@ interface JournalEntry
     MESSAGE: string;
     PRIORITY: string;
     SYSLOG_TIMESTAMP: string;
-}
-
-interface NetworkStat
-{
-    interfaceName: string;
-    bytesReadCount: number;
-    bytesTransmittedCount: number;
 }
 
 interface PerformanceStats
@@ -76,7 +70,7 @@ interface PerformanceStats
 @Injectable
 export class HostPerformanceMeasurementService
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager, private hostMetricsService: HostMetricsService)
     {
         this.lastCPUTimes = {
             idle: 0,
@@ -208,7 +202,7 @@ export class HostPerformanceMeasurementService
 
     private async QueryNetworkUsage(hostId: number)
     {
-        const stats = await this.ReadNetworkStatistics(hostId);
+        const stats = await this.hostMetricsService.ReadNetworkStatistics(hostId);
 
         const bytesReadCount = stats.Values().Map(x => x.bytesReadCount).Sum();
         const bytesWrittenCount = stats.Values().Map(x => x.bytesTransmittedCount).Sum();
@@ -240,26 +234,6 @@ export class HostPerformanceMeasurementService
                 sectorsReadCount: parseInt(parts[5]),
                 sectorsWriteCount: parseInt(parts[9]),
                 currentlyInProgress: parseInt(parts[11])
-            });
-        }
-
-        return result;
-    }
-
-    private async ReadNetworkStatistics(hostId: number)
-    {
-        const data = await this.remoteFileSystemManager.ReadTextFile(hostId, "/proc/net/dev");
-        const lines = data.trimEnd().split("\n");
-
-        const result: NetworkStat[] = [];
-        for (const line of lines.slice(2))
-        {
-            const parts = line.trimStart().split(/[ \t]+/);
-
-            result.push({
-                bytesReadCount: parseInt(parts[1]),
-                bytesTransmittedCount: parseInt(parts[9]),
-                interfaceName: parts[0].substring(0, parts[0].length - 1)
             });
         }
 

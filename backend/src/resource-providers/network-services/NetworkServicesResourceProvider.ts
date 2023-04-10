@@ -65,8 +65,10 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
     
     public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
+        await this.openVPNGatwayManager.StopServer(instanceContext.hostId, instanceContext.fullInstanceName);
         await this.remoteRootFileSystemManager.RemoveFile(instanceContext.hostId, this.openVPNGatwayManager.BuildConfigPath(instanceContext.fullInstanceName));
         await this.systemServicesManager.Reload(instanceContext.hostId);
+        
         await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
         return null;
     }

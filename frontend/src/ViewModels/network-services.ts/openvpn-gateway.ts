@@ -18,7 +18,7 @@
 
 import { FileDownloadService, RootInjector } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common";
-import { OpenVPNGatewayClient, OpenVPNGatewayExternalConfig, OpenVPNGatewayInfo, OpenVPNGatewayLogEntry } from "../../../dist/api";
+import { OpenVPNGatewayClient, OpenVPNGatewayConnectedClientEntry, OpenVPNGatewayExternalConfig, OpenVPNGatewayInfo, OpenVPNGatewayLogEntry } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
@@ -37,6 +37,15 @@ const overviewViewModel: ObjectViewModel<OpenVPNGatewayInfo, InstanceId>  = {
     formTitle: _ => "Overview",
     requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.info.get(ids.instanceName),
     schemaName: "OpenVPNGatewayInfo",
+};
+
+const connectionsViewModel: ListViewModel<OpenVPNGatewayConnectedClientEntry, InstanceId> = {
+    type: "list",
+    actions: [],
+    boundActions: [],
+    displayName: "Connections",
+    requestObjects: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.connections.get(ids.instanceName),
+    schemaName: "OpenVPNGatewayConnectedClientEntry"
 };
 
 const logsViewModel: ListViewModel<OpenVPNGatewayLogEntry, InstanceId> = {
@@ -110,6 +119,11 @@ export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
                     key: "overview",
                     displayName: "Overview",
                     child: overviewViewModel,
+                },
+                {
+                    child: connectionsViewModel,
+                    displayName: "Connections",
+                    key: "connections",
                 },
                 {
                     child: logsViewModel,

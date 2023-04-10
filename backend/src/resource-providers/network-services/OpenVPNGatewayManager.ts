@@ -29,6 +29,20 @@ import { ConfigModel } from "../../common/config/ConfigModel";
 import { ConfigWriter } from "../../common/config/ConfigWriter";
 import { InstanceContext } from "../../common/InstanceContext";
 import path from "path";
+import { Dictionary } from "acts-util-core";
+import { HostNATService } from "../../services/HostNATService";
+import { CIDRRange } from "../../common/CIDRRange";
+
+export interface OpenVPNGatewayConnectedClientEntry
+{
+    "Common Name": string;
+    "Real Address": string;
+    "Virtual Address": string;
+    "Bytes Received": number;
+    "Bytes Sent": number;
+    "Connected Since": string;
+    "Data Channel Cipher": string;
+}
 
 export interface OpenVPNGatewayPublicEndpointConfig
 {
@@ -59,13 +73,17 @@ export class OpenVPNGatewayManager
 {
     constructor(private instancesManager: InstancesManager, private instanceConfigController: InstanceConfigController,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
-        private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager)
+        private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
+        private hostNATService: HostNATService)
     {
     }
     
     //Public methods
     public async AutoStartServer(hostId: number, fullInstanceName: string)
     {
+        const config = await this.ReadServerConfig(hostId, fullInstanceName);
+        await this.hostNATService.AddSourceNATRule(hostId, config.virtualServerAddressRange);
+
         const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
 
         await this.systemServicesManager.EnableService(hostId, serviceName);
@@ -86,8 +104,7 @@ export class OpenVPNGatewayManager
             port: 1194,
             protocol: "udp",
             verbosity: 3,
-            virtualServerAddress: "10.8.0.0",
-            virtualServerSubnetMask: "255.255.255.0",
+            virtualServerAddressRange: "10.8.0.0/24",
         };
     }
 
@@ -95,6 +112,7 @@ export class OpenVPNGatewayManager
     {
         await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", serverDir + "/ta.key"], hostId);
 
+        const range = new CIDRRange(data.virtualServerAddressRange);
         const config = `
 dev tun
 topology subnet
@@ -110,7 +128,7 @@ tls-auth ${serverDir}/ta.key 0
 status ${serverDir}/openvpn-status.log
 log ${serverDir}/openvpn.log
 
-server ${data.virtualServerAddress} ${data.virtualServerSubnetMask}
+server ${range.netAddress} ${range.GenerateSubnetMask()}
 port ${data.port}
 proto ${data.protocol}
 cipher ${data.cipher}
@@ -194,7 +212,41 @@ ${taData}
     {
         const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
 
-        return await this.remoteRootFileSystemManager.ReadTextFile(instanceContext.hostId, path.join(instanceDir, "openvpn-status.log"));
+        const statusText = await this.remoteRootFileSystemManager.ReadTextFile(instanceContext.hostId, path.join(instanceDir, "openvpn-status.log"));
+        const lines = statusText.split("\n");
+
+        let lastHeaderFields: string[] = [];
+        const clients: OpenVPNGatewayConnectedClientEntry[] = [];
+        for (const line of lines)
+        {
+            const parts = line.split(",");
+            const type = parts[0];
+            parts.Remove(0);
+
+            if(type === "END")
+                break;
+
+            switch(type)
+            {
+                case "CLIENT_LIST":
+                    const client: Dictionary<string> = {};
+                    for(let i = 1; i < lastHeaderFields.length; i++)
+                        client[lastHeaderFields[i]] = parts[i - 1];
+                    clients.push(client as any);
+                    break;
+                case "HEADER":
+                    lastHeaderFields = parts;
+                    break;
+                case "GLOBAL_STATS":
+                case "ROUTING_TABLE":
+                case "TITLE":
+                case "TIME":
+                    //ignore
+                    break;
+            }
+        }
+
+        return clients;
     }
 
     public async ReadServerConfig(hostId: number, fullInstanceName: string): Promise<OpenVPNServerConfig>
@@ -211,8 +263,7 @@ ${taData}
             port: data.port,
             protocol: data.proto,
             verbosity: data.verb,
-            virtualServerAddress: server[0],
-            virtualServerSubnetMask: server[1],
+            virtualServerAddressRange: CIDRRange.FromAddressAndSubnetMask(server[0], server[1]).ToString()
         };
     }
 
@@ -220,6 +271,15 @@ ${taData}
     {
         const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
         await this.systemServicesManager.RestartService(hostId, serviceName);
+    }
+
+    public async StopServer(hostId: number, fullInstanceName: string)
+    {
+        const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
+        await this.systemServicesManager.StopService(hostId, serviceName);
+
+        const config = await this.ReadServerConfig(hostId, fullInstanceName);
+        await this.hostNATService.RemoveSourceNATRule(hostId, config.virtualServerAddressRange);
     }
 
     public async UpdateInstanceConfig(instanceId: number, publicEndpointConfig: OpenVPNGatewayPublicEndpointConfig)
@@ -233,6 +293,20 @@ ${taData}
 
     public async UpdateServerConfig(hostId: number, fullInstanceName: string, config: OpenVPNServerConfig)
     {
+        const oldConfig = await this.ReadServerConfig(hostId, fullInstanceName);
+        if(oldConfig.virtualServerAddressRange !== config.virtualServerAddressRange)
+        {
+            const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
+            const isRunning = await this.systemServicesManager.IsServiceActive(hostId, serviceName);
+            if(isRunning)
+            {
+                await this.hostNATService.RemoveSourceNATRule(hostId, oldConfig.virtualServerAddressRange);
+                await this.hostNATService.AddSourceNATRule(hostId, config.virtualServerAddressRange);
+            }
+        }
+
+        const range = new CIDRRange(config.virtualServerAddressRange);
+
         const parsed = await this.ParseConfig(hostId, fullInstanceName);
         const mdl = new ConfigModel(parsed);
         mdl.SetProperties("", {
@@ -241,13 +315,15 @@ ${taData}
             port: config.port,
             proto: config.protocol,
             verb: config.verbosity,
-            server: config.virtualServerAddress + " " + config.virtualServerSubnetMask,
+            server: range.netAddress + " " + range.GenerateSubnetMask(),
         });
 
         class OpenVPNConfigWriter extends ConfigWriter
         {
             protected KeyValueEntryToString(entry: KeyValueEntry)
             {
+                if(entry.value === null)
+                    return entry.key;
                 return entry.key + " " + entry.value;
             }
         }

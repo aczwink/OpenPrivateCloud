@@ -85,7 +85,10 @@ export class EditObjectComponent<ObjectType> extends Component<ObjectInput<Objec
     {
         event.preventDefault();
 
-        const response = await this.input.updateResource(this.routerState.routeParams, this.data);
+        const data = this.data;
+        this.data = null; //show loader
+
+        const response = await this.input.updateResource(this.routerState.routeParams, data);
         ShowErrorMessageOnErrorFromResponse(response);
 
         const updateUrl = ReplaceRouteParams(this.input.postUpdateUrl, this.routerState.routeParams)

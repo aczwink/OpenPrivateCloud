@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -139,7 +139,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         return RenderReadOnlyValue(obj[key], this.input.elementSchema.properties[key]! as any);
     }
 
-    private RenderObjectPropertyEntry(obj: any, key: string, idx: number)
+    private RenderObjectPropertyEntry(obj: any, key: string, idx: number, isRequired: boolean)
     {
         if((idx === 0) && this.input.hasChild)
         {
@@ -147,12 +147,16 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
             const route = this.ReplaceRouteParams(this.input.baseUrl + "/" + encodeURIComponent(id));
             return <Anchor route={route}>{this.RenderObjectProperty(obj, key)}</Anchor>;
         }
+
+        if(!isRequired && (obj[key] === undefined))
+            return <i>undefined</i>;
+
         return this.RenderObjectProperty(obj, key);
     }
 
     private RenderObjectRow(obj: any)
     {
-        let entries = this.input.elementSchema.properties.OwnKeys().ToArray().map( (k, i) => <td>{this.RenderObjectPropertyEntry(obj, k.toString(), i)}</td>);
+        let entries = this.input.elementSchema.properties.OwnKeys().ToArray().map( (k, i) => <td>{this.RenderObjectPropertyEntry(obj, k.toString(), i, this.input.elementSchema.required.Contains(k))}</td>);
         return <tr>{...entries.concat(this.RenderObjectActions(obj))}</tr>;
     }
 

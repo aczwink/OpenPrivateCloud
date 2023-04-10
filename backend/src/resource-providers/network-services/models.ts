@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -29,9 +29,20 @@ export interface OpenVPNServerConfig
 {
     port: number;
     protocol: "tcp" | "udp";
-    virtualServerAddress: string;
-    virtualServerSubnetMask: string;
+    
+    /**
+     * CIDR-range
+     */
+    virtualServerAddressRange: string;
+
     cipher: "AES-256-CBC";
+    /**
+     * 0 means no output except fatal errors, 1-4 normal usage range (3 recommended), 5 output info for each packet, 6-11 debug info
+     * @title Logging verbosity
+     * @minimum 0
+     * @maximum 11
+     * @default 1
+     */
     verbosity: number;
     authenticationAlgorithm: "SHA256";
 }

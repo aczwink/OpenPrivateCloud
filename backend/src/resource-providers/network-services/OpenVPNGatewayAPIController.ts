@@ -29,11 +29,6 @@ import { OpenVPNGatewayManager, OpenVPNGatewayPublicEndpointConfig } from "./Ope
 interface OpenVPNGatewayInfo
 {
     hostName: string;
-
-    /**
-     * @format multi-line
-     */
-    status: string;
 }
 
 interface OpenVPNGatewayClient
@@ -68,16 +63,6 @@ class OpenVPNGatewayAPIController
         return instanceContext;
     }
 
-    @Post("clients")
-    public async AddClient(
-        @Common instanceContext: InstanceContext,
-        @Body client: OpenVPNGatewayClient
-    )
-    {
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
-        await this.easyRSAManager.AddClient(instanceContext.hostId, instanceDir, client.name);
-    }
-
     @Get("clientconfig")
     public async QueryClientConfig(
         @Common instanceContext: InstanceContext,
@@ -89,6 +74,16 @@ class OpenVPNGatewayAPIController
         const config = await this.openVPNGatwayManager.GenerateClientConfig(instanceContext.hostId, instanceContext.instanceId, instanceDir, instanceContext.fullInstanceName, paths);
 
         return config;
+    }
+
+    @Post("clients")
+    public async AddClient(
+        @Common instanceContext: InstanceContext,
+        @Body client: OpenVPNGatewayClient
+    )
+    {
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        await this.easyRSAManager.AddClient(instanceContext.hostId, instanceDir, client.name);
     }
 
     @Get("clients")
@@ -105,27 +100,24 @@ class OpenVPNGatewayAPIController
         }).ToArray();
     }
 
-    @Get("info")
-    public async QueryInfo(
+    @Delete("clients")
+    public async RevokeClient(
         @Common instanceContext: InstanceContext,
+        @Body client: OpenVPNGatewayClient
     )
     {
-        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
-        const status = await this.openVPNGatwayManager.ReadInstanceStatus(instanceContext);
-
-        const result: OpenVPNGatewayInfo = {
-            hostName: host!.hostName,
-            status
-        };
-        return result;
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        await this.easyRSAManager.RevokeClient(instanceContext.hostId, instanceDir, client.name);
+        await this.openVPNGatwayManager.RestartServer(instanceContext.hostId, instanceContext.fullInstanceName);
     }
 
-    @Get("logs")
-    public async QueryLogs(
+    @Get("connections")
+    public async QueryConnections(
         @Common instanceContext: InstanceContext,
     )
     {
-        return await this.openVPNGatwayManager.ReadInstanceLogs(instanceContext);
+        const status = await this.openVPNGatwayManager.ReadInstanceStatus(instanceContext);
+        return status;
     }
 
     @Get("config")
@@ -140,17 +132,6 @@ class OpenVPNGatewayAPIController
         return config;
     }
 
-    @Delete("clients")
-    public async RevokeClient(
-        @Common instanceContext: InstanceContext,
-        @Body client: OpenVPNGatewayClient
-    )
-    {
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
-        await this.easyRSAManager.RevokeClient(instanceContext.hostId, instanceDir, client.name);
-        await this.openVPNGatwayManager.RestartServer(instanceContext.hostId, instanceContext.fullInstanceName);
-    }
-
     @Put("config")
     public async UpdateServerConfig(
         @Common instanceContext: InstanceContext,
@@ -161,5 +142,26 @@ class OpenVPNGatewayAPIController
         await this.openVPNGatwayManager.UpdateInstanceConfig(instanceContext.instanceId, config.publicEndpointConfig);
 
         await this.openVPNGatwayManager.RestartServer(instanceContext.hostId, instanceContext.fullInstanceName);
+    }
+
+    @Get("info")
+    public async QueryInfo(
+        @Common instanceContext: InstanceContext,
+    )
+    {
+        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
+
+        const result: OpenVPNGatewayInfo = {
+            hostName: host!.hostName,
+        };
+        return result;
+    }
+
+    @Get("logs")
+    public async QueryLogs(
+        @Common instanceContext: InstanceContext,
+    )
+    {
+        return await this.openVPNGatwayManager.ReadInstanceLogs(instanceContext);
     }
 }
