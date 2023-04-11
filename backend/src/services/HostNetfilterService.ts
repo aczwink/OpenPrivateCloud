@@ -16,7 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
@@ -64,7 +63,7 @@ interface RuleCounter
 
 interface RulePolicyAction
 {
-    type: "masquerade" | "return";
+    type: "accept" | "drop" | "masquerade" | "return";
 }
 
 interface RulePolicyJump
@@ -87,6 +86,15 @@ export interface NetfilterRule extends NetfilterRuleCreationData
     counter: RuleCounter;
     handle: number;
     policy?: RulePolicy;
+}
+
+interface ChainCreationProperties
+{
+    name: string;
+    type: "nat";
+    hook: "postrouting";
+    priority: "srcnat";
+    policy: "accept";
 }
 
 interface Chain<RuleType>
@@ -114,67 +122,46 @@ export class HostNetfilterService
     }
 
     //Public methods
-    /**
-     * The rule will be gone on reboot
-     */
-    public async AddTemporaryNATRule(hostId: number, familyName: string, tableName: string, chainName: string, rule: NetfilterRuleCreationData)
+    public async AddChain(hostId: number, familyName: string, tableName: string, chainProps: ChainCreationProperties)
+    {
+        const configArgs = ["{", "type", chainProps.type, "hook", chainProps.hook, "priority", chainProps.priority + ";", "policy", chainProps.policy + ";", "}"];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "add", "chain", familyName, tableName, chainProps.name, configArgs.join(" ")], hostId);
+    }
+
+    public async AddNATRule(hostId: number, familyName: string, tableName: string, chainName: string, rule: NetfilterRuleCreationData)
     {
         const conditionArgs = rule.conditions.Values().Map(x => this.ConditionToArgs(x).Values()).Flatten().ToArray();
         const policyArgs = this.PolicyToArgs(rule.policy);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "add", "rule", familyName, tableName, chainName, ...conditionArgs, "counter", ...policyArgs], hostId);
+
+        await this.PersistRuleSet(hostId);
     }
 
-    /**
-     * It will only be deleted from the active state, but might get reloaded from permanent rule set
-     */
-    public async DeleteNATRuleTemporarily(hostId: number, familyName: string, tableName: string, chainName: string, handle: number)
+    public async AddTable(hostId: number, family: string, tableName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "add", "table", family, tableName], hostId);
+    }
+
+    public async DeleteNATRule(hostId: number, familyName: string, tableName: string, chainName: string, handle: number)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "delete", "rule", familyName, tableName, chainName, "handle", handle.toString()], hostId);
+
+        await this.PersistRuleSet(hostId);
     }
 
     public async ReadActiveRuleSet(hostId: number)
     {
         const result = await this.ReadNFTables(hostId);
-        //return result.Map(this.FilterChainFromDockerAndLibvirtRules.bind(this)).Filter(x => x.rules.length > 0);
         return result;
     }
 
-    public async UpdatePermanentRules(hostId: number)
-    {
-        const ruleSet = await this.ReadActiveRuleSet(hostId);
-
-        const textContent = "#!/usr/sbin/nft -f\n\nflush ruleset\n\n" + ruleSet.Values().Filter(x => x.name.startsWith("opc_")).Map(this.TableToString.bind(this)).Join("\n\n");
-        await this.remoteRootFileSystemManager.WriteTextFile(hostId, "/etc/nftables.conf", textContent);
-
-        const enabled = await this.systemServicesManager.IsServiceEnabled(hostId, "nftables");
-        if(!enabled)
-            await this.systemServicesManager.EnableService(hostId, "nftables");
-    }
-
     //Private methods
-    private ChainToString(chain: Chain<NetfilterRule>)
-    {
-        const type = (chain.type === undefined) ? "" : ("type " + chain.type);
-        const hook = (chain.hook === undefined) ? "" : ("hook " + chain.hook);
-        const prio = (chain.prio === undefined) ? "" : ("priority " + chain.prio);
-        const part1 = [type, hook, prio].join(" ");
-        const policy = (chain.policy === undefined) ? "" : ("policy " + chain.policy + ";");
-        const part2 = [part1, policy].filter(x => x.length > 0).join("; ");
-
-        return "chain " + chain.name + " {\n\t\t" + part2 + "\n" + chain.rules.Values().Map(this.RuleToString.bind(this)).Join("\n") + "\n\t}";
-    }
-
     private ConditionToArgs(condition: RuleCondition): string[]
     {
         const result = this.OperandToArgs(condition.left);
         if(condition.op !== "==")
             result.push(condition.op);
         return result.concat(this.OperandToArgs(condition.right));
-    }
-
-    private ConditionToString(condition: RuleCondition)
-    {
-        return this.OperandToString(condition.left) + (condition.op === "==" ? " " : " != ") + this.OperandToString(condition.right);
     }
 
     private ConvertMatch(match: any): RuleCondition
@@ -229,10 +216,12 @@ export class HostNetfilterService
 
         for (const entry of rule.expr)
         {
-            if("counter" in entry)
-            {
+            if("accept" in entry)
+                policy = { type: "accept" };
+            else if("counter" in entry)
                 counter = entry.counter;
-            }
+            else if("drop" in entry)
+                policy = { type: "drop" };
             else if("jump" in entry)
             {
                 policy = {
@@ -260,34 +249,10 @@ export class HostNetfilterService
         };
     }
 
-    private FilterChainFromDockerAndLibvirtRules(chain: Chain<NetfilterRule>): Chain<NetfilterRule>
+    private async ExportTable(hostId: number, table: Table<NetfilterRule>)
     {
-        const filter = (chain.name === "DOCKER") || chain.name.startsWith("LIBVIRT_");
-
-        return {
-            name: chain.name,
-            rules: (filter ? [] : chain.rules.filter(this.IsDockerOrLibvirtRule.bind(this))),
-            policy: chain.policy
-        };
-    }
-
-    private IsDockerOrLibvirtRule(rule: NetfilterRule)
-    {
-        if((rule.policy?.type === "jump") && (rule.policy.target.startsWith("LIBVIRT_")))
-            return false;
-        if((rule.policy?.type === "jump") && (rule.policy.target === "DOCKER"))
-            return false;
-        if(rule.conditions.Values().Map(this.IsDockerOrLibvirtRuleCondition.bind(this)).AnyTrue())
-            return false;
-
-        return true;
-    }
-
-    private IsDockerOrLibvirtRuleCondition(condition: RuleCondition)
-    {
-        if( (condition.right.type === "value") && (condition.right.value === "docker0") )
-            return true;
-        return false;
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "nft", "list", "table", table.family, table.name], hostId);
+        return result.stdOut;
     }
 
     private OperandToArgs(op: NetfilteRuleConditionOperand): string[]
@@ -305,19 +270,18 @@ export class HostNetfilterService
         }
     }
 
-    private OperandToString(op: NetfilteRuleConditionOperand)
+    private async PersistRuleSet(hostId: number)
     {
-        switch(op.type)
-        {
-            case "meta":
-                return op.key;
-            case "payload":
-                return "ip " + op.field;
-            case "prefix":
-                return op.addr + "/" + op.len;
-            case "value":
-                return op.value;
-        }
+        const ruleSet = await this.ReadActiveRuleSet(hostId);
+
+        const exportedTables = await ruleSet.Values().Filter(x => x.name.startsWith("opc_")).Map(this.ExportTable.bind(this, hostId)).PromiseAll();
+
+        const textContent = "#!/usr/sbin/nft -f\n\nflush ruleset\n\n" + exportedTables.join("\n\n");
+        await this.remoteRootFileSystemManager.WriteTextFile(hostId, "/etc/nftables.conf", textContent);
+
+        const enabled = await this.systemServicesManager.IsServiceEnabled(hostId, "nftables");
+        if(!enabled)
+            await this.systemServicesManager.EnableService(hostId, "nftables");
     }
 
     private PolicyToArgs(policy: RulePolicy | undefined): string[]
@@ -327,15 +291,6 @@ export class HostNetfilterService
         else if(policy.type === "jump")
             throw new Error("Method not implemented.");
         return [policy.type];
-    }
-
-    private PolicyToString(policy: RulePolicy | undefined)
-    {
-        if(policy === undefined)
-            return "";
-        else if(policy.type === "jump")
-            throw new Error("Method not implemented.");
-        return policy.type;
     }
 
     private async ReadNFTables(hostId: number)
@@ -375,15 +330,5 @@ export class HostNetfilterService
         }
 
         return tables;
-    }
-
-    private RuleToString(rule: NetfilterRule)
-    {
-        return "\t\t" + rule.conditions.Values().Map(this.ConditionToString.bind(this)).Join(" ") + " counter " + this.PolicyToString(rule.policy);
-    }
-
-    private TableToString(table: Table<NetfilterRule>)
-    {
-        return "table " + table.family + " " + table.name + " {\n\t" + table.chains.Values().Map(this.ChainToString.bind(this)).Join("\n\n\t") + "\n}";
     }
 }

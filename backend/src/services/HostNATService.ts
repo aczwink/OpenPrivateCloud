@@ -18,42 +18,33 @@
 
 import { Injectable } from "acts-util-node";
 import { CIDRRange } from "../common/CIDRRange";
-//import { HostConfigController } from "../data-access/HostConfigController";
 import { HostMetricsService } from "./HostMetricsService";
 import { HostNetfilterService, NetfilterRule, NetfilterRuleCreationData, NetfilteRuleConditionOperand } from "./HostNetfilterService";
-
-interface SNATEntry
-{
-    sourceRange: string;
-}
 
 @Injectable
 export class HostNATService
 {
-    constructor(/*private hostConfigController: HostConfigController, */private hostNetfilterService: HostNetfilterService, private hostMetricsService: HostMetricsService)
+    constructor(private hostNetfilterService: HostNetfilterService, private hostMetricsService: HostMetricsService)
     {
     }
 
     //Public methods
     public async AddSourceNATRule(hostId: number, cidrRange: string)
     {
-        /*const entries = await this.QuerySNATConfig(hostId);
-        entries.push({ sourceRange: cidrRange });
-        await this.UpdateSNATConfig(hostId, entries);*/
+        const ruleSet = await this.hostNetfilterService.ReadActiveRuleSet(hostId);
+        const table = ruleSet.find(x => x.name === "opc_nat");
+        if(table === undefined)
+            await this.hostNetfilterService.AddTable(hostId, "ip", "opc_nat");
+        const chain = table?.chains.find(x => x.name === "POSTROUTING");
+        if(chain === undefined)
+            await this.hostNetfilterService.AddChain(hostId, "ip", "opc_nat", { hook: "postrouting", name: "POSTROUTING", policy: "accept", priority: "srcnat", type: "nat" });
 
         const networkInterface = await this.FindExternalNetworkInterface(hostId);
-        await this.hostNetfilterService.AddTemporaryNATRule(hostId, "ip", "opc_nat", "POSTROUTING", this.GenerateSNATRule(networkInterface, cidrRange));
-
-        await this.UpdatePermanentHostRuleSet(hostId);
+        await this.hostNetfilterService.AddNATRule(hostId, "ip", "opc_nat", "POSTROUTING", this.GenerateSNATRule(networkInterface, cidrRange));
     }
 
     public async RemoveSourceNATRule(hostId: number, cidrRange: string)
     {
-        /*const entries = await this.QuerySNATConfig(hostId);
-        const index = entries.findIndex(x => x.sourceRange === cidrRange);
-        entries.Remove(index);
-        await this.UpdateSNATConfig(hostId, entries);*/
-
         const active = (await this.hostNetfilterService.ReadActiveRuleSet(hostId));
         const table = active.find(x => x.name === "opc_nat");
         const chain = table?.chains.find(x => x.name === "POSTROUTING");
@@ -63,10 +54,8 @@ export class HostNATService
             const found = chain.rules.find(this.FindMatchingSNATRule.bind(this, cidr));
 
             if(found !== undefined)
-                await this.hostNetfilterService.DeleteNATRuleTemporarily(hostId, "ip", "opc_nat", "POSTROUTING", found.handle);
+                await this.hostNetfilterService.DeleteNATRule(hostId, "ip", "opc_nat", "POSTROUTING", found.handle);
         }
-
-        await this.UpdatePermanentHostRuleSet(hostId);
     }
 
     //Private methods
@@ -132,35 +121,5 @@ export class HostNATService
                 type: "masquerade"
             }
         };
-    }
-
-    /*private async QuerySNATConfig(hostId: number)
-    {
-        const config = await this.hostConfigController.QueryConfig<SNATEntry[]>(hostId, "SNAT");
-        if(config === undefined)
-            return [];
-        return config;
-    }
-
-    private async UpdateSNATConfig(hostId: number, entries: SNATEntry[])
-    {
-        await this.hostConfigController.UpdateOrInsertConfig(hostId, "SNAT", entries);
-    }*/
-
-    private async UpdatePermanentHostRuleSet(hostId: number)
-    {
-        //const entries = await this.QuerySNATConfig(hostId);
-
-        const networkInterface = await this.FindExternalNetworkInterface(hostId);
-        
-        await this.hostNetfilterService.UpdatePermanentRules(hostId);
-        /*
-        [
-            {
-                name: "POSTROUTING",
-                rules: entries.map(x => this.GenerateSNATRule(networkInterface, x.sourceRange))
-            }
-        ]
-        */
     }
 }
