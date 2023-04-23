@@ -37,6 +37,7 @@ interface NodeEnvironmentVariableMapping
 
 export interface NodeAppConfig
 {
+    autoStart: boolean;
     env: NodeEnvironmentVariableMapping[];
 }
 
@@ -85,9 +86,11 @@ export class NodeAppServiceManager
 
     public async QueryConfig(instanceContext: InstanceContext): Promise<NodeAppConfig>
     {
-        const serviceProps = await this.systemServicesManager.ReadServiceUnit(instanceContext.hostId, this.MapFullInstanceNameToSystemDName(instanceContext.fullInstanceName));
+        const serviceName = this.MapFullInstanceNameToSystemDName(instanceContext.fullInstanceName);
+        const serviceProps = await this.systemServicesManager.ReadServiceUnit(instanceContext.hostId, serviceName);
 
         return {
+            autoStart: await this.systemServicesManager.IsServiceEnabled(instanceContext.hostId, serviceName),
             env: serviceProps.environment.Entries().Map(kv => ({ varName: kv.key.toString(), value: kv.value! })).ToArray()
         };
     }
@@ -102,6 +105,12 @@ export class NodeAppServiceManager
     {
         const env = config.env.Values().ToDictionary(e => e.varName, e => e.value);
         await this.UpdateService(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName, env);
+
+        const serviceName = this.MapFullInstanceNameToSystemDName(instanceContext.fullInstanceName);
+        if(config.autoStart)
+            await this.systemServicesManager.EnableService(instanceContext.hostId, serviceName);
+        else
+            await this.systemServicesManager.DisableService(instanceContext.hostId, serviceName);
     }
 
     public async UpdateContent(instanceId: number, buffer: Buffer)

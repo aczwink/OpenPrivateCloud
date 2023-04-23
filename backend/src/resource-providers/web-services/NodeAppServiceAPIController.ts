@@ -22,8 +22,6 @@ import { resourceProviders } from "openprivatecloud-common";
 import { c_nodeAppServiceResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
 import { NodeAppConfig, NodeAppServiceManager } from "./NodeAppServiceManager";
 
@@ -46,8 +44,7 @@ interface NodeAppServiceStatus
 @APIController(`resourceProviders/${c_webServicesResourceProviderName}/${c_nodeAppServiceResourceTypeName}/{instanceName}`)
 class NodeAppServiceAPIController
 {
-    constructor(private instancesManager: InstancesManager, private instancesController: InstancesController, private nodeAppServiceManager: NodeAppServiceManager,
-        private hostStoragesController: HostStoragesController, private hostsController: HostsController)
+    constructor(private instancesManager: InstancesManager, private nodeAppServiceManager: NodeAppServiceManager, private hostsController: HostsController)
     {
     }
     
