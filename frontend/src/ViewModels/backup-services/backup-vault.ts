@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultTargetConfig, BackupVaultTrigger, InstanceLog, InstanceLogOverviewData } from "../../../dist/api";
+import { BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultTargetConfig, BackupVaultTrigger, InstanceLog, InstanceLogOverviewData } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
@@ -152,6 +152,21 @@ const triggerConfigViewModel: ObjectViewModel<BackupVaultTrigger, InstanceId> = 
     type: "object"
 };
 
+const retentionConfigViewModel: ObjectViewModel<BackupVaultRetentionConfig, InstanceId> = {
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "BackupVaultRetentionConfig",
+            requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.retention.get(ids.instanceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.retention.put(ids.instanceName, newValue)
+        }
+    ],
+    formTitle: _ => "Retention configuration",
+    requestObject: (service, ids) => service.resourceProviders.backupservices.backupvault._any_.retention.get(ids.instanceName),
+    schemaName: "BackupVaultRetentionConfig",
+    type: "object"
+};
+
 const logViewModel: ObjectViewModel<InstanceLog, InstanceId & { logId: number}> = {
     type: "object",
     actions: [],
@@ -206,6 +221,11 @@ export const backupVaultViewModel: MultiPageViewModel<InstanceId> = {
                     key: "trigger",
                     displayName: "Trigger config",
                     child: triggerConfigViewModel
+                },
+                {
+                    key: "retention",
+                    displayName: "Retention config",
+                    child: retentionConfigViewModel
                 },
                 {
                     key: "logs",

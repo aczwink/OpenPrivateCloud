@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,9 @@ interface Task
     timerId: NodeJS.Timeout;
 }
 
+/**
+ * As soon as tasks are sucessfully dispatched, they can't be stopped anymore and any reference to it are lost.
+ */
 @Injectable
 export class TaskScheduler
 {
@@ -66,8 +69,11 @@ export class TaskScheduler
     {
         const task = this.tasks.get(taskId);
 
-        clearTimeout(task!.timerId);
-        this.tasks.delete(taskId);
+        if(task !== undefined) //task may have been dispatched already
+        {
+            clearTimeout(task.timerId);
+            this.tasks.delete(taskId);
+        }
     }
 
     //Private variables
@@ -120,7 +126,7 @@ export class TaskScheduler
     {
         let task = this.tasks.get(taskId);
         if(task === undefined)
-            return;
+            return; //task was already stopped
         if(task.nextScheduleTime.valueOf() > Date.now())
         {
             //clock came to early, reschedule

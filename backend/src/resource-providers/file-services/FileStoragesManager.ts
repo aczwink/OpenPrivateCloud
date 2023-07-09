@@ -25,14 +25,19 @@ import { InstanceContext } from "../../common/InstanceContext";
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
 import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
 
-export interface SMBConfig
+interface SMBConfig
 {
     enabled: boolean;
+    /**
+     * Degrades performance but should be enabled when connecting over unsecure networks or when sensitive data is transferred.
+     */
+    transportEncryption: boolean;
 }
 
-interface FileStorageConfig
+export interface FileStorageConfig
 {
     smb: SMBConfig;
+    snapshotRetentionDays?: number;
 };
 
 @Injectable
@@ -46,22 +51,44 @@ export class FileStoragesManager
     }
     
     //Public methods
-    public async CreateSnapshot(hostId: number, storagePath: string, fullInstanceName: string)
+    public async CreateSnapshot(instanceContext: InstanceContext)
     {
-        const dataPath = this.GetDataPath(storagePath, fullInstanceName);
-        const snapsPath = this.GetSnapshotsPath(storagePath, fullInstanceName);
+        await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(instanceContext);
+
+        const dataPath = this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const snapsPath = this.GetSnapshotsPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
         const snapName = new Date().toISOString();
         const fullSnapPath = path.join(snapsPath, snapName);
         
-        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "snapshot", "-r", dataPath, fullSnapPath], hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sync"], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "snapshot", "-r", dataPath, fullSnapPath], instanceContext.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sync"], instanceContext.hostId);
     }
 
     public async DeleteAllSnapshots(instanceContext: InstanceContext)
     {
-        const snapshots = await this.QuerySnapshotsRawOrdered(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const snapshots = await this.QuerySnapshotsOrdered(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
         for (const snapshot of snapshots)
-            await this.DeleteSnapshot(instanceContext, snapshot);
+            await this.DeleteSnapshot(instanceContext, snapshot.snapshotName);
+    }
+
+    public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(instanceContext: InstanceContext)
+    {
+        const config = await this.ReadConfig(instanceContext.instanceId);
+        if(config.snapshotRetentionDays === undefined)
+            return;
+
+        const msToDay = 1000 * 60 * 60 * 24;
+        const currentDay = Date.now() / msToDay;
+
+        const snapshots = await this.QuerySnapshotsOrdered(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        for (const snapshot of snapshots)
+        {
+            const snapshotDay = snapshot.creationDate.valueOf() / msToDay;
+            if((snapshotDay + config.snapshotRetentionDays) < currentDay)
+            {
+                await this.DeleteSnapshot(instanceContext, snapshot.snapshotName);
+            }
+        }
     }
 
     public GetDataPath(storagePath: string, fullInstanceName: string)
@@ -81,46 +108,55 @@ export class FileStoragesManager
         return path.join(instancePath, "snapshots");
     }
 
-    public async QuerySMBConfig(instanceId: number)
-    {
-        const cfg = await this.ReadConfig(instanceId);
-        return cfg.smb;
-    }
-
-    public async QuerySnapshots(hostId: number, storagePath: string, fullInstanceName: string)
-    {
-        const snaps = await this.QuerySnapshotsRawOrdered(hostId, storagePath, fullInstanceName);
-        return snaps.Map(x => new Date(x)).ToArray();
-    }
-
-    public async QuerySnapshotsRawOrdered(hostId: number, storagePath: string, fullInstanceName: string)
+    public async QuerySnapshotsOrdered(hostId: number, storagePath: string, fullInstanceName: string)
     {
         const snapsPath = this.GetSnapshotsPath(storagePath, fullInstanceName);
 
         const snapshots = await this.remoteFileSystemManager.ListDirectoryContents(hostId, snapsPath);
-        return snapshots.Values().OrderBy(x => x);
+        return snapshots.Values().OrderBy(x => x).Map(x => ({
+            snapshotName: x,
+            creationDate: new Date(x)
+        }));
+    }
+
+    public async ReadConfig(instanceId: number): Promise<FileStorageConfig>
+    {
+        const config = await this.instanceConfigController.QueryConfig<FileStorageConfig>(instanceId);
+        if(config === undefined)
+        {
+            return {
+                smb: {
+                    enabled: false,
+                    transportEncryption: false
+                }
+            };
+        }
+        return config;
     }
 
     public async RefreshPermissions(instanceContext: InstanceContext)
     {
         const dataPath = this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
         await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, dataPath, false);
-        await this.UpdateSMBConfig(instanceContext, await this.QuerySMBConfig(instanceContext.instanceId));
+
+        const cfg = await this.ReadConfig(instanceContext.instanceId);
+        await this.UpdateConfig(instanceContext, cfg);
     }
     
-    public async UpdateSMBConfig(instanceContext: InstanceContext, smbConfig: SMBConfig)
+    public async UpdateConfig(instanceContext: InstanceContext, config: FileStorageConfig)
     {
         const result = await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
-            enabled: smbConfig.enabled,
+            enabled: config.smb.enabled,
             sharePath: this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName),
-            readOnly: false
+            readOnly: false,
+            transportEncryption: config.smb.transportEncryption,
         }, instanceContext);
         if(result !== undefined)
             return result;
 
-        const config = await this.ReadConfig(instanceContext.instanceId);
-        config.smb = smbConfig;
         await this.WriteConfig(instanceContext.instanceId, config);
+
+        await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(instanceContext);
     }
 
     //Private methods
@@ -129,20 +165,6 @@ export class FileStoragesManager
         const snapshotsPath = this.GetSnapshotsPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
         const snapshotPath = path.join(snapshotsPath, snapshotName);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "btrfs", "subvolume", "delete", snapshotPath], instanceContext.hostId);
-    }
-
-    private async ReadConfig(instanceId: number): Promise<FileStorageConfig>
-    {
-        const config = await this.instanceConfigController.QueryConfig<FileStorageConfig>(instanceId);
-        if(config === undefined)
-        {
-            return {
-                smb: {
-                    enabled: false
-                }
-            };
-        }
-        return config;
     }
 
     private async WriteConfig(instanceId: number, config: FileStorageConfig)

@@ -21,13 +21,14 @@ import { InstanceConfigController } from "../../data-access/InstanceConfigContro
 import { InstancesController } from "../../data-access/InstancesController";
 import { TaskSchedulingManager } from "../../services/TaskSchedulingManager";
 import { BackupProcessService } from "./BackupProcessService";
-import { BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
+import { BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
 
 interface BackupVaultConfig
 {
     sources: BackupVaultSourcesConfig;
     target: BackupVaultTargetConfig;
     trigger: BackupVaultTrigger;
+    retention: BackupVaultRetentionConfig;
 
     state: {
         lastScheduleTime?: Date;
@@ -74,6 +75,9 @@ export class BackupVaultManager
                 trigger: {
                     type: "manual"
                 },
+                retention: {
+                    numberOfDays: 36500
+                },
 
                 state: {
                 },
@@ -92,6 +96,7 @@ export class BackupVaultManager
     {
         const config = await this.ReadConfig(instanceId);
         await this.backupProcessService.RunBackup(instanceId, config.sources, config.target);
+        await this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(instanceId, config.sources, config.target, config.retention);
     }
 
     public async WriteConfig(instanceId: number, config: BackupVaultConfig)
@@ -100,6 +105,7 @@ export class BackupVaultManager
             sources: config.sources,
             target: config.target,
             trigger: config.trigger,
+            retention: config.retention,
             state: {
                 lastScheduleTime: (config.state.lastScheduleTime === undefined) ? undefined : config.state.lastScheduleTime.toISOString()
             }

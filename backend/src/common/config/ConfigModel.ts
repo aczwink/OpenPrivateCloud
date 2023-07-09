@@ -21,17 +21,85 @@ import { ConfigEntry, KeyValueEntry, PropertyType } from "./ConfigParser";
 
 export type Section = Dictionary<KeyValueEntry>;
 
-interface SectionInsertPosition
+class SectionRange
 {
-    entries: ConfigEntry[];
-    before: ConfigEntry | undefined;
-}
+    constructor(private from: ConfigEntry, private to: ConfigEntry, private _source: ConfigEntry[])
+    {
+    }
 
-interface SectionRange
-{
-    from: ConfigEntry;
-    to: ConfigEntry;
-    source: ConfigEntry[];
+    //Properties
+    public get entriesCount()
+    {
+        return this.toIndex - this.fromIndex;
+    }
+
+    public get source()
+    {
+        return this._source;
+    }
+
+    public get toIndex()
+    {
+        return this._source.lastIndexOf(this.to);
+    }
+
+    //Public methods
+    public AppendEntry(newEntry: ConfigEntry)
+    {
+        const insertIndex = this.nonEmptyEndIndex;
+        this._source.splice(insertIndex + 1, 0, newEntry);
+
+        if(this._source[insertIndex] === this.to)
+            this.to = newEntry;
+    }
+
+    public FilterOut(match: (entry: ConfigEntry) => boolean)
+    {
+        const fromIdx = this.fromIndex;
+        const toIdx = this.toIndex;
+        
+        for(let i = toIdx; i >= fromIdx; i--)
+        {
+            const entry = this._source[i];
+            if(match(entry))
+            {
+                this.Remove(i);
+            }
+        }
+    }
+
+    public RemoveAll()
+    {
+        const fromIdx = this.fromIndex;
+        const toIdx = this.toIndex;
+
+        for(let i = toIdx; i >= fromIdx; i--)
+            this.Remove(i);
+    }
+
+    //Private properties
+    private get fromIndex()
+    {
+        return this._source.indexOf(this.from);
+    }
+
+    private get nonEmptyEndIndex()
+    {
+        const startIndex = this.fromIndex;
+        let index = this.toIndex;
+        while( (index > startIndex) && (this._source[index].type !== "KeyValue"))
+            index--;
+
+        return index;
+    }
+
+    //Private methods
+    private Remove(index: number)
+    {
+        if(this.to === this._source[index])
+            this.to = this._source[index - 1];
+        this._source.Remove(index);
+    }
 }
 
 export class ConfigModel
@@ -39,12 +107,10 @@ export class ConfigModel
     constructor(entries: ConfigEntry[])
     {
         this.sections = {};
-        this.sectionInsertPositions = {};
-        this.newSectionInsertPos = {
-            entries,
-            before: undefined,
-        };
         this.sectionRanges = {};
+
+        const lastEntry = entries[entries.length - 1];
+        this.newestSectionRange = new SectionRange(lastEntry, lastEntry, entries);
 
         this.FindKeyValueEntries(entries);
     }
@@ -61,6 +127,28 @@ export class ConfigModel
         return this.sections.OwnKeys().ToDictionary(key => key, key => this.SectionAsDictionary(key.toString()));
     }
 
+    public DeleteProperties(sectionName: string, propertyNames: string[])
+    {
+        for (const propertyName of propertyNames)
+            this.DeleteProperty(sectionName, propertyName);
+    }
+
+    public DeleteProperty(sectionName: string, propertyName: string)
+    {
+        const section = this.sections[sectionName];
+        if(section === undefined)
+            return;
+
+        const ranges = this.sectionRanges[sectionName];
+        if(ranges !== undefined)
+        {
+            for (const range of ranges)
+                range.FilterOut(entry => (entry.type === "KeyValue") && (entry.key === propertyName) );
+        }
+
+        delete section[propertyName];
+    }
+
     public DeleteSection(sectionName: string)
     {
         const section = this.sections[sectionName];
@@ -71,18 +159,12 @@ export class ConfigModel
         if(ranges !== undefined)
         {
             for (const range of ranges)
-            {
-                const from = range.source.indexOf(range.from);
-                const to = range.source.lastIndexOf(range.to);
-                for(let i = to; i >= from; i--)
-                    range.source.Remove(i);
-            }
+                range.RemoveAll();
 
             delete this.sectionRanges[sectionName];
         }
 
         delete this.sections[sectionName];
-        delete this.sectionInsertPositions[sectionName];
     }
 
     public GetProperty(sectionName: string, propertyName: string)
@@ -123,7 +205,7 @@ export class ConfigModel
         const entry = section[propertyName];
         if(entry === undefined)
         {
-            const insertPos = this.FindBestInsertPos(sectionName);
+            const insertRange = this.FindBestInsertRange(sectionName);
 
             const newEntry: KeyValueEntry = {
                 type: "KeyValue",
@@ -131,7 +213,8 @@ export class ConfigModel
                 value
             };
 
-            this.InsertEntry(insertPos, newEntry);
+            insertRange.AppendEntry(newEntry);
+            section[propertyName] = newEntry;
         }
         else
             entry.value = value;
@@ -144,53 +227,22 @@ export class ConfigModel
 
     //Private variables
     private sections: Dictionary<Section>;
-    private sectionInsertPositions: Dictionary<SectionInsertPosition[]>;
-    private newSectionInsertPos: SectionInsertPosition;
+    private newestSectionRange: SectionRange;
     private sectionRanges: Dictionary<SectionRange[]>;
 
     //Private methods
-    private EndSection(sectionName: string, before: ConfigEntry | undefined, entries: ConfigEntry[], from: ConfigEntry, to: ConfigEntry)
+    private AddSectionRange(sectionName: string, newRange: SectionRange)
     {
-        let beforeNext = undefined;
-        if(before !== undefined)
-        {
-            let index = entries.indexOf(before);
-            while( (index > 0) && entries[index-1].type !== "KeyValue")
-                index--;
-
-            before = entries[index];
-            beforeNext = entries[index+1];
-        }
-
-        const insertPos: SectionInsertPosition = {
-            entries,
-            before
-        };
-
-        if(sectionName in this.sectionInsertPositions)
-            this.sectionInsertPositions[sectionName]!.push(insertPos);
-        else
-            this.sectionInsertPositions[sectionName] = [insertPos];
-
-        this.newSectionInsertPos = {
-            entries,
-            before: beforeNext,
-        };
-
         let ranges = this.sectionRanges[sectionName];
         if(ranges === undefined)
             ranges = this.sectionRanges[sectionName] = [];
-        ranges.push({
-            from,
-            to,
-            source: entries
-        });
+        ranges.push(newRange);
     }
 
-    private FindBestInsertPos(sectionName: string)
+    private FindBestInsertRange(sectionName: string)
     {
-        const positions = this.sectionInsertPositions[sectionName]!;
-        return positions.Values().OrderByDescending(x => x.entries.length).First();
+        const ranges = this.sectionRanges[sectionName]!;
+        return ranges.Values().OrderByDescending(x => x.entriesCount).First();
     }
     
     private FindKeyValueEntries(entries: ConfigEntry[])
@@ -204,7 +256,7 @@ export class ConfigModel
             switch(entry.type)
             {
                 case "BeginSection":
-                    this.EndSection(currentSectionName, entry, entries, firstEntry!, prevEntry!);
+                    this.InserSectionRange(currentSectionName, entries, firstEntry!, prevEntry!);
 
                     currentSectionName = entry.textValue;
                     this.sections[currentSectionName] = {};
@@ -226,53 +278,38 @@ export class ConfigModel
 
             prevEntry = entry;
         }
-        this.EndSection(currentSectionName, undefined, entries, firstEntry!, prevEntry!);
-    }
-
-    private InsertEntry(insertPos: SectionInsertPosition, newEntry: ConfigEntry)
-    {
-        if(insertPos.before === undefined)
-            insertPos.entries.push(newEntry);
-        else
-        {
-            const index = insertPos.entries.indexOf(insertPos.before);
-            insertPos.entries.splice(index, 0, newEntry);
-        }
-    }
-
-    private InsertEntries(insertPos: SectionInsertPosition, ...newEntries: ConfigEntry[])
-    {
-        for (const entry of newEntries)
-            this.InsertEntry(insertPos, entry);
+        this.InserSectionRange(currentSectionName, entries, firstEntry!, prevEntry!);
     }
 
     private InsertNewSection(sectionName: string): Section
     {
-        this.InsertEntries(this.newSectionInsertPos,
-            {
-                type: "Text",
-                textValue: ""
-            },
-            {
-                type: "BeginSection",
-                textValue: sectionName
-            }
-        );
-
-        const newEntry: ConfigEntry = {
+        const blankLine: ConfigEntry = {
             type: "Text",
             textValue: ""
         };
-        this.InsertEntry(this.newSectionInsertPos, newEntry);
 
-        const pos: SectionInsertPosition = {
-            entries: this.newSectionInsertPos.entries,
-            before: newEntry
+        this.newestSectionRange.AppendEntry(blankLine);
+
+        const newSectionEntry: ConfigEntry = {
+            type: "BeginSection",
+            textValue: sectionName
         };
+
+        const pos = this.newestSectionRange.toIndex;
+        this.newestSectionRange.source.splice(pos + 1, 0, newSectionEntry);
+
+        this.InserSectionRange(sectionName, this.newestSectionRange.source, newSectionEntry, newSectionEntry);
+        this.newestSectionRange.AppendEntry(blankLine);
 
         const section = {};
         this.sections[sectionName] = section;
-        this.sectionInsertPositions[sectionName] = [pos];
         return section;
+    }
+
+    private InserSectionRange(sectionName: string, entries: ConfigEntry[], from: ConfigEntry, to: ConfigEntry)
+    {
+        const newRange = new SectionRange(from, to, entries);
+        this.AddSectionRange(sectionName, newRange);
+        this.newestSectionRange = newRange;
     }
 }

@@ -42,13 +42,17 @@ async function LoadViewModels()
 {
     const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
 
-    const viewModelNames = [
-        "hosts", "instances", "settings", "usersandgroups", "usersettings"
+    const modules = [
+        import("./ViewModels/hosts"),
+        import("./ViewModels/instances"),
+        import("./ViewModels/settings"),
+        import("./ViewModels/usersandgroups"),
+        import("./ViewModels/usersettings"),
     ];
 
-    for (const viewModelName of viewModelNames)
+    for (const module of modules)
     {
-        const imported = await import("./ViewModels/" + viewModelName);
+        const imported = await module
         viewModelRegistry.Register(imported.default);
     }
 }

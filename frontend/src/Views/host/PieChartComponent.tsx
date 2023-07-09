@@ -37,7 +37,7 @@ export class PieChartComponent extends Component<PieChartInput>
     }
 
     //Private variables
-    private chart?: Chart;
+    private chart?: any;
 
     //Private methods
     private UpdateChart()

@@ -4,9 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js",
-    "build-release-package": "rm ./dist/bundle.js && npx webpack",
-    "restart-service": "sudo systemctl restart openprivatecloud.service"
+    "run-dev-server": "nodemon --exec \"npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js && sudo systemctl restart openprivatecloud.service\"",
+    "build-release-package": "rm ./dist/bundle.js && npx webpack"
   },
   "keywords": [],
   "author": "Amir Czwink",
@@ -24,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^18.6.3",
     "@types/ssh2": "^1.11.5",
+    "nodemon": "^2.0.22",
     "source-map-loader": "^4.0.1",
     "ts-loader": "^9.4.1",
     "webpack": "^5.74.0",

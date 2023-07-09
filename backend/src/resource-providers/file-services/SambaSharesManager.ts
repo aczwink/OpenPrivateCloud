@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,8 @@ import { ConfigParser, PropertyType } from "../../common/config/ConfigParser";
 import { ConfigWriter } from "../../common/config/ConfigWriter";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { Share } from "./models";
+import { Share, ShareProperties } from "./models";
+import { ConfigReducer } from "../../common/config/ConfigReducer";
 
 type GlobalSettings = Dictionary<boolean | number | string | null>;
 
@@ -42,6 +43,7 @@ interface ShareData
     writeUsers: string[];
     shareName: string;
     sharePath: string;
+    smbEncrypt: "default" | "required";
 }
 
 const smbConfDialect: ConfigDialect = {
@@ -50,6 +52,23 @@ const smbConfDialect: ConfigDialect = {
         falseMapping: "no",
         trueMapping: "yes"
     }
+};
+
+/**
+ * Defauls as defined in smb.conf: https://www.samba.org/samba/docs/current/man-html/smb.conf.5.html
+ */
+const defaultSmbConfShareProperties: ShareProperties = {
+    allowGuests: false,
+    browseable: true,
+    comment: "",
+    createMask: 0o744,
+    directoryMask: 0o755,
+    path: "",
+    printable: false,
+    smbEncrypt: "default",
+    validUsers: [],
+    writeable: false,
+    writeList: [],
 };
 
 @Injectable
@@ -109,6 +128,7 @@ chmod 600 /home/<your user>/.smbcredentials/${hostName}
         newShare.properties.path = data.sharePath;
         newShare.properties.validUsers = data.readUsers;
         newShare.properties.writeList = data.writeUsers;
+        newShare.properties.smbEncrypt = data.smbEncrypt;
 
         if(oldShare === undefined)
             settings.shares.push(newShare);
@@ -122,16 +142,7 @@ chmod 600 /home/<your user>/.smbcredentials/${hostName}
         return {
             name: shareName,
             properties: {
-                allowGuests: false,
-                browseable: true,
-                comment: "",
-                createMask: 0o744,
-                directoryMask: 0o744,
-                path: "",
-                printable: false,
-                validUsers: [],
-                writable: false,
-                writeList: [],
+                ...defaultSmbConfShareProperties,
             }
         };
     }
@@ -175,13 +186,17 @@ chmod 600 /home/<your user>/.smbcredentials/${hostName}
                         p.printable = b;
                         break;
                     case "read only":
-                        p.writable = !b;
+                        p.writeable = !b;
+                        break;
+                    case "smb encrypt":
+                        p.smbEncrypt = s as any;
                         break;
                     case "valid users":
                         p.validUsers = s.split(" ");
                         break;
                     case "writable":
-                        p.writable = b;
+                    case "writeable":
+                        p.writeable = b;
                         break;
                     case "write list":
                         p.writeList = s.split(" ");
@@ -220,6 +235,23 @@ chmod 600 /home/<your user>/.smbcredentials/${hostName}
         return { global, shares };
     }
 
+    private ToConfigObject(shareProperties: ShareProperties)
+    {
+        return {
+            "guest ok": shareProperties.allowGuests,
+            "browseable": shareProperties.browseable,
+            comment: shareProperties.comment,
+            "create mask": this.ToOctal(shareProperties.createMask),
+            "directory mask": this.ToOctal(shareProperties.directoryMask),
+            path: shareProperties.path,
+            printable: shareProperties.printable,
+            "smb encrypt": shareProperties.smbEncrypt,
+            "valid users": shareProperties.validUsers.join(" "),
+            writeable: shareProperties.writeable,
+            "write list": shareProperties.writeList.join(" ")
+        };
+    }
+
     private ToOctal(n: number)
     {
         let string = n.toString(8);
@@ -237,25 +269,27 @@ chmod 600 /home/<your user>/.smbcredentials/${hostName}
         const mdl = new ConfigModel(cfgEntries);
 
         mdl.SetProperties("global", global);
-        const shareNamesToDelete = mdl.sectionNames.Filter(x => x !== "global").ToSet();
 
+        const defaultDict = this.ToConfigObject(defaultSmbConfShareProperties);
+        const globalDict = mdl.SectionAsDictionary("global");
+
+        const shareNamesToDelete = mdl.sectionNames.Filter(x => x !== "global").ToSet();
         for (const share of shares)
         {
-            const p = share.properties;
-            mdl.SetProperties(share.name, {
-                "guest ok": p.allowGuests,
-                "browseable": p.browseable,
-                comment: p.comment,
-                "create mask": this.ToOctal(p.createMask),
-                "directory mask": this.ToOctal(p.directoryMask),
-                path: p.path,
-                printable: p.printable,
-                "valid users": p.validUsers.join(" "),
-                writable: p.writable,
-                "write list": p.writeList.join(" ")
-            });
-
             shareNamesToDelete.delete(share.name);
+
+            const p = share.properties;
+
+            mdl.DeleteProperties(share.name, ["writable"]); //delete aliases
+            mdl.SetProperties(share.name, this.ToConfigObject(p));
+
+            const configReducer = new ConfigReducer;
+            configReducer.AddChild(defaultDict);
+            configReducer.AddChild(globalDict);
+            configReducer.AddChild(mdl.SectionAsDictionary(share.name));
+            const redundant = configReducer.OptimizeLeaf();
+
+            mdl.DeleteProperties(share.name, redundant);
         }
 
         for (const shareNameToDelete of shareNamesToDelete)

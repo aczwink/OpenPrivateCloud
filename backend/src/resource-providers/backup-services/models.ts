@@ -83,3 +83,8 @@ interface BackupVaultAutomaticTrigger
 }
 
 export type BackupVaultTrigger = BackupVaultManualTrigger | BackupVaultAutomaticTrigger;
+
+export interface BackupVaultRetentionConfig
+{
+    numberOfDays: number;
+}

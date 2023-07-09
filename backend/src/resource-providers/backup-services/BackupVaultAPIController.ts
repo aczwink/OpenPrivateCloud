@@ -23,7 +23,8 @@ import { HostStoragesController } from "../../data-access/HostStoragesController
 import { InstancesController } from "../../data-access/InstancesController";
 import { InstancesManager } from "../../services/InstancesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
-import { BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
+import { BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
+import { BackupProcessService } from "./BackupProcessService";
 
 interface BackupVaultDeploymentDataDto
 {
@@ -36,7 +37,8 @@ type BackupVaultAnySourceConfigDto = BackupVaultFileStorageConfig | BackupVaultD
 class BackupVaultAPIController
 {
     constructor(private instancesController: InstancesController, private instancesManager: InstancesManager, private backupVaultManager: BackupVaultManager,
-        private hostStoragesController: HostStoragesController, private hostsController: HostsController)
+        private hostStoragesController: HostStoragesController, private hostsController: HostsController,
+        private backupProcessService: BackupProcessService)
     {
     }
 
@@ -103,6 +105,15 @@ class BackupVaultAPIController
         };
         return result;
     }
+
+    @Get("retention")
+    public async QueryRetentionConfig(
+        @Common instanceId: number
+    )
+    {
+        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        return config.retention;
+    }
     
     @Get("sources")
     public async QuerySourcesConfig(
@@ -137,6 +148,19 @@ class BackupVaultAPIController
     )
     {
         this.backupVaultManager.StartBackupProcess(instanceId);
+    }
+
+    @Put("retention")
+    public async UpdateRetentionConfig(
+        @Common instanceId: number,
+        @Body targetConfig: BackupVaultRetentionConfig
+    )
+    {
+        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        config.retention = targetConfig;
+        await this.backupVaultManager.WriteConfig(instanceId, config);
+
+        this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(instanceId, config.sources, config.target, config.retention);
     }
 
     @Put("target")

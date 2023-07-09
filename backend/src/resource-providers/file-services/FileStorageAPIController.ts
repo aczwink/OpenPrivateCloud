@@ -26,7 +26,7 @@ import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager"
 import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { HostsController } from "../../data-access/HostsController";
 import { SessionsManager } from "../../services/SessionsManager";
-import { FileStoragesManager, SMBConfig } from "./FileStoragesManager";
+import { FileStorageConfig, FileStoragesManager } from "./FileStoragesManager";
 import { InstanceContext } from "../../common/InstanceContext";
 
 interface DeploymentDataDto
@@ -68,7 +68,7 @@ class FileStorageAPIController
         @Common data: InstanceContext
     )
     {
-        await this.fileStoragesManager.CreateSnapshot(data.hostId, data.hostStoragePath, data.fullInstanceName);
+        await this.fileStoragesManager.CreateSnapshot(data);
     }
 
     @Common()
@@ -122,12 +122,12 @@ class FileStorageAPIController
         return await this.fileStoragesManager.GetSMBConnectionInfo(data, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
     }
 
-    @Get("smbcfg")
-    public async QuerySMBConfig(
+    @Get("config")
+    public async QueryConfig(
         @Common data: InstanceContext
     )
     {
-        return await this.fileStoragesManager.QuerySMBConfig(data.instanceId);
+        return await this.fileStoragesManager.ReadConfig(data.instanceId);
     }
 
     @Get("snapshots")
@@ -135,20 +135,20 @@ class FileStorageAPIController
         @Common data: InstanceContext
     )
     {
-        const snaps = await this.fileStoragesManager.QuerySnapshots(data.hostId, data.hostStoragePath, data.fullInstanceName);
-        return snaps.map(x => {
-            const res: SnapshotDto = { date: x };
+        const snaps = await this.fileStoragesManager.QuerySnapshotsOrdered(data.hostId, data.hostStoragePath, data.fullInstanceName);
+        return snaps.Map(x => {
+            const res: SnapshotDto = { date: x.creationDate };
             return res;
-        });
+        }).ToArray();
     }
 
-    @Put("smbcfg")
-    public async UpdateSMBConfig(
+    @Put("config")
+    public async UpdateConfig(
         @Common data: InstanceContext,
-        @Body config: SMBConfig
+        @Body config: FileStorageConfig
     )
     {
-        const result = await this.fileStoragesManager.UpdateSMBConfig(data, config);
+        const result = await this.fileStoragesManager.UpdateConfig(data, config);
         if(result === "ErrorNoOneHasAccess")
             return BadRequest("no user has been giving read access to the share");
     }

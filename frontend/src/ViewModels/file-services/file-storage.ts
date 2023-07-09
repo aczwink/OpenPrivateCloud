@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { DeploymentDataDto, SMBConfig, SMBConnectionInfo, SnapshotDto } from "../../../dist/api";
+import { DeploymentDataDto, FileStorageConfig, SMBConfig, SMBConnectionInfo, SnapshotDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { FileManagerComponent } from "../../Views/file-manager/FileManagerComponent";
 import { resourceProviders } from "openprivatecloud-common";
@@ -38,19 +38,19 @@ const overviewViewModel: ObjectViewModel<DeploymentDataDto, InstanceId>  = {
     schemaName: "DeploymentDataDto",
 };
 
-const smbConfigViewModel: ObjectViewModel<SMBConfig, InstanceId>  = {
+const configViewModel: ObjectViewModel<FileStorageConfig, InstanceId>  = {
     type: "object",
     actions: [
         {
             type: "edit",
-            propertiesSchemaName: "SMBConfig",
-            requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.smbcfg.get(ids.instanceName),
-            updateResource: (service, ids, cfg) => service.resourceProviders.fileservices.filestorage._any_.smbcfg.put(ids.instanceName, cfg)
+            propertiesSchemaName: "FileStorageConfig",
+            requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.config.get(ids.instanceName),
+            updateResource: (service, ids, cfg) => service.resourceProviders.fileservices.filestorage._any_.config.put(ids.instanceName, cfg)
         }
     ],
-    formTitle: _ => "SMB config",
-    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.smbcfg.get(ids.instanceName),
-    schemaName: "SMBConfig",
+    formTitle: _ => "Configuration",
+    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.config.get(ids.instanceName),
+    schemaName: "FileStorageConfig",
 };
 
 const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId>  = {
@@ -102,9 +102,9 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId> = {
                     displayName: "File manager"
                 },
                 {
-                    key: "smb-settings",
-                    child: smbConfigViewModel,
-                    displayName: "SMB configuration"
+                    key: "settings",
+                    child: configViewModel,
+                    displayName: "Configuration"
                 },
                 {
                     key: "smb-connection",

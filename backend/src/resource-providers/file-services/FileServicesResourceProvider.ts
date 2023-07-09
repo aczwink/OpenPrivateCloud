@@ -62,7 +62,9 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     
     public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
     {
-        await this.fileStoragesManager.UpdateSMBConfig(instanceContext, { enabled: false });
+        await this.fileStoragesManager.UpdateConfig(instanceContext, {
+            smb: { enabled: false, transportEncryption: false }
+        });
         await this.fileStoragesManager.DeleteAllSnapshots(instanceContext);
         await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
 
