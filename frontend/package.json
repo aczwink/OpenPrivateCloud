@@ -5,7 +5,8 @@
   "main": "dist/app.js",
   "scripts": {
     "generate-api": "npx acts-util-apilib && ln -sf ../../backend/dist/openapi.json dist/openapi.json",
-    "start-dev": "webpack serve --open"
+    "start-dev": "webpack serve --open",
+    "build": "npx webpack"
   },
   "keywords": [],
   "author": "Amir Czwink",
