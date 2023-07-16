@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,8 +20,8 @@ import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Pos
 import { c_backupServicesResourceProviderName, c_backupVaultResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { HostsController } from "../../data-access/HostsController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesController } from "../../data-access/ResourcesController";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
 import { BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
 import { BackupProcessService } from "./BackupProcessService";
@@ -33,10 +33,10 @@ interface BackupVaultDeploymentDataDto
 
 type BackupVaultAnySourceConfigDto = BackupVaultFileStorageConfig | BackupVaultDatabaseConfig;
 
-@APIController(`resourceProviders/${c_backupServicesResourceProviderName}/${c_backupVaultResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_backupServicesResourceProviderName}/${c_backupVaultResourceTypeName}/{instanceName}`)
 class BackupVaultAPIController
 {
-    constructor(private instancesController: InstancesController, private instancesManager: InstancesManager, private backupVaultManager: BackupVaultManager,
+    constructor(private instancesController: ResourcesController, private instancesManager: ResourcesManager, private backupVaultManager: BackupVaultManager,
         private hostStoragesController: HostStoragesController, private hostsController: HostsController,
         private backupProcessService: BackupProcessService)
     {
@@ -44,15 +44,18 @@ class BackupVaultAPIController
 
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        throw new Error("TODO: reimplement me");
+        /*const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, instanceName);
+        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
         if(instance === undefined)
             return NotFound("instance not found");
 
         return instance.id;
+        */
     }
 
     @Post("sources")
@@ -96,7 +99,7 @@ class BackupVaultAPIController
         @Common instanceId: number,
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
         const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
 
@@ -185,7 +188,7 @@ class BackupVaultAPIController
         config.trigger = targetConfig;
         await this.backupVaultManager.WriteConfig(instanceId, config);
 
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, instanceName);
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, instanceName);
         this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(fullInstanceName);
     }
 }

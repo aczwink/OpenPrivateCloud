@@ -23,22 +23,22 @@ import { ListViewModel } from "../../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildInstanceGeneralPageGroupEntry } from "../shared/instancegeneral";
 
-type InstanceId = { instanceName: string };
-type InstanceAndUserId = InstanceId & { user: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
+type ResourceAndGroupIdAndUserId = ResourceAndGroupId & { user: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.databaseServices.name + "/" + resourceProviders.databaseServices.mariadbResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.databaseServices.name + "/" + resourceProviders.databaseServices.mariadbResourceType.name + "/" + resourceName;
 }
 
-const permissionsViewModel: ListViewModel<MySQLGrant, InstanceAndUserId> = {
+const permissionsViewModel: ListViewModel<MySQLGrant, ResourceAndGroupIdAndUserId> = {
     type: "list",
     actions: [
         {
             type: "create",
             createResource: (service, ids, data) => {
                 const parts = ids.user.split("@");
-                return service.resourceProviders.databaseservices.mariadb._any_.permissions.post(ids.instanceName, {
+                return service.resourceProviders._any_.databaseservices.mariadb._any_.permissions.post(ids.resourceGroupName, ids.resourceName, {
                     hostName: parts[1],
                     permission: data,
                     userName: parts[0]
@@ -50,12 +50,12 @@ const permissionsViewModel: ListViewModel<MySQLGrant, InstanceAndUserId> = {
     displayName: "User permissions",
     requestObjects: (service, ids) => {
         const parts = ids.user.split("@");
-        return service.resourceProviders.databaseservices.mariadb._any_.permissions.get(ids.instanceName, { hostName: parts[1], userName: parts[0] });
+        return service.resourceProviders._any_.databaseservices.mariadb._any_.permissions.get(ids.resourceGroupName, ids.resourceName, { hostName: parts[1], userName: parts[0] });
     },
     schemaName: "MySQLGrant"
 };
 
-const userViewModel: ObjectViewModel<MySQLUserEntry, InstanceAndUserId> = {
+const userViewModel: ObjectViewModel<MySQLUserEntry, ResourceAndGroupIdAndUserId> = {
     type: "object",
     actions: [],
     formTitle: _ => "User",
@@ -70,14 +70,14 @@ const userViewModel: ObjectViewModel<MySQLUserEntry, InstanceAndUserId> = {
     schemaName: "MySQLUserEntry"
 };
 
-const userAndPermissionsViewModel: MultiPageViewModel<InstanceAndUserId> = {
+const userAndPermissionsViewModel: MultiPageViewModel<ResourceAndGroupIdAndUserId> = {
     type: "multiPage",
     actions: [
         {
             type: "delete",
             deleteResource: (service, ids) => {
                 const parts = ids.user.split("@");
-                return service.resourceProviders.databaseservices.mariadb._any_.users.delete(ids.instanceName, { hostName: parts[1], userName: parts[0] });
+                return service.resourceProviders._any_.databaseservices.mariadb._any_.users.delete(ids.resourceGroupName, ids.resourceName, { hostName: parts[1], userName: parts[0] });
             }
         }
     ],
@@ -101,12 +101,12 @@ const userAndPermissionsViewModel: MultiPageViewModel<InstanceAndUserId> = {
     formTitle: ids => "User: " + ids.user
 };
 
-const usersViewModel: CollectionViewModel<MySQLUserEntry, InstanceId, MySQLUserCreationData> = {
+const usersViewModel: CollectionViewModel<MySQLUserEntry, ResourceAndGroupId, MySQLUserCreationData> = {
     type: "collection",
     actions: [
         {
             type: "create",
-            createResource: (service, ids, data) => service.resourceProviders.databaseservices.mariadb._any_.users.post(ids.instanceName, data),
+            createResource: (service, ids, data) => service.resourceProviders._any_.databaseservices.mariadb._any_.users.post(ids.resourceGroupName, ids.resourceName, data),
             schemaName: "MySQLUserCreationData"
         },
     ],
@@ -114,29 +114,29 @@ const usersViewModel: CollectionViewModel<MySQLUserEntry, InstanceId, MySQLUserC
     displayName: "Users",
     extractId: x => x.User + "@" + x.Host,
     idKey: "user",
-    requestObjects: (service, ids) => service.resourceProviders.databaseservices.mariadb._any_.users.get(ids.instanceName),
+    requestObjects: (service, ids) => service.resourceProviders._any_.databaseservices.mariadb._any_.users.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "MySQLUserEntry"
 };
 
-const databasesViewModel: ListViewModel<MySQLDatabaseEntry, InstanceId> = {
+const databasesViewModel: ListViewModel<MySQLDatabaseEntry, ResourceAndGroupId> = {
     type: "list",
     actions: [
         {
             type: "create",
-            createResource: (service, ids, resource) => service.resourceProviders.databaseservices.mariadb._any_.databases.post(ids.instanceName, resource),
+            createResource: (service, ids, resource) => service.resourceProviders._any_.databaseservices.mariadb._any_.databases.post(ids.resourceGroupName, ids.resourceName, resource),
         }
     ],
     boundActions: [],
     displayName: "Databases",
-    requestObjects: (service, ids) => service.resourceProviders.databaseservices.mariadb._any_.databases.get(ids.instanceName),
+    requestObjects: (service, ids) => service.resourceProviders._any_.databaseservices.mariadb._any_.databases.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "MySQLDatabaseEntry"
 };
 
-export const mariadbViewModel: MultiPageViewModel<InstanceId> = {
+export const mariadbViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -167,8 +167,8 @@ export const mariadbViewModel: MultiPageViewModel<InstanceId> = {
                 }
             ]
         },
-        BuildInstanceGeneralPageGroupEntry(BuildFullInstanceName),
+        BuildInstanceGeneralPageGroupEntry(BuildResourceId),
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

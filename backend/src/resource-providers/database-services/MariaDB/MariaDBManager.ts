@@ -24,6 +24,7 @@ import { MariaDBContainerManager } from "./MariaDBContainerManager";
 import { MariaDBHostManager } from "./MariaDBHostManager";
 import { MariaDBInterface } from "./MariaDBInterface";
 import { MariadbProperties } from "./MariadbProperties";
+import { ResourceReference } from "../../../common/InstanceReference";
 
 interface MariaDBConfig
 {
@@ -89,10 +90,10 @@ export class MariaDBManager
         await mariaDBInterface.CreateUser(instanceContext, userName, hostName, password);
     }
 
-    public async DeleteResource(instanceContext: InstanceContext)
+    public async DeleteResource(resourceReference: ResourceReference)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        await mariaDBInterface.DeleteResource(instanceContext);
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        await mariaDBInterface.DeleteResource(resourceReference);
     }
 
     public async DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string)

@@ -18,7 +18,7 @@
 import { Injectable } from "acts-util-node";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstanceLogsController } from "../../data-access/InstanceLogsController";
-import { InstancesController } from "../../data-access/InstancesController";
+import { ResourcesController } from "../../data-access/ResourcesController";
 import { ProcessTracker, ProcessTrackerManager } from "../../services/ProcessTrackerManager";
 import { BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig } from "./models";
 import { BackupTargetMountService, MountedBackupTarget } from "./BackupTargetMountService";
@@ -29,7 +29,7 @@ import { DatabaseBackupProcessService } from "./DatabaseBackupProcessService";
 @Injectable
 export class BackupProcessService
 {
-    constructor(private processTrackerManager: ProcessTrackerManager, private instancesController: InstancesController,
+    constructor(private processTrackerManager: ProcessTrackerManager, private instancesController: ResourcesController,
         private hostStoragesController: HostStoragesController, private instanceLogsController: InstanceLogsController,
         private backupTargetMountService: BackupTargetMountService,
         private fileStorageBackupProcessService: FileStorageBackupProcessService,
@@ -40,10 +40,10 @@ export class BackupProcessService
     //Public methods
     public async DeleteBackupsThatAreOlderThanRetentionPeriod(instanceId: number, sources: BackupVaultSourcesConfig, target: BackupVaultTargetConfig, retention: BackupVaultRetentionConfig)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        const processTracker = await this.processTrackerManager.Create(storage!.hostId, "Deleting old backups of: " + instance!.fullName);
+        const processTracker = await this.processTrackerManager.Create(storage!.hostId, "Deleting old backups of: " + instance!.name);
 
         const hostId = storage!.hostId;
         const mountStatus = await this.backupTargetMountService.MountTarget(hostId, target, processTracker);
@@ -71,10 +71,10 @@ export class BackupProcessService
 
     public async RunBackup(instanceId: number, sources: BackupVaultSourcesConfig, target: BackupVaultTargetConfig)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        const processTracker = await this.processTrackerManager.Create(storage!.hostId, "Backup of: " + instance!.fullName);
+        const processTracker = await this.processTrackerManager.Create(storage!.hostId, "Backup of: " + instance!.name);
         try
         {
             await this.MountAndDoBackup(storage!.hostId, sources, target, processTracker);

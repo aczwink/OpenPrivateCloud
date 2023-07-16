@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -51,8 +51,9 @@ export class UploadNodeAppServieContentComponent extends Component
     private async OnUpload()
     {
         this.loading = true;
+        const resourceGroupName = this.routerState.routeParams.resourceGroupName!;
         const instanceName = this.routerState.routeParams.instanceName!;
-        await this.apiService.resourceProviders.webservices.nodeappservice._any_.post(instanceName, { file: this.file! });
+        await this.apiService.resourceProviders._any_.webservices.nodeappservice._any_.post(resourceGroupName, instanceName, { file: this.file! });
 
         this.router.RouteTo("/instances/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nodeAppServiceResourceType.name + "/" + instanceName);
     }

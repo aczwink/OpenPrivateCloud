@@ -1,8 +1,8 @@
--- MariaDB dump 10.19  Distrib 10.6.7-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19  Distrib 10.11.2-MariaDB, for debian-linux-gnu (x86_64)
 --
 -- Host: localhost    Database: openprivatecloud
 -- ------------------------------------------------------
--- Server version	10.6.7-MariaDB-2ubuntu1.1
+-- Server version	10.11.2-MariaDB-1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -20,7 +20,10 @@
 
 LOCK TABLES `roles` WRITE;
 /*!40000 ALTER TABLE `roles` DISABLE KEYS */;
-INSERT INTO `roles` VALUES (100093036582666240,'Data Reader'),(100093036582666241,'Data Contributor'),(100093036582666242,'Instance Reader');
+INSERT INTO `roles` VALUES
+(100093036582666240,'Data Reader'),
+(100093036582666241,'Data Contributor'),
+(100093036582666242,'Instance Reader');
 /*!40000 ALTER TABLE `roles` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -30,7 +33,11 @@ UNLOCK TABLES;
 
 LOCK TABLES `roles_permissions` WRITE;
 /*!40000 ALTER TABLE `roles_permissions` DISABLE KEYS */;
-INSERT INTO `roles_permissions` VALUES (100093036582666240,'/data/read'),(100093036582666241,'/data/read'),(100093036582666241,'/data/write'),(100093036582666242,'/read');
+INSERT INTO `roles_permissions` VALUES
+(100093036582666240,'/data/read'),
+(100093036582666241,'/data/read'),
+(100093036582666241,'/data/write'),
+(100093036582666242,'/read');
 /*!40000 ALTER TABLE `roles_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -42,4 +49,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-23 14:20:04
+-- Dump completed on 2023-07-16 21:44:40

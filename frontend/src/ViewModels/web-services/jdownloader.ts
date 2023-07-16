@@ -21,62 +21,62 @@ import { JdownloaderInfoDto, MyJDownloaderCredentials, SMBConnectionInfo } from 
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.jdownloaderResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.jdownloaderResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<JdownloaderInfoDto, InstanceId> = {
+const overviewViewModel: ObjectViewModel<JdownloaderInfoDto, ResourceAndGroupId> = {
     type: "object",
     actions: [
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.webservices.jdownloader._any_.post(ids.instanceName, { action: "start" }),
+            execute: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.post(ids.resourceGroupName, ids.resourceName, { action: "start" }),
             matIcon: "play_arrow",
             title: "Start"
         },
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.webservices.jdownloader._any_.post(ids.instanceName, { action: "stop" }),
+            execute: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.post(ids.resourceGroupName, ids.resourceName, { action: "stop" }),
             matIcon: "power_settings_new",
             title: "Stop"
         },
     ],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.webservices.jdownloader._any_.info.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "JdownloaderInfoDto"
 };
 
-const myjdcredentialsViewModel: ObjectViewModel<MyJDownloaderCredentials, InstanceId> = {
+const myjdcredentialsViewModel: ObjectViewModel<MyJDownloaderCredentials, ResourceAndGroupId> = {
     type: "object",
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "MyJDownloaderCredentials",
-            requestObject: (service, ids) => service.resourceProviders.webservices.jdownloader._any_.credentials.get(ids.instanceName),
-            updateResource: (service, ids, creds) => service.resourceProviders.webservices.jdownloader._any_.credentials.put(ids.instanceName, creds),
+            requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.credentials.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, creds) => service.resourceProviders._any_.webservices.jdownloader._any_.credentials.put(ids.resourceGroupName, ids.resourceName, creds),
         }
     ],
     formTitle: _ => "MyJD Credentials",
-    requestObject: (service, ids) => service.resourceProviders.webservices.jdownloader._any_.credentials.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.credentials.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "MyJDownloaderCredentials"
 };
 
-const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId>  = {
+const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, ResourceAndGroupId>  = {
     type: "object",
     actions: [],
     formTitle: _ => "SMB connection information",
-    requestObject: (service, ids) => service.resourceProviders.webservices.jdownloader._any_.smbconnect.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.smbconnect.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "SMBConnectionInfo",
 };
 
-export const jdownloaderViewModel: MultiPageViewModel<InstanceId> = {
+export const jdownloaderViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -88,7 +88,7 @@ export const jdownloaderViewModel: MultiPageViewModel<InstanceId> = {
                     displayName: "Overview",
                     child: overviewViewModel,
                 },
-                BuildAccessControlPageEntry(BuildFullInstanceName),
+                BuildAccessControlPageEntry(BuildResourceId),
                 {
                     key: "credentials",
                     displayName: "Credentials",
@@ -102,6 +102,6 @@ export const jdownloaderViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

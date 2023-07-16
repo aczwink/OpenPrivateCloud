@@ -17,17 +17,18 @@
  * */
 import { Injectable } from "acts-util-node";
 import { InstanceContext } from "../../../common/InstanceContext";
-import { InstancesManager } from "../../../services/InstancesManager";
+import { ResourcesManager } from "../../../services/ResourcesManager";
 import { DockerContainerConfig, DockerManager } from "../../compute-services/DockerManager";
 import { DeploymentContext } from "../../ResourceProvider";
 import { MySQLClient, MySQLGrant } from "../MySQLClient";
 import { MariaDBInterface } from "./MariaDBInterface";
 import { MariadbProperties } from "./MariadbProperties";
+import { ResourceReference } from "../../../common/InstanceReference";
 
 @Injectable
 export class MariaDBContainerManager implements MariaDBInterface
 {
-    constructor(private dockerManager: DockerManager, private instancesManager: InstancesManager)
+    constructor(private dockerManager: DockerManager, private instancesManager: ResourcesManager)
     {
     }
 
@@ -40,7 +41,7 @@ export class MariaDBContainerManager implements MariaDBInterface
 
     public async CheckAllDatabases(instanceContext: InstanceContext): Promise<string>
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
+        const parts = this.instancesManager.TODO_DEPRECATED_ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
         const shell = await this.dockerManager.SpawnShell(instanceContext.hostId, parts.instanceName);
 
         await shell.StartCommand(["mysqlcheck", "--all-databases", "-u", "root", "-p"]);
@@ -71,15 +72,14 @@ export class MariaDBContainerManager implements MariaDBInterface
         await client.CreateUser(userName, hostName, password);
     }
 
-    public async DeleteResource(instanceContext: InstanceContext): Promise<void>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<void>
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        const containerInfo = await this.dockerManager.InspectContainer(instanceContext.hostId, parts.instanceName);
+        const containerInfo = await this.dockerManager.InspectContainer(resourceReference.hostId, resourceReference.name);
 
         if(containerInfo!.State.Running)
-            await this.dockerManager.StopContainer(instanceContext.hostId, parts.instanceName);
+            await this.dockerManager.StopContainer(resourceReference.hostId, resourceReference.name);
 
-        await this.dockerManager.DeleteContainer(instanceContext.hostId, parts.instanceName);
+        await this.dockerManager.DeleteContainer(resourceReference.hostId, resourceReference.name);
     }
 
     public async DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string): Promise<void>
@@ -108,13 +108,13 @@ export class MariaDBContainerManager implements MariaDBInterface
             portMap: [],
             restartPolicy: "always",
         };
-        await this.dockerManager.CreateContainerInstanceAndAutoStart(context.hostId, instanceProperties.name, config);
+        await this.dockerManager.CreateContainerInstanceAndStart(context.hostId, instanceProperties.name, config);
     }
 
     //Private methods
     private CreateClient(instanceContext: InstanceContext)
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
+        const parts = this.instancesManager.TODO_DEPRECATED_ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
         return new MySQLClient(() => this.dockerManager.SpawnShell(instanceContext.hostId, parts.instanceName), [], "openprivatecloud"); //TODO: pw
     }
 }

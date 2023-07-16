@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,13 +20,14 @@ import { PermissionsController } from "../data-access/PermissionsController";
 import { UserGroupsController } from "../data-access/UserGroupsController";
 import { HostUsersManager } from "./HostUsersManager";
 import { ResourceProviderManager } from "./ResourceProviderManager";
+import { ResourcesManager } from "./ResourcesManager";
 
 
 @Injectable
 export class UserGroupsManager
 {
     constructor(private userGroupsController: UserGroupsController, private hostUsersManager: HostUsersManager, private permissionsController: PermissionsController,
-        private resourceProviderManager: ResourceProviderManager)
+        private resourceProviderManager: ResourceProviderManager, private resourcesManager: ResourcesManager)
     {
     }
 
@@ -36,9 +37,12 @@ export class UserGroupsManager
         await this.userGroupsController.AddMember(userGroupId, userId);
         await this.ResyncGroupToAllHosts(userGroupId);
 
-        const fullInstanceNames = await this.permissionsController.QueryInstancesAssociatedWithGroup(userGroupId);
-        for (const fullInstanceName of fullInstanceNames)
-            await this.resourceProviderManager.InstancePermissionsChanged(fullInstanceName);
+        const resourceIds = await this.permissionsController.QueryResourceIdsAssociatedWithGroup(userGroupId);
+        for (const resourceId of resourceIds)
+        {
+            const ref = await this.resourcesManager.CreateResourceReference(resourceId);
+            await this.resourceProviderManager.InstancePermissionsChanged(ref!);
+        }
     }
 
     public async RemoveMembership(userGroupId: number, userId: number)

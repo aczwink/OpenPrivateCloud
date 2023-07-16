@@ -201,6 +201,9 @@ export class SSHCommandExecutor
         const cmd = this.CommandToString(command);
         const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
 
+        if(options.stdin !== undefined)
+            channel.stdin.write(options.stdin);
+
         let stdOut = "";
         let stdErr = "";
 

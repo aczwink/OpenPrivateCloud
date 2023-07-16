@@ -20,29 +20,29 @@ import { InstanceHealthData } from "../../../dist/api";
 import { ObjectViewModel } from "../../UI/ViewModel";
 import { BuildAccessControlPageEntry } from "./accesscontrol";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildHealthViewModel(buildFullInstanceName: (instanceName: string) => string)
+function BuildHealthViewModel(buildResourceId: (resourceGroupName: string, resourceName: string) => string)
 {
-    const accessControlViewModel: ObjectViewModel<InstanceHealthData, InstanceId> = {
+    const healthViewModel: ObjectViewModel<InstanceHealthData, ResourceAndGroupId> = {
         type: "object",
         actions: [],
         formTitle: _ => "Instance health",
-        requestObject: (service, ids) => service.health.instance.get({ fullInstanceName: buildFullInstanceName(ids.instanceName) }),
+        requestObject: (service, ids) => service.health.instance.get({ id: buildResourceId(ids.resourceGroupName, ids.resourceName) }),
         schemaName: "InstanceHealthData"
     };
 
-    return accessControlViewModel;
+    return healthViewModel;
 }
 
-export function BuildInstanceGeneralPageGroupEntry(buildFullInstanceName: (instanceName: string) => string)
+export function BuildInstanceGeneralPageGroupEntry(buildResourceId: (resourceGroupName: string, resourceName: string) => string)
 {
     return {
         displayName: "",
         entries: [
-            BuildAccessControlPageEntry(buildFullInstanceName),
+            BuildAccessControlPageEntry(buildResourceId),
             {
-                child: BuildHealthViewModel(buildFullInstanceName),
+                child: BuildHealthViewModel(buildResourceId),
                 displayName: "Health",
                 key: "health"
             },

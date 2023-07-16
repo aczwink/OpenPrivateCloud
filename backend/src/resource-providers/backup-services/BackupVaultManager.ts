@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@
 
 import { Injectable } from "acts-util-node";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { InstancesController } from "../../data-access/InstancesController";
+import { ResourcesController } from "../../data-access/ResourcesController";
 import { TaskSchedulingManager } from "../../services/TaskSchedulingManager";
 import { BackupProcessService } from "./BackupProcessService";
 import { BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
@@ -39,14 +39,16 @@ interface BackupVaultConfig
 export class BackupVaultManager
 {
     constructor(private instanceConfigController: InstanceConfigController, private backupProcessService: BackupProcessService,
-        private instancesController: InstancesController, private taskSchedulingManager: TaskSchedulingManager)
+        private instancesController: ResourcesController, private taskSchedulingManager: TaskSchedulingManager)
     {
     }
 
     //Public methods
     public async EnsureBackupTimerIsRunningIfConfigured(fullInstanceName: string)
     {
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        throw new Error("TODO: reimplement me");
+        /*
+        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
         const instanceId = instance!.id;
 
         const config = await this.ReadConfig(instanceId);
@@ -54,7 +56,7 @@ export class BackupVaultManager
         {
             const lastScheduleTime = config.state.lastScheduleTime ?? new Date(0);
             this.taskSchedulingManager.ScheduleForInstance(fullInstanceName, lastScheduleTime, config.trigger.schedule, this.OnAutomaticBackupTrigger.bind(this, instanceId, fullInstanceName));
-        }
+        }*/
     }
 
     public async ReadConfig(instanceId: number): Promise<BackupVaultConfig>

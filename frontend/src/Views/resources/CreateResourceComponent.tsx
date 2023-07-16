@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ import { ObjectEditorComponent, ObjectEditorContext } from "../../UI/Components/
   
    
 @Injectable
-export class AddInstanceComponent extends Component
+export class CreateResourceComponent extends Component
 {
     constructor(private apiSchemaService: APISchemaService, private router: Router, private apiService: APIService)
     {
@@ -77,7 +77,8 @@ export class AddInstanceComponent extends Component
     {
         event.preventDefault();
 
-        await this.apiService.instances.post(this.data);
-        this.router.RouteTo("/instances");
+        const rgName = this.router.state.Get().routeParams.resourceGroupName!;
+        await this.apiService.resourceGroups._any_.resources.post(rgName, this.data);
+        this.router.RouteTo("/resourceGroups/" + rgName);
     }
 }

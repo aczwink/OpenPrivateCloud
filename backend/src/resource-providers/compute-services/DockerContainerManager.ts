@@ -17,25 +17,24 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { InstanceContext } from "../../common/InstanceContext";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { InstancesManager } from "../../services/InstancesManager";
-import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { ResourceDeletionError } from "../ResourceProvider";
-import { DockerContainerConfig, DockerManager } from "./DockerManager";
+import { DockerContainerConfig, DockerContainerConfigPortMapping, DockerContainerInfo, DockerManager } from "./DockerManager";
+import { LightweightResourceReference } from "../../common/InstanceReference";
 
 @Injectable
 export class DockerContainerManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private dockerManager: DockerManager,
-        private instanceConfigController: InstanceConfigController, private instancesManager: InstancesManager)
+    constructor(private dockerManager: DockerManager, private instanceConfigController: InstanceConfigController)
     {
     }
 
     //Public methods
-    public async DeleteResource(hostId: number, instanceName: string): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: LightweightResourceReference): Promise<ResourceDeletionError | null>
     {
-        const containerInfo = await this.dockerManager.InspectContainer(hostId, instanceName);
+        const containerName = this.DeriveContainerName(resourceReference);
+
+        const containerInfo = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
         if(containerInfo === undefined)
             return null;
 
@@ -46,28 +45,27 @@ export class DockerContainerManager
                 message: "The container is running. Shut it down before deleting it."
             };
         }
-        await this.dockerManager.DeleteContainer(hostId, instanceName);
+        await this.dockerManager.DeleteContainer(resourceReference.hostId, containerName);
 
         return null;
     }
 
-    public async ExecuteAction(instanceContext: InstanceContext, action: "start" | "shutdown")
+    public async ExecuteAction(resourceReference: LightweightResourceReference, action: "start" | "shutdown")
     {
         switch(action)
         {
             case "shutdown":
-                const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-                await this.dockerManager.StopContainer(instanceContext.hostId, parts.instanceName);
+                await this.dockerManager.StopContainer(resourceReference.hostId, this.DeriveContainerName(resourceReference));
                 break;
             case "start":
-                await this.StartContainer(instanceContext);
+                await this.StartContainer(resourceReference);
                 break;
         }
     }
 
-    public async QueryContainerConfig(instanceId: number): Promise<DockerContainerConfig>
+    public async QueryContainerConfig(resourceId: number): Promise<DockerContainerConfig>
     {
-        const config = await this.instanceConfigController.QueryConfig<DockerContainerConfig>(instanceId);
+        const config = await this.instanceConfigController.QueryConfig<DockerContainerConfig>(resourceId);
         if(config === undefined)
         {
             return {
@@ -81,49 +79,104 @@ export class DockerContainerManager
         return config;
     }
 
-    public async QueryContainerStatus(hostId: number, instanceName: string)
+    public async QueryContainerStatus(resourceReference: LightweightResourceReference)
     {
-        const containerData = await this.dockerManager.InspectContainer(hostId, instanceName);
+        const containerName = this.DeriveContainerName(resourceReference);
+        const containerData = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
         if(containerData === undefined)
             return "not created yet";
 
         return containerData.State.Status;
     }
 
-    public async QueryLog(hostId: number, instanceName: string)
+    public async QueryLog(resourceReference: LightweightResourceReference)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "docker", "container", "logs", instanceName], hostId);
-        return result;
+        const status = await this.QueryContainerStatus(resourceReference);
+        if(status === "not created yet")
+        {
+            return {
+                stdOut: "",
+                stdErr: ""
+            };
+        }
+
+        const containerName = this.DeriveContainerName(resourceReference);
+        return this.dockerManager.QueryContainerLogs(resourceReference.hostId, containerName);
     }
 
-    public async UpdateContainerConfig(instanceId: number, config: DockerContainerConfig)
+    public async UpdateContainerConfig(resourceId: number, config: DockerContainerConfig)
     {
-        await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
+        await this.instanceConfigController.UpdateOrInsertConfig(resourceId, config);
     }
 
-    public async UpdateContainerImage(instanceContext: InstanceContext)
+    public async UpdateContainerImage(resourceReference: LightweightResourceReference)
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        const containerData = await this.dockerManager.InspectContainer(instanceContext.hostId, parts.instanceName);
+        const containerName = this.DeriveContainerName(resourceReference);
+        const containerData = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
         if(containerData?.State.Running)
             throw new Error("Container is running");
 
-        const config = await this.QueryContainerConfig(instanceContext.instanceId);
-        await this.dockerManager.PullImage(instanceContext.hostId, config.imageName);
+        const config = await this.QueryContainerConfig(resourceReference.id);
+        await this.dockerManager.PullImage(resourceReference.hostId, config.imageName);
     }
 
     //Private methods
-    private async StartContainer(instanceContext: InstanceContext)
+    private DeriveContainerName(resourceReference: LightweightResourceReference)
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        const config = await this.QueryContainerConfig(instanceContext.instanceId);
+        return "opc-rdc-" + resourceReference.id;
+    }
 
-        const containerData = await this.dockerManager.InspectContainer(instanceContext.hostId, parts.instanceName);
-        if(containerData !== undefined)
+    private HasConfigChanged(containerData: DockerContainerInfo, config: DockerContainerConfig)
+    {
+        const currentPortMapping = this.ParsePortBindings(containerData);
+        const desiredPortMapping = config.portMap;
+
+        currentPortMapping.SortBy(x => x.hostPost);
+        if(!currentPortMapping.Equals(desiredPortMapping.Values().OrderBy(x => x.hostPost).ToArray()))
+            return true;
+
+        return !(
+            (containerData.Config.Image === config.imageName)
+        );
+    }
+
+    private ParsePortBindings(containerData: DockerContainerInfo): DockerContainerConfigPortMapping[]
+    {
+        const result: DockerContainerConfigPortMapping[] = [];
+        for (const containerBinding in containerData.HostConfig.PortBindings)
         {
-            await this.dockerManager.DeleteContainer(instanceContext.hostId, parts.instanceName);
-        }
+            if (Object.prototype.hasOwnProperty.call(containerData.HostConfig.PortBindings, containerBinding))
+            {
+                const hostBinding = containerData.HostConfig.PortBindings[containerBinding]!;
 
-        await this.dockerManager.CreateContainerInstanceAndAutoStart(instanceContext.hostId, parts.instanceName, config);
+                const containerPort = parseInt(containerBinding.split("/")[0]);
+
+                hostBinding.forEach(x => result.push({
+                    containerPort,
+                    hostPost: parseInt(x.HostPort)
+                }));
+            }
+        }
+        return result;
+    }
+
+    private async StartContainer(resourceReference: LightweightResourceReference)
+    {
+        const config = await this.QueryContainerConfig(resourceReference.id);
+
+        const containerName = this.DeriveContainerName(resourceReference);
+        const containerData = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
+        if(containerData?.State.Running)
+            throw new Error("Container is already running");
+
+        if((containerData !== undefined) && this.HasConfigChanged(containerData, config))
+        {
+            await this.dockerManager.DeleteContainer(resourceReference.hostId, containerName);
+            await this.dockerManager.CreateContainerInstance(resourceReference.hostId, containerName, config);
+        }
+        else if(containerData === undefined)
+            await this.dockerManager.CreateContainerInstance(resourceReference.hostId, containerName, config);
+        
+        await this.dockerManager.StartExistingContainer(resourceReference.hostId, containerName);
     }
 }

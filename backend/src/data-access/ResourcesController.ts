@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,52 +19,54 @@
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
-export interface Instance
-{
-    fullName: string;
-    storageId: number;
-}
-
-export interface FullInstance extends Instance
+export interface Resource
 {
     id: number;
+    instanceGroupId: number;
+    name: string;
+    storageId: number;
+    resourceProviderName: string;
+    instanceType: string;
 }
 
 interface OverviewInstanceData
 {
-    fullName: string;
+    name: string;
+    resourceProviderName: string;
+    instanceType: string;
     status: number;
 }
 
 @Injectable
-export class InstancesController
+export class ResourcesController
 {
     constructor(private dbConnMgr: DBConnectionsManager)
     {
     }
 
     //Public methods
-    public async AddInstance(storageId: number, fullName: string)
+    public async AddInstance(instanceGroupId: number, storageId: number, resourceProviderName: string, instanceType: string, name: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const result = await conn.InsertRow("instances", { storageId, fullName });
+        const result = await conn.InsertRow("instances", { instanceGroupId, storageId, resourceProviderName, instanceType, name });
         return result.insertId;
     }
 
-    public async DeleteInstance(fullInstanceName: string)
+    public async DeleteResource(resourceId: number)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("instances", "fullName = ?", fullInstanceName)
+        await conn.DeleteRows("instances", "id = ?", resourceId)
     }
 
-    public async QueryAllInstanceIds()
+    public async QueryAllResourceIdsInResourceGroup(resourceGroupId: number)
     {
         const query = `
         SELECT id
         FROM instances
+        WHERE instanceGroupId = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query);
+        const rows = await conn.Select(query, resourceGroupId);
         return rows.Values().Map(x => x.id as number);
     }
 
@@ -85,26 +87,29 @@ export class InstancesController
         return row.hostId as number;
     }
 
-    public async QueryInstance(fullInstanceName: string)
+    public async QueryResource(id: number)
     {
         const query = `
-        SELECT id, fullName, storageId
-        FROM instances
-        WHERE fullName = ?
-        `;
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.SelectOne<FullInstance>(query, fullInstanceName);
-    }
-
-    public async QueryInstanceById(instanceId: number)
-    {
-        const query = `
-        SELECT id, fullName, storageId
+        SELECT id, name, storageId, resourceProviderName, instanceType, instanceGroupId
         FROM instances
         WHERE id = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.SelectOne<FullInstance>(query, instanceId);
+        return await conn.SelectOne<Resource>(query, id);
+    }
+
+    public async QueryResourceByName(resourceGroupName: string, resourceProviderName: string, resourceType: string, name: string)
+    {
+        const query = `
+        SELECT i.id, i.name, i.storageId, i.resourceProviderName, i.instanceType
+        FROM instances i
+        INNER JOIN instancegroups ig
+            ON ig.id = i.instanceGroupId
+        WHERE i.name = ? AND i.resourceProviderName = ? AND i.instanceType = ? AND ig.name = ?
+        LIMIT 1
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        return await conn.SelectOne<Resource>(query, name, resourceProviderName, resourceType, resourceGroupName);
     }
 
     public async QueryInstanceIdsAssociatedWithHost(hostId: number)
@@ -124,7 +129,7 @@ export class InstancesController
     public async QueryOverviewInstanceData(instanceId: number)
     {
         const query = `
-        SELECT i.fullName, ih.status
+        SELECT i.name, i.resourceProviderName, i.instanceType, ih.status
         FROM instances i
         INNER JOIN instances_health ih
             ON ih.instanceId = i.id
@@ -146,7 +151,7 @@ export class InstancesController
         WHERE h.hostName = ? AND i.fullName LIKE ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.Select<Instance>(query, hostName, fullNamePattern);
+        return await conn.Select<Resource>(query, hostName, fullNamePattern);
     }
 
     //Private methods

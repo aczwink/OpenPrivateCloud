@@ -21,7 +21,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { EasyRSAManager } from "./EasyRSAManager";
 import { OpenVPNServerConfig } from "./models";
 import { OpenVPNGatewayManager, OpenVPNGatewayPublicEndpointConfig } from "./OpenVPNGatewayManager";
@@ -42,21 +42,22 @@ interface OpenVPNGatewayExternalConfig
     serverConfig: OpenVPNServerConfig;
 }
 
-@APIController(`resourceProviders/${c_networkServicesResourceProviderName}/${c_openVPNGatewayResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_networkServicesResourceProviderName}/${c_openVPNGatewayResourceTypeName}/{instanceName}`)
 class OpenVPNGatewayAPIController
 {
-    constructor(private hostsController: HostsController, private instancesManager: InstancesManager, private easyRSAManager: EasyRSAManager,
+    constructor(private hostsController: HostsController, private instancesManager: ResourcesManager, private easyRSAManager: EasyRSAManager,
         private openVPNGatwayManager: OpenVPNGatewayManager)
     {
     }
 
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.networkServices.name, resourceProviders.networkServices.openVPNGatewayResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.networkServices.name, resourceProviders.networkServices.openVPNGatewayResourceType.name, instanceName);
+        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
         if(instanceContext === undefined)
             return NotFound("instance not found");
 

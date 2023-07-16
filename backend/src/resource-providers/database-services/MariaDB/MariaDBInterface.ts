@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { InstanceContext } from "../../../common/InstanceContext";
+import { ResourceReference } from "../../../common/InstanceReference";
 import { MySQLGrant } from "../MySQLClient";
 
 export interface MariaDBInterface
@@ -24,7 +25,7 @@ export interface MariaDBInterface
     CheckAllDatabases(instanceContext: InstanceContext): Promise<string>;
     CreateDatabase(instanceContext: InstanceContext, databaseName: string): Promise<void>;
     CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string): Promise<void>;
-    DeleteResource(instanceContext: InstanceContext): Promise<void>;
+    DeleteResource(resourceReference: ResourceReference): Promise<void>;
     DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string): Promise<void>;
     ExecuteSelectQuery(instanceContext: InstanceContext, query: string): Promise<any[]>;
 }

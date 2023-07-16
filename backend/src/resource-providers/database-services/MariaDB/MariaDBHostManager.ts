@@ -22,7 +22,7 @@ import { ConfigModel } from "../../../common/config/ConfigModel";
 import { ConfigParser } from "../../../common/config/ConfigParser";
 import { ConfigWriter } from "../../../common/config/ConfigWriter";
 import { HostUsersManager } from "../../../services/HostUsersManager";
-import { InstancesManager } from "../../../services/InstancesManager";
+import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ModulesManager } from "../../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../../services/RemoteFileSystemManager";
@@ -33,6 +33,7 @@ import { MariadbProperties } from "./MariadbProperties";
 import { MariaDBInterface } from "./MariaDBInterface";
 import { InstanceContext } from "../../../common/InstanceContext";
 import { MySQLClient, MySQLGrant } from "../MySQLClient";
+import { ResourceReference } from "../../../common/InstanceReference";
 
 interface MysqldSettings
 {
@@ -66,7 +67,7 @@ export class MariaDBConfigParser extends ConfigParser
 @Injectable
 export class MariaDBHostManager implements MariaDBInterface
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private modulesManager: ModulesManager, private instancesManager: InstancesManager,
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private modulesManager: ModulesManager, private instancesManager: ResourcesManager,
         private remoteFileSystemManager: RemoteFileSystemManager, private hostUsersManager: HostUsersManager,
         private remoteRootFileSystemManager: RemoteRootFileSystemManager, private systemServicesManager: SystemServicesManager)
     {
@@ -97,14 +98,14 @@ export class MariaDBHostManager implements MariaDBInterface
         await client.CreateUser(userName, hostName, password);
     }
 
-    public async DeleteResource(instanceContext: InstanceContext): Promise<void>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<void>
     {
-        const hostId = instanceContext.hostId;
+        const hostId = resourceReference.hostId;
 
         await this.systemServicesManager.StopService(hostId, "mariadb");
         await this.modulesManager.Uninstall(hostId, "mariadb");
 
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, resourceReference.hostStoragePath, resourceReference.externalId);
     }
 
     public async DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string): Promise<void>
@@ -128,7 +129,7 @@ export class MariaDBHostManager implements MariaDBInterface
 
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "mariadb");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o755);
         const uid = await this.hostUsersManager.ResolveHostUserId(context.hostId, "mysql");
         const gid = await this.hostUsersManager.ResolveHostGroupId(context.hostId, "mysql");

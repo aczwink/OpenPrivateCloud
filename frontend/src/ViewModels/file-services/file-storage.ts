@@ -16,71 +16,71 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { DeploymentDataDto, FileStorageConfig, SMBConfig, SMBConnectionInfo, SnapshotDto } from "../../../dist/api";
+import { DeploymentDataDto, FileStorageConfig, SMBConnectionInfo, SnapshotDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { FileManagerComponent } from "../../Views/file-manager/FileManagerComponent";
 import { resourceProviders } from "openprivatecloud-common";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.fileStorageResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.fileStorageResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<DeploymentDataDto, InstanceId>  = {
+const overviewViewModel: ObjectViewModel<DeploymentDataDto, ResourceAndGroupId>  = {
     type: "object",
     actions: [],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.deploymentdata.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.filestorage._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "DeploymentDataDto",
 };
 
-const configViewModel: ObjectViewModel<FileStorageConfig, InstanceId>  = {
+const configViewModel: ObjectViewModel<FileStorageConfig, ResourceAndGroupId>  = {
     type: "object",
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "FileStorageConfig",
-            requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.config.get(ids.instanceName),
-            updateResource: (service, ids, cfg) => service.resourceProviders.fileservices.filestorage._any_.config.put(ids.instanceName, cfg)
+            requestObject: (service, ids) => service.resourceProviders._any_.fileservices.filestorage._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, cfg) => service.resourceProviders._any_.fileservices.filestorage._any_.config.put(ids.resourceGroupName, ids.resourceName, cfg)
         }
     ],
     formTitle: _ => "Configuration",
-    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.config.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.filestorage._any_.config.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "FileStorageConfig",
 };
 
-const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, InstanceId>  = {
+const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, ResourceAndGroupId>  = {
     type: "object",
     actions: [],
     formTitle: _ => "SMB connection information",
-    requestObject: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.smbconnect.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.filestorage._any_.smbconnect.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "SMBConnectionInfo",
 };
 
 
-const snapshotsViewModel: ListViewModel<SnapshotDto, InstanceId> = {
+const snapshotsViewModel: ListViewModel<SnapshotDto, ResourceAndGroupId> = {
     actions: [
         {
             type: "create",
-            createResource: (service, ids, _) => service.resourceProviders.fileservices.filestorage._any_.snapshots.post(ids.instanceName)
+            createResource: (service, ids, _) => service.resourceProviders._any_.fileservices.filestorage._any_.snapshots.post(ids.resourceGroupName, ids.resourceName)
         }
     ],
     boundActions: [],
     displayName: "Snapshots",
-    requestObjects: (service, ids) => service.resourceProviders.fileservices.filestorage._any_.snapshots.get(ids.instanceName),
+    requestObjects: (service, ids) => service.resourceProviders._any_.fileservices.filestorage._any_.snapshots.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "SnapshotDto",
     type: "list",
 };
 
-export const fileStorageViewModel: MultiPageViewModel<InstanceId> = {
+export const fileStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -92,7 +92,7 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId> = {
                     child: overviewViewModel,
                     displayName: "Overview"
                 },
-                BuildAccessControlPageEntry(BuildFullInstanceName),
+                BuildAccessControlPageEntry(BuildResourceId),
                 {
                     key: "file-manager",
                     child: {
@@ -119,6 +119,6 @@ export const fileStorageViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

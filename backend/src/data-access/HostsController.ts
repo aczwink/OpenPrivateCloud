@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,18 @@ export class HostsController
         await conn.DeleteRows("hosts", "hostName = ?", hostName);
     }
 
-    public async RequestHost(hostName: string)
+    public async QueryHost(id: number)
+    {
+        const query = `
+        SELECT hostName
+        FROM hosts
+        WHERE id = ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        return conn.SelectOne<Host>(query, id);
+    }
+
+    public async QueryHostByName(hostName: string)
     {
         const query = `
         SELECT hostName

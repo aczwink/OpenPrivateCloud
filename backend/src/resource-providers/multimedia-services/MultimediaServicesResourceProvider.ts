@@ -18,18 +18,19 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { AVTranscoderProperties } from "./AVTranscoderProperties";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { AVTranscoderConfig, AVTranscoderQuality } from "./AVTranscoderConfig";
 import { InstanceContext } from "../../common/InstanceContext";
+import { ResourceReference } from "../../common/InstanceReference";
 
 @Injectable
 export class MultimediaServicesResourceProvider implements ResourceProvider<AVTranscoderProperties>
 {
-    constructor(private modulesManager: ModulesManager, private instancesManager: InstancesManager, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private modulesManager: ModulesManager, private instancesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
     
@@ -59,13 +60,13 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     {
     }
     
-    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        await this.instancesManager.RemoveInstanceStorageDirectory(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
         return null;
     }
 
-    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
+    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 
@@ -73,7 +74,7 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "ffmpeg");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
 
         const tmpDir = path.join(instanceDir, "tmp");
 

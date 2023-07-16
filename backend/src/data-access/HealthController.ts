@@ -25,6 +25,7 @@ export enum HealthStatus
     Up = 1,
     Down = 2,
     Corrupt = 3,
+    InDeployment = 4
 }
 
 interface InstanceHealthData

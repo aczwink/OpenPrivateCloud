@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../../data-access/UsersController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
@@ -30,7 +30,7 @@ import { LetsEncryptProperties } from "./Properties";
 export class LetsEncryptManager
 {
     constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private modulesManager: ModulesManager,
-        private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager, private instancesManager: InstancesManager)
+        private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager, private instancesManager: ResourcesManager)
     {
     }
 
@@ -62,7 +62,7 @@ export class LetsEncryptManager
         const enabledSiteNames = await this.SaveApacheState(context.hostId);
         await this.PrepareApacheForCertbot(context.hostId, enabledSiteNames);
 
-        const certName = this.MapFullInstanceNameToCertificateName(context.fullInstanceName);
+        const certName = this.MapFullInstanceNameToCertificateName(context.resourceReference.externalId);
         const command = ["sudo", "certbot", "certonly", "--cert-name", certName, "--webroot", "-w", "/var/www/html/", "-d", instanceProperties.domainName, "-m", user!.emailAddress, "--agree-tos"];
         try
         {

@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { InstancesController } from "../data-access/InstancesController";
+import { ResourcesController } from "../data-access/ResourcesController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { HostUsersManager } from "./HostUsersManager";
@@ -24,7 +24,7 @@ import { HostUsersManager } from "./HostUsersManager";
 @Injectable
 export class PermissionsManager
 {
-    constructor(private instancesController: InstancesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
+    constructor(private instancesController: ResourcesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
         private roleAssignmentsController: RoleAssignmentsController)
     {
     }

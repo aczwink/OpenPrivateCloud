@@ -16,14 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
-import { resourceProviders } from "openprivatecloud-common";
+import { APIController, Body, BodyProp, Common, Get, Path, Post, Put } from "acts-util-apilib";
 import { c_computeServicesResourceProviderName, c_dockerContainerResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { InstanceContext } from "../../common/InstanceContext";
-import { HostsController } from "../../data-access/HostsController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { DockerContainerManager } from "./DockerContainerManager";
 import { DockerContainerConfig } from "./DockerManager";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourceReference } from "../../common/InstanceReference";
 
 
 interface DockerContainerInfo
@@ -45,74 +44,67 @@ interface DockerContainerLogDto
     stdOut: string;
 }
 
-@APIController(`resourceProviders/${c_computeServicesResourceProviderName}/${c_dockerContainerResourceTypeName}/{instanceName}`)
-class DockerContainerAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_computeServicesResourceProviderName}/${c_dockerContainerResourceTypeName}/{resourceName}`)
+class _api_ extends ResourceAPIControllerBase
 {
-    constructor(private instancesManager: InstancesManager, private hostsController: HostsController, private dockerManager: DockerContainerManager)
+    constructor(instancesManager: ResourcesManager, private dockerContainerManager: DockerContainerManager)
     {
+        super(instancesManager, c_computeServicesResourceProviderName, c_dockerContainerResourceTypeName);
     }
 
     @Common()
     public async ExtractCommonAPIData(
-        @Path instanceName: string
+        @Path resourceGroupName: string,
+        @Path resourceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.computeServices.name, resourceProviders.computeServices.dockerContainerResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
-        if(instanceContext === undefined)
-            return NotFound("instance not found");
-
-        return instanceContext;
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Post()
-    public async ExecuteVMAction(
-        @Common instanceContext: InstanceContext,
+    public async ExecuteContainerAction(
+        @Common resourceReference: ResourceReference,
         @BodyProp action: "start" | "shutdown"
     )
     {
-        await this.dockerManager.ExecuteAction(instanceContext, action);
+        await this.dockerContainerManager.ExecuteAction(resourceReference, action);
     }
 
     @Get("config")
     public async QueryContainerConfig(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference
     )
     {
-        return this.dockerManager.QueryContainerConfig(instanceContext.instanceId);
+        return this.dockerContainerManager.QueryContainerConfig(resourceReference.id);
     }
 
     @Put("config")
     public async UpdateContainerConfig(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Body config: DockerContainerConfig
     )
     {
-        return this.dockerManager.UpdateContainerConfig(instanceContext.instanceId, config);
+        return this.dockerContainerManager.UpdateContainerConfig(resourceReference.id, config);
     }
 
     @Get("info")
     public async QueryContainerInfo(
-        @Common instanceContext: InstanceContext,
-        @Path instanceName: string
+        @Common resourceReference: ResourceReference
     )
-    {
-        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
-            
+    {            
         const result: DockerContainerInfo = {
-            hostName: host!.hostName,
-            state: await this.dockerManager.QueryContainerStatus(instanceContext.hostId, instanceName),
+            hostName: resourceReference.hostName,
+            state: await this.dockerContainerManager.QueryContainerStatus(resourceReference),
         };
         return result;
     }
 
     @Get("log")
     public async QueryLog(
-        @Common instanceContext: InstanceContext,
-        @Path instanceName: string
+        @Common resourceReference: ResourceReference
     )
     {
-        const log = await this.dockerManager.QueryLog(instanceContext.hostId, instanceName);
+        const log = await this.dockerContainerManager.QueryLog(resourceReference);
 
         const result: DockerContainerLogDto = {
             stdErr: log.stdErr,
@@ -123,9 +115,9 @@ class DockerContainerAPIController
 
     @Post("update")
     public async UpdateContainerImage(
-        @Common instanceContext: InstanceContext
+        @Common resourceReference: ResourceReference
     )
     {
-        await this.dockerManager.UpdateContainerImage(instanceContext);
+        await this.dockerContainerManager.UpdateContainerImage(resourceReference);
     }
 }

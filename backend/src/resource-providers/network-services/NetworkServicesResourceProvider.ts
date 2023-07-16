@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { OpenVPNGatewayProperties } from "./OpenVPNGatewayProperties";
@@ -27,11 +27,12 @@ import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { SysCtlConfService } from "./SysCtlConfService";
 import { InstanceContext } from "../../common/InstanceContext";
+import { ResourceReference } from "../../common/InstanceReference";
  
 @Injectable
 export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPNGatewayProperties>
 {
-    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
+    constructor(private instancesManager: ResourcesManager, private modulesManager: ModulesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private easyRSAManager: EasyRSAManager, private openVPNGatwayManager: OpenVPNGatewayManager, private systemServicesManager: SystemServicesManager,
         private sysCtlConfService: SysCtlConfService)
     {
@@ -63,17 +64,17 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
     {
     }
     
-    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        await this.openVPNGatwayManager.StopServer(instanceContext.hostId, instanceContext.fullInstanceName);
-        await this.remoteRootFileSystemManager.RemoveFile(instanceContext.hostId, this.openVPNGatwayManager.BuildConfigPath(instanceContext.fullInstanceName));
-        await this.systemServicesManager.Reload(instanceContext.hostId);
+        await this.openVPNGatwayManager.StopServer(resourceReference.hostId, resourceReference.externalId);
+        await this.remoteRootFileSystemManager.RemoveFile(resourceReference.hostId, this.openVPNGatwayManager.BuildConfigPath(resourceReference.externalId));
+        await this.systemServicesManager.Reload(resourceReference.hostId);
         
-        await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        await this.instancesManager.RemoveInstanceStorageDirectory(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
         return null;
     }
 
-    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
+    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 
@@ -81,15 +82,15 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "openvpn");
         await this.sysCtlConfService.SetIPForwardingState(context.hostId, true);
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(context.storagePath, context.fullInstanceName);
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(context.storagePath, context.resourceReference.externalId);
 
         await this.easyRSAManager.CreateCADir(context.hostId, instanceDir);
         await this.easyRSAManager.CreateCA(context.hostId, instanceDir, instanceProperties.name, instanceProperties.keySize);
         await this.easyRSAManager.CreateServer(context.hostId, instanceDir, instanceProperties.publicEndpoint.domainName, instanceProperties.keySize);
 
         const paths = this.easyRSAManager.GetCertPaths(instanceDir, instanceProperties.publicEndpoint.domainName);
-        await this.openVPNGatwayManager.CreateServerConfig(context.hostId, instanceDir, context.fullInstanceName, this.openVPNGatwayManager.CreateDefaultConfig(), paths);
-        await this.openVPNGatwayManager.AutoStartServer(context.hostId, context.fullInstanceName);
+        await this.openVPNGatwayManager.CreateServerConfig(context.hostId, instanceDir, context.resourceReference.externalId, this.openVPNGatwayManager.CreateDefaultConfig(), paths);
+        await this.openVPNGatwayManager.AutoStartServer(context.hostId, context.resourceReference.externalId);
 
         const config: OpenVPNGatewayInternalConfig = {
             pki: {

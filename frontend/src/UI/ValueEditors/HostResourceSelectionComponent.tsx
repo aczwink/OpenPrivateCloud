@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ interface HostInstanceSelection
 }
   
 @Injectable
-export class HostInstanceSelectionComponent extends Component<HostInstanceSelection>
+export class HostResourceSelectionComponent extends Component<HostInstanceSelection>
 {
     constructor(private apiService: APIService)
     {
@@ -59,7 +59,7 @@ export class HostInstanceSelectionComponent extends Component<HostInstanceSelect
         {
             this.state = null;
 
-            const response = await this.apiService.instances.search.get({
+            const response = await this.apiService.resources.search.get({
                 hostName: this.input.hostName,
                 instanceNameFilter: this.input.value,
                 type: this.input.type
@@ -75,14 +75,20 @@ export class HostInstanceSelectionComponent extends Component<HostInstanceSelect
     {
         searchText = searchText.toLowerCase();
 
-        const response = await this.apiService.instances.search.get({
+        const response = await this.apiService.resources.search.get({
             hostName: this.input.hostName,
             instanceNameFilter: searchText,
             type: this.input.type
         });
-        return response.data.map(x => ({
+        alert("TODO");
+        throw new Error("TODO");
+        /*return response.data.map(x => ({
             key: x.fullName,
             displayValue: x.fullName,
+        }));*/
+        return response.data.map(x => ({
+            key: "asd",
+            displayValue: "asd",
         }));
     }
 

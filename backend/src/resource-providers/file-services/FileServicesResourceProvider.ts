@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
@@ -25,11 +25,12 @@ import { FileStoragesManager } from "./FileStoragesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { InstanceContext } from "../../common/InstanceContext";
+import { ResourceReference } from "../../common/InstanceReference";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileStorageProperties>
 {
-    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager,
+    constructor(private instancesManager: ResourcesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
@@ -60,30 +61,30 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     {
     }
     
-    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        await this.fileStoragesManager.UpdateConfig(instanceContext, {
+        await this.fileStoragesManager.UpdateConfig(resourceReference, {
             smb: { enabled: false, transportEncryption: false }
         });
-        await this.fileStoragesManager.DeleteAllSnapshots(instanceContext);
-        await this.instancesManager.RemoveInstanceStorageDirectory(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        await this.fileStoragesManager.DeleteAllSnapshots(resourceReference);
+        await this.instancesManager.RemoveInstanceStorageDirectory(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
 
         return null;
     }
 
-    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
+    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
-        await this.fileStoragesManager.RefreshPermissions(instanceContext);
+        await this.fileStoragesManager.RefreshPermissions(resourceReference);
     }
 
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
-        const instancePath = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instancePath = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, instancePath, 0o775);
 
-        const dataPath = this.fileStoragesManager.GetDataPath(context.storagePath, context.fullInstanceName);
-        const snapshotsPath = this.fileStoragesManager.GetSnapshotsPath(context.storagePath, context.fullInstanceName);
+        const dataPath = this.fileStoragesManager.GetDataPath(context.storagePath, context.resourceReference.externalId);
+        const snapshotsPath = this.fileStoragesManager.GetSnapshotsPath(context.storagePath, context.resourceReference.externalId);
 
         await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "create", dataPath], context.hostId);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, dataPath, 0o770);

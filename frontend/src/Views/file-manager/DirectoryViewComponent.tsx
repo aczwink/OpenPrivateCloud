@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ import { APIService } from "../../Services/APIService";
 import { RenderReadOnlyValue } from "../../UI/ValuePresentation";
 
 @Injectable
-export class DirectoryViewComponent extends Component<{ instanceName: string }>
+export class DirectoryViewComponent extends Component<{ resourceGroupName: string; instanceName: string }>
 {
     constructor(private apiService: APIService, private apiSchemaService: APISchemaService)
     {
@@ -65,7 +65,7 @@ export class DirectoryViewComponent extends Component<{ instanceName: string }>
 
     private async QueryEntries(path: string)
     {
-        const result = await this.apiService.resourceProviders.fileservices.filestorage._any_.contents.get(this.input.instanceName, { dirPath: path });
+        const result = await this.apiService.resourceProviders._any_.fileservices.filestorage._any_.contents.get(this.input.resourceGroupName, this.input.instanceName, { dirPath: path });
         if(result.statusCode === 200)
         {
             this.dirPath = path;

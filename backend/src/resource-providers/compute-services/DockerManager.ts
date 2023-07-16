@@ -21,6 +21,7 @@ import { ShellWrapper } from "../../common/ShellWrapper";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { LetsEncryptManager } from "../web-services/LetsEncryptManager";
+import { Dictionary } from "acts-util-core";
 
 interface EnvironmentVariableMapping
 {
@@ -28,7 +29,7 @@ interface EnvironmentVariableMapping
     value: string;
 }
 
-interface PortMapping
+export interface DockerContainerConfigPortMapping
 {
     hostPost: number;
     containerPort: number;
@@ -44,12 +45,22 @@ export interface DockerContainerConfig
 
     env: EnvironmentVariableMapping[];
     imageName: string;
-    portMap: PortMapping[];
+    portMap: DockerContainerConfigPortMapping[];
     restartPolicy: "always" | "no";
 }
 
-interface DockerContainerInfo
+interface DockerContainerInfoPortBinding
 {
+    HostIp: string;
+    HostPort: string;
+}
+
+export interface DockerContainerInfo
+{
+    HostConfig: {
+        PortBindings: Dictionary<DockerContainerInfoPortBinding[]>;
+    };
+
     Config: {
         Image: string;
     };
@@ -68,7 +79,7 @@ export class DockerManager
     }
 
     //Public methods
-    public async CreateContainerInstanceAndAutoStart(hostId: number, containerName: string, config: DockerContainerConfig)
+    public async CreateContainerInstance(hostId: number, containerName: string, config: DockerContainerConfig)
     {
         await this.EnsureDockerIsInstalled(hostId);
 
@@ -95,7 +106,12 @@ export class DockerManager
         ];
 
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "create", ...cmdArgs], hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "start", containerName], hostId);
+    }
+
+    public async CreateContainerInstanceAndStart(hostId: number, containerName: string, config: DockerContainerConfig)
+    {
+        await this.CreateContainerInstance(hostId, containerName, config);
+        await this.StartExistingContainer(hostId, containerName);
     }
 
     public async DeleteContainer(hostId: number, containerName: string)
@@ -126,6 +142,12 @@ export class DockerManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "pull", imageName], hostId);
     }
 
+    public async QueryContainerLogs(hostId: number, containerName: string)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "docker", "container", "logs", containerName], hostId);
+        return result;
+    }
+
     public async SpawnShell(hostId: number, containerName: string, shellType: "sh" = "sh")
     {
         const hostShell = await this.remoteCommandExecutor.SpawnRawShell(hostId);
@@ -145,6 +167,11 @@ export class DockerManager
         };
 
         return new ShellFrontend(containerShell);
+    }
+
+    public async StartExistingContainer(hostId: number, containerName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "start", containerName], hostId);
     }
 
     public async StopContainer(hostId: number, containerName: string)

@@ -21,62 +21,62 @@ import { NodeAppConfig, NodeAppServiceInfoDto, NodeAppServiceStatus } from "../.
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadNodeAppServieContentComponent } from "../../Views/node-app-service/UploadNodeAppServieContentComponent";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nodeAppServiceResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nodeAppServiceResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<NodeAppServiceInfoDto, InstanceId> = {
+const overviewViewModel: ObjectViewModel<NodeAppServiceInfoDto, ResourceAndGroupId> = {
     type: "object",
     actions: [
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.startStop.post(ids.instanceName, { action: "start" }),
+            execute: (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.startStop.post(ids.resourceGroupName, ids.resourceName, { action: "start" }),
             matIcon: "play_arrow",
             title: "Start"
         },
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.startStop.post(ids.instanceName, { action: "stop" }),
+            execute: (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.startStop.post(ids.resourceGroupName, ids.resourceName, { action: "stop" }),
             matIcon: "power_settings_new",
             title: "Stop"
         },
     ],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.info.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "NodeAppServiceInfoDto"
 };
 
-const statusViewModel: ObjectViewModel<NodeAppServiceStatus, InstanceId> = {
+const statusViewModel: ObjectViewModel<NodeAppServiceStatus, ResourceAndGroupId> = {
     type: "object",
     actions: [],
     formTitle: _ => "Status",
-    requestObject: (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.status.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.status.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "NodeAppServiceStatus"
 };
 
-const configViewModel: ObjectViewModel<NodeAppConfig, InstanceId> = {
+const configViewModel: ObjectViewModel<NodeAppConfig, ResourceAndGroupId> = {
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "NodeAppConfig",
-            requestObject: async (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.config.get(ids.instanceName),
-            updateResource: (service, ids, newValue) => service.resourceProviders.webservices.nodeappservice._any_.config.put(ids.instanceName, newValue)
+            requestObject: async (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders._any_.webservices.nodeappservice._any_.config.put(ids.resourceGroupName, ids.resourceName, newValue)
         }
     ],
     formTitle: _ => "Configuration",
-    requestObject: async (service, ids) => service.resourceProviders.webservices.nodeappservice._any_.config.get(ids.instanceName),
+    requestObject: async (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.config.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "NodeAppConfig",
     type: "object"
 };
 
-export const nodeAppServiceViewodel: MultiPageViewModel<InstanceId> = {
+export const nodeAppServiceViewodel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -109,6 +109,6 @@ export const nodeAppServiceViewodel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

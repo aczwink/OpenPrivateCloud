@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,58 +16,60 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterButton } from "acfrontend";
+import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, Router, RouterButton, RouterState } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common/resourceProviders";
-import { HealthStatus, OverviewInstanceData } from "../../../dist/api";
+import { HealthStatus, ResourceOverviewDataDTO } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
  
   
 @Injectable
-export class InstancesListComponent extends Component
+export class ResourceListComponent extends Component
 {
-    constructor(private apiService: APIService)
+    constructor(private apiService: APIService, routerState: RouterState, private router: Router)
     {
         super();
 
-        this.instances = null;
+        this.resources = null;
+        this.resourceGroupName = routerState.routeParams.resourceGroupName!;
     }
 
     protected Render(): RenderValue
     {
-        if(this.instances === null)
+        if( (this.resources === null) )
             return <ProgressSpinner />;
 
         return <fragment>
-            <h2>Instances</h2>
+            <h2>Resources</h2>
             <table className="table table-striped">
                 <thead>
                     <tr>
-                        <th>Instance name</th>
-                        <th>Instance type</th>
+                        <th>Resource name</th>
+                        <th>Resource type</th>
                         <th>Status</th>
                         <th>Resource provider</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {this.instances.map(this.RenderInstance.bind(this))}
+                    {this.resources.map(this.RenderInstance.bind(this))}
                 </tbody>
             </table>
-            <RouterButton className="btn btn-primary" route={"/instances/add"}><BootstrapIcon>plus</BootstrapIcon></RouterButton>
+            <RouterButton className="btn btn-primary" route={"/resourceGroups/" + this.resourceGroupName + "/add"}><BootstrapIcon>plus</BootstrapIcon></RouterButton>
         </fragment>;
     }
 
     //Private variables
-    private instances: OverviewInstanceData[] | null;
+    private resourceGroupName: string;
+    private resources: ResourceOverviewDataDTO[] | null;
 
     //Private methods
-    private RenderInstance(instance: OverviewInstanceData)
+    private RenderInstance(resource: ResourceOverviewDataDTO)
     {
-        const parts = instance.fullName.substring(1).split("/");
+        const urlPart = resource.id.substring(resource.id.indexOf("/", 1));
         return <tr>
-            <td>{this.RenderResourceIcon(parts[1])} <Anchor route={"/instances" + instance.fullName}>{parts[2]}</Anchor></td>
-            <td>{parts[1]}</td>
-            <td>{this.RenderStatus(instance.status)}</td>
-            <td>{parts[0]}</td>
+            <td>{this.RenderResourceIcon(resource.instanceType)} <Anchor route={"/resourceGroups/" + this.resourceGroupName + "/resources" + urlPart}>{resource.name}</Anchor></td>
+            <td>{resource.instanceType}</td>
+            <td>{this.RenderStatus(resource.status)}</td>
+            <td>{resource.resourceProviderName}</td>
         </tr>;
     }
 
@@ -111,13 +113,22 @@ export class InstancesListComponent extends Component
                 return <div className="text-warning"><BootstrapIcon>exclamation-circle-fill</BootstrapIcon></div>;
             case HealthStatus.Up:
                 return <div className="text-success"><BootstrapIcon>check-circle-fill</BootstrapIcon></div>;
+            case HealthStatus.InDeployment:
+                return <div className="text-danger"><BootstrapIcon>hourglass-split</BootstrapIcon></div>;
         }
     }
 
     //Event handlers
     override async OnInitiated(): Promise<void>
     {
-        const response = await this.apiService.instances.get();
-        this.instances = response.data;
+        const response = await this.apiService.resourceGroups._any_.resources.get(this.resourceGroupName);
+        if(response.statusCode === 404)
+        {
+            alert("Resource group not found");
+            this.router.RouteTo("/resourceGroups");
+            return;
+        }
+
+        this.resources = response.data;
     }
 }

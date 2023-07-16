@@ -17,13 +17,14 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
 import { InstanceContext } from "../../common/InstanceContext";
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
 import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
+import { ResourceReference } from "../../common/InstanceReference";
 
 interface SMBConfig
 {
@@ -43,7 +44,7 @@ export interface FileStorageConfig
 @Injectable
 export class FileStoragesManager
 {
-    constructor(private instancesManager: InstancesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
+    constructor(private instancesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
         private remoteFileSystemManager: RemoteFileSystemManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: InstanceConfigController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
@@ -51,42 +52,42 @@ export class FileStoragesManager
     }
     
     //Public methods
-    public async CreateSnapshot(instanceContext: InstanceContext)
+    public async CreateSnapshot(resourceReference: ResourceReference)
     {
-        await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(instanceContext);
+        await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference);
 
-        const dataPath = this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
-        const snapsPath = this.GetSnapshotsPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const dataPath = this.GetDataPath(resourceReference.hostStoragePath, resourceReference.externalId);
+        const snapsPath = this.GetSnapshotsPath(resourceReference.hostStoragePath, resourceReference.externalId);
         const snapName = new Date().toISOString();
         const fullSnapPath = path.join(snapsPath, snapName);
         
-        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "snapshot", "-r", dataPath, fullSnapPath], instanceContext.hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sync"], instanceContext.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "snapshot", "-r", dataPath, fullSnapPath], resourceReference.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sync"], resourceReference.hostId);
     }
 
-    public async DeleteAllSnapshots(instanceContext: InstanceContext)
+    public async DeleteAllSnapshots(resourceReference: ResourceReference)
     {
-        const snapshots = await this.QuerySnapshotsOrdered(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const snapshots = await this.QuerySnapshotsOrdered(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
         for (const snapshot of snapshots)
-            await this.DeleteSnapshot(instanceContext, snapshot.snapshotName);
+            await this.DeleteSnapshot(resourceReference, snapshot.snapshotName);
     }
 
-    public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(instanceContext: InstanceContext)
+    public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference: ResourceReference)
     {
-        const config = await this.ReadConfig(instanceContext.instanceId);
+        const config = await this.ReadConfig(resourceReference.id);
         if(config.snapshotRetentionDays === undefined)
             return;
 
         const msToDay = 1000 * 60 * 60 * 24;
         const currentDay = Date.now() / msToDay;
 
-        const snapshots = await this.QuerySnapshotsOrdered(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const snapshots = await this.QuerySnapshotsOrdered(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
         for (const snapshot of snapshots)
         {
             const snapshotDay = snapshot.creationDate.valueOf() / msToDay;
             if((snapshotDay + config.snapshotRetentionDays) < currentDay)
             {
-                await this.DeleteSnapshot(instanceContext, snapshot.snapshotName);
+                await this.DeleteSnapshot(resourceReference, snapshot.snapshotName);
             }
         }
     }
@@ -134,37 +135,37 @@ export class FileStoragesManager
         return config;
     }
 
-    public async RefreshPermissions(instanceContext: InstanceContext)
+    public async RefreshPermissions(resourceReference: ResourceReference)
     {
-        const dataPath = this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
-        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, dataPath, false);
+        const dataPath = this.GetDataPath(resourceReference.hostStoragePath, resourceReference.externalId);
+        await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, dataPath, false);
 
-        const cfg = await this.ReadConfig(instanceContext.instanceId);
-        await this.UpdateConfig(instanceContext, cfg);
+        const cfg = await this.ReadConfig(resourceReference.id);
+        await this.UpdateConfig(resourceReference, cfg);
     }
     
-    public async UpdateConfig(instanceContext: InstanceContext, config: FileStorageConfig)
+    public async UpdateConfig(resourceReference: ResourceReference, config: FileStorageConfig)
     {
         const result = await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
             enabled: config.smb.enabled,
-            sharePath: this.GetDataPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName),
+            sharePath: this.GetDataPath(resourceReference.hostStoragePath, resourceReference.externalId),
             readOnly: false,
             transportEncryption: config.smb.transportEncryption,
-        }, instanceContext);
+        }, resourceReference);
         if(result !== undefined)
             return result;
 
-        await this.WriteConfig(instanceContext.instanceId, config);
+        await this.WriteConfig(resourceReference.id, config);
 
-        await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(instanceContext);
+        await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference);
     }
 
     //Private methods
-    private async DeleteSnapshot(instanceContext: InstanceContext, snapshotName: string)
+    private async DeleteSnapshot(resourceReference: ResourceReference, snapshotName: string)
     {
-        const snapshotsPath = this.GetSnapshotsPath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const snapshotsPath = this.GetSnapshotsPath(resourceReference.hostStoragePath, resourceReference.externalId);
         const snapshotPath = path.join(snapshotsPath, snapshotName);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "btrfs", "subvolume", "delete", snapshotPath], instanceContext.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "btrfs", "subvolume", "delete", snapshotPath], resourceReference.hostId);
     }
 
     private async WriteConfig(instanceId: number, config: FileStorageConfig)

@@ -20,18 +20,18 @@ import { resourceProviders } from "openprivatecloud-common";
 import { PageNotFoundComponent } from "../../PageNotFoundComponent";
 import { MultiPageViewModel } from "../../UI/ViewModel";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nextcloudResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nextcloudResourceType.name + "/" + resourceName;
 }
 
-export const nextcloudViewModel: MultiPageViewModel<InstanceId> = {
+export const nextcloudViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -53,6 +53,6 @@ export const nextcloudViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

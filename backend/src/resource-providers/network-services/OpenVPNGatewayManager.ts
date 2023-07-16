@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { CertKeyFiles, OpenVPNServerConfig } from "./models";
@@ -71,7 +71,7 @@ const openVPNConfigDialect: ConfigDialect = {
 @Injectable
 export class OpenVPNGatewayManager
 {
-    constructor(private instancesManager: InstancesManager, private instanceConfigController: InstanceConfigController,
+    constructor(private instancesManager: ResourcesManager, private instanceConfigController: InstanceConfigController,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private hostNATService: HostNATService)

@@ -20,8 +20,8 @@ import { APIController, BodyProp, Common, Get, NotFound, Path, Post } from "acts
 import { c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { HostsController } from "../../data-access/HostsController";
 import { HostStorage, HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesController } from "../../data-access/ResourcesController";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { VirtualMachineManager } from "./VirtualMachineManager";
 
 
@@ -32,27 +32,29 @@ interface VMInfo
     state: string;
 }
  
-@APIController(`resourceProviders/${c_computeServicesResourceProviderName}/${c_virtualMachineResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_computeServicesResourceProviderName}/${c_virtualMachineResourceTypeName}/{instanceName}`)
 class VirtualMachineAPIController
 {
-    constructor(private instancesController: InstancesController, private instancesManager: InstancesManager,
+    constructor(private instancesController: ResourcesController, private instancesManager: ResourcesManager,
         private hostStoragesController: HostStoragesController, private hostsController: HostsController, private virtualMachineManager: VirtualMachineManager)
     {
     }
 
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        throw new Error("TODO: reimplement me");
+        /*const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, instanceName);
+        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
         if(instance === undefined)
             return NotFound("instance not found");
 
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        return storage!;
+        return storage!;*/
     }
 
     @Post()

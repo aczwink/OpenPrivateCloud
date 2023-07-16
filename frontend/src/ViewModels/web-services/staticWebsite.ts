@@ -21,41 +21,41 @@ import { StaticWebsiteConfig, StaticWebsiteInfoDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadStaticWebsiteContentComponent } from "../../Views/static-website/UploadStaticWebsiteContentComponent";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.staticWebsiteResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.staticWebsiteResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<StaticWebsiteInfoDto, InstanceId> = {
+const overviewViewModel: ObjectViewModel<StaticWebsiteInfoDto, ResourceAndGroupId> = {
     type: "object",
     actions: [],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.webservices.staticwebsite._any_.info.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.staticwebsite._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "StaticWebsiteInfoDto"
 };
 
-const configViewModel: ObjectViewModel<StaticWebsiteConfig, InstanceId> = {
+const configViewModel: ObjectViewModel<StaticWebsiteConfig, ResourceAndGroupId> = {
     type: "object",
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "StaticWebsiteConfig",
-            requestObject: (service, ids) => service.resourceProviders.webservices.staticwebsite._any_.config.get(ids.instanceName),
-            updateResource: (service, ids, config) => service.resourceProviders.webservices.staticwebsite._any_.config.put(ids.instanceName, config),
+            requestObject: (service, ids) => service.resourceProviders._any_.webservices.staticwebsite._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, config) => service.resourceProviders._any_.webservices.staticwebsite._any_.config.put(ids.resourceGroupName, ids.resourceName, config),
         }
     ],
     formTitle: _ => "Config",
-    requestObject: (service, ids) => service.resourceProviders.webservices.staticwebsite._any_.config.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.staticwebsite._any_.config.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "StaticWebsiteConfig"
 };
 
-export const staticWebsiteViewModel: MultiPageViewModel<InstanceId> = {
+export const staticWebsiteViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -83,6 +83,6 @@ export const staticWebsiteViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

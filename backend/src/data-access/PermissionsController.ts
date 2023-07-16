@@ -137,38 +137,83 @@ export class PermissionsController
         return rows.Values().Map(x => x.hostId as number);
     }
 
-    public async QueryInstancesAssociatedWithGroup(userGroupId: number)
+    public async QueryResourceIdsAssociatedWithGroup(userGroupId: number)
     {
         let query = `
-        SELECT DISTINCT i.fullName
-        FROM instances i
-        INNER JOIN instances_roleAssignments ira
-            ON ira.instanceId = i.id
+        SELECT DISTINCT ira.instanceId
+        FROM instances_roleAssignments ira
         WHERE ira.userGroupId = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         const rows = await conn.Select(query, userGroupId);
 
-        return rows.Values().Map(x => x.fullName as string);
+        return rows.Values().Map(x => x.instanceId as number);
     }
 
-    public async QueryInstanceIdsThatUserHasAccessTo(userId: number)
+    public async QueryResourceGroupIdsThatUserHasAccessTo(userId: number)
     {
         const query = `
-        SELECT i.id
-        FROM instances i
-        INNER JOIN instances_roleAssignments ira
-            ON ira.instanceId = i.id
+        SELECT ig.id
+        FROM instancegroups ig
+        INNER JOIN instancegroups_roleAssignments igra
+            ON igra.instanceGroupId = ig.id
         INNER JOIN usergroups_members ugm
-            ON ugm.groupId = ira.userGroupId
+            ON ugm.groupId = igra.userGroupId
         INNER JOIN roles_permissions rp
-            ON rp.roleId = ira.roleId AND rp.permission = '/read'
+            ON rp.roleId = igra.roleId AND rp.permission = '/read'
         WHERE ugm.userId = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         const rows = await conn.Select(query, userId);
+
+        return rows.Values().Map(x => x.id as number);
+    }
+
+    public async QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(userId: number, resourceGroupId: number)
+    {
+        const query = `
+        SELECT DISTINCT id FROM
+        (
+            SELECT i.id
+            FROM instances i
+            INNER JOIN instances_roleAssignments ira
+                ON i.id = ira.instanceId
+            INNER JOIN roles_permissions rp
+                ON rp.roleId = ira.roleId
+            INNER JOIN usergroups_members ugm
+                ON ugm.groupId = ira.userGroupId
+            WHERE ugm.userId = ? AND rp.permission = '/read' AND i.instanceGroupId = ?
+
+            UNION ALL
+            
+            SELECT i.id
+            FROM instances i
+            INNER JOIN instancegroups_roleAssignments igra
+                ON igra.instanceGroupId = i.instanceGroupId
+            INNER JOIN roles_permissions rp
+                ON rp.roleId = igra.roleId
+            INNER JOIN usergroups_members ugm
+                ON ugm.groupId = igra.userGroupId
+            WHERE ugm.userId = ? AND rp.permission = '/read' AND i.instanceGroupId = ?
+
+            UNION ALL
+
+            SELECT i.id
+            FROM instances i
+            INNER JOIN cluster_roleAssignments cra
+                ON cra.userGroupId
+            INNER JOIN usergroups_members ugm
+                ON ugm.groupId = cra.userGroupId
+            INNER JOIN roles_permissions rp
+                ON rp.roleId = cra.roleId
+            WHERE ugm.userId = ? AND rp.permission = '/read' AND i.instanceGroupId = ?
+        ) inner_table
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, userId, resourceGroupId, userId, resourceGroupId, userId, resourceGroupId);
 
         return rows.Values().Map(x => x.id as number);
     }

@@ -21,6 +21,7 @@ import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourcePro
 import { InstanceContext } from "../../common/InstanceContext";
 import { MariadbProperties } from "./MariaDB/MariadbProperties";
 import { MariaDBManager } from "./MariaDB/MariaDBManager";
+import { ResourceReference } from "../../common/InstanceReference";
 
   
 @Injectable
@@ -67,13 +68,13 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
         await this.mariaDBManager.CheckDatabaseIntegrity(instanceContext);
     }
     
-    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        await this.mariaDBManager.DeleteResource(instanceContext);
+        await this.mariaDBManager.DeleteResource(resourceReference);
         return null;
     }
 
-    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
+    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 

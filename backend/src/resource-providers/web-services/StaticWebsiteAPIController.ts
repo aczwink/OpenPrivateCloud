@@ -23,8 +23,8 @@ import { c_staticWebsiteResourceTypeName, c_webServicesResourceProviderName } fr
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesController } from "../../data-access/ResourcesController";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { StaticWebsiteConfig, StaticWebsitesManager } from "./StaticWebsitesManager";
 
 interface StaticWebsiteInfoDto
@@ -34,21 +34,22 @@ interface StaticWebsiteInfoDto
     port: number;
 }
 
-@APIController(`resourceProviders/${c_webServicesResourceProviderName}/${c_staticWebsiteResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_staticWebsiteResourceTypeName}/{instanceName}`)
 class StaticWebsiteAPIController
 {
-    constructor(private instancesManager: InstancesManager, private instancesController: InstancesController, private staticWebsitesManager: StaticWebsitesManager,
+    constructor(private instancesManager: ResourcesManager, private instancesController: ResourcesController, private staticWebsitesManager: StaticWebsitesManager,
         private hostStoragesController: HostStoragesController, private hostsController: HostsController)
     {
     }
     
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.staticWebsiteResourceType.name, instanceName);
-        const instanceContext = this.instancesManager.CreateInstanceContext(fullInstanceName);
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.staticWebsiteResourceType.name, instanceName);
+        const instanceContext = this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
         if(instanceContext === undefined)
             return NotFound("instance not found");
 
@@ -77,14 +78,14 @@ class StaticWebsiteAPIController
         @Common instanceContext: InstanceContext,
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceContext.instanceId);
+        const instance = await this.instancesController.QueryResource(instanceContext.instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
         const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
             
         const result: StaticWebsiteInfoDto = {
             hostName: host!.hostName,
             storagePath: storage!.path,
-            port: await this.staticWebsitesManager.QueryPort(storage!.hostId, instance!.fullName)
+            port: await this.staticWebsitesManager.QueryPort(storage!.hostId, instance!.name)
         };
         return result;
     }

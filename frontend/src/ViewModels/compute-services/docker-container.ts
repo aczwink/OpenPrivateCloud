@@ -21,47 +21,47 @@ import { DockerContainerConfig, DockerContainerInfo, DockerContainerLogDto } fro
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.computeServices.name + "/" + resourceProviders.computeServices.dockerContainerResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.computeServices.name + "/" + resourceProviders.computeServices.dockerContainerResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<DockerContainerInfo, InstanceId>  = {
+const overviewViewModel: ObjectViewModel<DockerContainerInfo, ResourceAndGroupId>  = {
     type: "object",
     actions: [
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.post(ids.instanceName, { action: "start"}),
+            execute: (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.post(ids.resourceGroupName, ids.resourceName, { action: "start"}),
             matIcon: "play_arrow",
             title: "Start"
         },
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.post(ids.instanceName, { action: "shutdown"}),
+            execute: (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.post(ids.resourceGroupName, ids.resourceName, { action: "shutdown"}),
             matIcon: "power_settings_new",
             title: "Shutdown"
         },
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.update.post(ids.instanceName),
+            execute: (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.update.post(ids.resourceGroupName, ids.resourceName),
             matIcon: "update",
             title: "Update"
         }
     ],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.info.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "DockerContainerInfo",
 };
 
-const configViewModel: ObjectViewModel<DockerContainerConfig, InstanceId> = {
+const configViewModel: ObjectViewModel<DockerContainerConfig, ResourceAndGroupId> = {
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "DockerContainerConfig",
             loadContext: async (service, ids) => {
-                const response = await service.resourceProviders.computeservices.dockercontainer._any_.info.get(ids.instanceName);
+                const response = await service.resourceProviders._any_.computeservices.dockercontainer._any_.info.get(ids.resourceGroupName, ids.resourceName);
                 const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok)
                     return result.value;
@@ -69,29 +69,29 @@ const configViewModel: ObjectViewModel<DockerContainerConfig, InstanceId> = {
                     hostName: ""
                 };
             },
-            requestObject: async (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.config.get(ids.instanceName),
-            updateResource: (service, ids, newValue) => service.resourceProviders.computeservices.dockercontainer._any_.config.put(ids.instanceName, newValue)
+            requestObject: async (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders._any_.computeservices.dockercontainer._any_.config.put(ids.resourceGroupName, ids.resourceName, newValue)
         }
     ],
     formTitle: _ => "Container configuration",
-    requestObject: async (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.config.get(ids.instanceName),
+    requestObject: async (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.config.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "DockerContainerConfig",
     type: "object"
 };
 
-const logViewModel: ObjectViewModel<DockerContainerLogDto, InstanceId> = {
+const logViewModel: ObjectViewModel<DockerContainerLogDto, ResourceAndGroupId> = {
     actions: [],
     formTitle: _ => "Container log",
-    requestObject: async (service, ids) => service.resourceProviders.computeservices.dockercontainer._any_.log.get(ids.instanceName),
+    requestObject: async (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.log.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "DockerContainerLogDto",
     type: "object"
 };
 
-export const dockerContainerViewModel: MultiPageViewModel<InstanceId> = {
+export const dockerContainerViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -116,6 +116,6 @@ export const dockerContainerViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

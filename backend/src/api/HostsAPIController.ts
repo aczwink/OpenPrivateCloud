@@ -79,7 +79,7 @@ class HostAPIController
         @Path hostName: string
     )
     {
-        const host = await this.hostsController.RequestHost(hostName);
+        const host = await this.hostsController.QueryHostByName(hostName);
         if(host === undefined)
             return NotFound("host does not exist");
             

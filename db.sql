@@ -1,8 +1,8 @@
--- MariaDB dump 10.19  Distrib 10.6.11-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19  Distrib 10.11.2-MariaDB, for debian-linux-gnu (x86_64)
 --
 -- Host: localhost    Database: openprivatecloud
 -- ------------------------------------------------------
--- Server version	10.6.11-MariaDB-0ubuntu0.22.04.1
+-- Server version	10.11.2-MariaDB-1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -95,6 +95,40 @@ CREATE TABLE `hosts_storages` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `instancegroups`
+--
+
+DROP TABLE IF EXISTS `instancegroups`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `instancegroups` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(200) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `instancegroups_roleAssignments`
+--
+
+DROP TABLE IF EXISTS `instancegroups_roleAssignments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `instancegroups_roleAssignments` (
+  `instanceGroupId` int(10) unsigned NOT NULL,
+  `userGroupId` int(10) unsigned NOT NULL,
+  `roleId` bigint(20) unsigned NOT NULL,
+  PRIMARY KEY (`instanceGroupId`,`userGroupId`,`roleId`) USING BTREE,
+  KEY `instancegroups_roleAssignments_roleId` (`roleId`),
+  KEY `instancegroups_roleAssignments_userGroupId` (`userGroupId`),
+  CONSTRAINT `instancegroups_roleAssignments_instanceGroupId` FOREIGN KEY (`instanceGroupId`) REFERENCES `instancegroups` (`id`),
+  CONSTRAINT `instancegroups_roleAssignments_roleId` FOREIGN KEY (`roleId`) REFERENCES `roles` (`id`),
+  CONSTRAINT `instancegroups_roleAssignments_userGroupId` FOREIGN KEY (`userGroupId`) REFERENCES `usergroups` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `instances`
 --
 
@@ -103,11 +137,15 @@ DROP TABLE IF EXISTS `instances`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `instances` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `fullName` varchar(200) NOT NULL,
+  `instanceGroupId` int(10) unsigned NOT NULL,
   `storageId` int(10) unsigned NOT NULL,
+  `resourceProviderName` varchar(200) NOT NULL,
+  `instanceType` varchar(200) NOT NULL,
+  `name` varchar(200) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `fullName` (`fullName`),
+  UNIQUE KEY `instanceGroupId` (`instanceGroupId`,`resourceProviderName`,`instanceType`,`name`),
   KEY `instances_storageId` (`storageId`),
+  CONSTRAINT `instances_instanceGroupId` FOREIGN KEY (`instanceGroupId`) REFERENCES `instancegroups` (`id`),
   CONSTRAINT `instances_storageId` FOREIGN KEY (`storageId`) REFERENCES `hosts_storages` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -272,4 +310,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-01-14 23:51:09
+-- Dump completed on 2023-07-16 21:44:40

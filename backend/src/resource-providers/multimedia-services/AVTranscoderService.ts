@@ -19,21 +19,21 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { AVTranscoderConfig, AVTranscoderFormat, AVTranscoderQuality } from "./AVTranscoderConfig";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { InstancesController } from "../../data-access/InstancesController";
+import { ResourcesController } from "../../data-access/ResourcesController";
 import { HostStorage, HostStoragesController } from "../../data-access/HostStoragesController";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
 import { CodecService, FFProbe_StreamInfo } from "./CodecService";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { EnumeratorBuilder } from "acts-util-core/dist/Enumeration/EnumeratorBuilder";
 
 @Injectable
 export class AVTranscoderService
 {
-    constructor(private instancesController: InstancesController, private hostStoragesController: HostStoragesController,
+    constructor(private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
         private remoteFileSystemManager: RemoteFileSystemManager, private fileStoragesManager: FileStoragesManager, private codecService: CodecService,
-        private remoteCommandExecutor: RemoteCommandExecutor, private instancesManager: InstancesManager,
+        private remoteCommandExecutor: RemoteCommandExecutor, private instancesManager: ResourcesManager,
         private remoteRootFileSystemManager: RemoteRootFileSystemManager)
     {
     }
@@ -41,14 +41,16 @@ export class AVTranscoderService
     //Public methods
     public async Transcode(instanceId: number, config: AVTranscoderConfig)
     {
-        const sourceFileStorageInstance = await this.instancesController.QueryInstance(config.source.fullInstanceName);
+        throw new Error("TODO: reimplement me");
+        /*
+        const sourceFileStorageInstance = await this.instancesController.QueryResourceByName(config.source.fullInstanceName);
         const sourceFileStorageInstanceStorage = await this.hostStoragesController.RequestHostStorage(sourceFileStorageInstance!.storageId);
         const hostId = sourceFileStorageInstanceStorage!.hostId;
 
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.fullName);
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.name);
 
         const files = await this.ReadInputFiles(config.source.fullInstanceName, config.source.sourcePath, sourceFileStorageInstanceStorage!);
 
@@ -56,6 +58,7 @@ export class AVTranscoderService
         const targetPath = path.join(dataPath, config.targetPath);
         for (const file of files)
             await this.TranscodeFile(hostId, file, config.format, instanceDir, targetPath);
+            */
     }
 
     //Private methods

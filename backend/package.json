@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "run-dev-server": "nodemon --exec \"npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js && sudo systemctl restart openprivatecloud.service\"",
+    "run-dev-server": "nodemon --exec \"npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js && sudo -u opc-controller node dist/bundle.js\"",
     "build-release-package": "rm ./dist/bundle.js && npx webpack"
   },
   "keywords": [],

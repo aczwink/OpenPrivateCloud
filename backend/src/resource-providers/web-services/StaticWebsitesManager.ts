@@ -19,7 +19,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../../data-access/UsersController";
 import { HostUsersManager } from "../../services/HostUsersManager";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
@@ -29,7 +29,7 @@ import { ApacheManager } from "./ApacheManager";
 import { StaticWebsiteProperties } from "./Properties";
 import { VirtualHost } from "./VirtualHost";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { InstancesController } from "../../data-access/InstancesController";
+import { ResourcesController } from "../../data-access/ResourcesController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { TempFilesManager } from "../../services/TempFilesManager";
 import { linuxSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
@@ -43,11 +43,11 @@ export interface StaticWebsiteConfig
 @Injectable
 export class StaticWebsitesManager
 {
-    constructor(private modulesManager: ModulesManager, private instancesManager: InstancesManager,
+    constructor(private modulesManager: ModulesManager, private instancesManager: ResourcesManager,
         private hostUsersManager: HostUsersManager, private apacheManager: ApacheManager, private usersController: UsersController,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private remoteFileSystemManager: RemoteFileSystemManager, private remoteCommandExecutor: RemoteCommandExecutor,
-        private instancesController: InstancesController, private hostStoragesController: HostStoragesController,
+        private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
         private tempFilesMangager: TempFilesManager)
     {
     }
@@ -75,7 +75,7 @@ export class StaticWebsitesManager
         const gid = await this.hostUsersManager.ResolveHostGroupId(context.hostId, linuxSpecialGroups["www-data"]);
         const uid = await this.hostUsersManager.ResolveHostUserId(context.hostId, opcSpecialUsers.host);
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, uid, gid);
 
         const user = await this.usersController.QueryUser(context.userId);
@@ -89,7 +89,7 @@ export class StaticWebsitesManager
             }
         ];
 
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(context.fullInstanceName);
+        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(context.resourceReference.externalId);
         await this.apacheManager.CreateSite(context.hostId, siteName, vHost);
         await this.apacheManager.EnableSite(context.hostId, siteName);
         await this.apacheManager.EnablePort(context.hostId, instanceProperties.port);
@@ -127,11 +127,11 @@ export class StaticWebsitesManager
 
     public async UpdateContent(instanceId: number, buffer: Buffer)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
         const hostId = storage!.hostId;
 
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.fullName);
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.name);
 
         await this.CleanUpFolder(hostId, instanceDir);
 

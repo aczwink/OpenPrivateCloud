@@ -20,7 +20,7 @@ import { AutoCompleteSelectBox, BootstrapIcon, CheckBox, Component, FormField, I
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { APIService } from "../../Services/APIService";
-import { HostInstanceSelectionComponent } from "../ValueEditors/HostInstanceSelectionComponent";
+import { HostResourceSelectionComponent } from "../ValueEditors/HostResourceSelectionComponent";
 import { RoleSelectionComponent } from "../ValueEditors/RoleSelectionComponent";
 import { UserGroupSelectionComponent } from "../ValueEditors/UserGroupSelectionComponent";
 import { UserSelectionComponent } from "../ValueEditors/UserSelectionComponent";
@@ -253,7 +253,7 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
             {
                 const idx = schema.format.indexOf("[");
                 const arg = schema.format.substring(idx+1, schema.format.length - 1);
-                return <HostInstanceSelectionComponent type={arg} hostName={this.input.context!.hostName} value={value} valueChanged={valueChanged} />;
+                return <HostResourceSelectionComponent type={arg} hostName={this.input.context!.hostName} value={value} valueChanged={valueChanged} />;
             }
         }
 

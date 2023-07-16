@@ -18,7 +18,7 @@
 
 import { APIController, Get, NotFound, Query } from "acts-util-apilib";
 import { HealthController, HealthStats } from "../data-access/HealthController";
-import { InstancesController } from "../data-access/InstancesController";
+import { ResourcesManager } from "../services/ResourcesManager";
 
 interface ClusterHealthStats
 {
@@ -29,7 +29,7 @@ interface ClusterHealthStats
 @APIController("health")
 class HealthAPIController
 {
-    constructor(private healthController: HealthController, private instancesController: InstancesController)
+    constructor(private healthController: HealthController, private resourcesManager: ResourcesManager)
     {
     }
 
@@ -45,13 +45,13 @@ class HealthAPIController
 
     @Get("instance")
     public async QueueInstanceHealth(
-        @Query fullInstanceName: string
+        @Query id: string
     )
     {
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
-        if(instance === undefined)
-            return NotFound("instance not found");
+        const ref = await this.resourcesManager.CreateResourceReferenceFromExternalId(id);
+        if(ref === undefined)
+            return NotFound("resource not found");
 
-        return this.healthController.QueryInstanceHealthData(instance.id);
+        return this.healthController.QueryInstanceHealthData(ref.id);
     }
 }

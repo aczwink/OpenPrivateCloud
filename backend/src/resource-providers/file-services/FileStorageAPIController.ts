@@ -19,15 +19,16 @@
 import { APIController, Common, Body, Forbidden, Get, Header, NotFound, Path, Put, Query, Post, BadRequest } from "acts-util-apilib";
 import path from "path";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
+import { ResourcesController } from "../../data-access/ResourcesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { HostsController } from "../../data-access/HostsController";
 import { SessionsManager } from "../../services/SessionsManager";
 import { FileStorageConfig, FileStoragesManager } from "./FileStoragesManager";
 import { InstanceContext } from "../../common/InstanceContext";
+import { ResourceReference } from "../../common/InstanceReference";
 
 interface DeploymentDataDto
 {
@@ -52,11 +53,11 @@ interface SnapshotDto
     date: Date;
 }
 
-@APIController(`resourceProviders/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{instanceName}`)
 class FileStorageAPIController
 {
-    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private instancesController: InstancesController,
-        private instancesManager: InstancesManager, private hostStoragesController: HostStoragesController,
+    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private instancesController: ResourcesController,
+        private instancesManager: ResourcesManager, private hostStoragesController: HostStoragesController,
         private hostUsersManager: HostUsersManager, private hostsController: HostsController,
         private sessionsManager: SessionsManager, private fileStoragesManager: FileStoragesManager)
     {
@@ -65,19 +66,20 @@ class FileStorageAPIController
     //Public methods
     @Post("snapshots")
     public async AddSnapshot(
-        @Common data: InstanceContext
+        @Common resourceReference: ResourceReference
     )
     {
-        await this.fileStoragesManager.CreateSnapshot(data);
+        await this.fileStoragesManager.CreateSnapshot(resourceReference);
     }
 
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
-        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
+        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
         if(instanceContext === undefined)
             return NotFound("instance not found");
 
@@ -144,11 +146,11 @@ class FileStorageAPIController
 
     @Put("config")
     public async UpdateConfig(
-        @Common data: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Body config: FileStorageConfig
     )
     {
-        const result = await this.fileStoragesManager.UpdateConfig(data, config);
+        const result = await this.fileStoragesManager.UpdateConfig(resourceReference, config);
         if(result === "ErrorNoOneHasAccess")
             return BadRequest("no user has been giving read access to the share");
     }

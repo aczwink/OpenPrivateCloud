@@ -22,50 +22,50 @@ import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.backupServices.name + "/" + resourceProviders.backupServices.backupVaultResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.backupServices.name + "/" + resourceProviders.backupServices.backupVaultResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<BackupVaultDeploymentDataDto, InstanceId>  = {
+const overviewViewModel: ObjectViewModel<BackupVaultDeploymentDataDto, ResourceAndGroupId>  = {
     type: "object",
     actions: [
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.backupservices.backupvault._any_.post(ids.instanceName),
+            execute: (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.post(ids.resourceGroupName, ids.resourceName),
             matIcon: "backup",
             title: "Start backup"
         }
     ],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.backupservices.backupvault._any_.deploymentdata.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "BackupVaultDeploymentDataDto",
 };
 
-const targetConfigViewModel: ObjectViewModel<BackupVaultTargetConfig, InstanceId> = {
+const targetConfigViewModel: ObjectViewModel<BackupVaultTargetConfig, ResourceAndGroupId> = {
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "BackupVaultTargetConfig",
-            requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.target.get(ids.instanceName),
-            updateResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.target.put(ids.instanceName, newValue)
+            requestObject: async (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.target.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.target.put(ids.resourceGroupName, ids.resourceName, newValue)
         }
     ],
     formTitle: _ => "Backup target configuration",
-    requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.target.get(ids.instanceName),
+    requestObject: async (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.target.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "BackupVaultTargetConfig",
     type: "object"
 };
 
-const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, InstanceId> = {
+const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, ResourceAndGroupId> = {
     actions: [
         {
             type: "create",
-            createResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.sources.post(ids.instanceName, newValue),
+            createResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
             loadContext: async (service, ids) => {
-                const response = await service.resourceProviders.backupservices.backupvault._any_.deploymentdata.get(ids.instanceName);
+                const response = await service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
                 const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok === false)
                     throw new Error("TODO");
@@ -76,13 +76,13 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, I
     boundActions: [
         {
             type: "delete",
-            deleteResource: (service, ids, config) => service.resourceProviders.backupservices.backupvault._any_.sources.delete(ids.instanceName, { fullInstanceSourceName: config.fullInstanceName }),
+            deleteResource: (service, ids, config) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, { fullInstanceSourceName: config.fullInstanceName }),
         }
     ],
     displayName: "File storage to backup",
     requestObjects: async (service, ids) => 
     {
-        const response = await service.resourceProviders.backupservices.backupvault._any_.sources.get(ids.instanceName);
+        const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
         const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
@@ -98,14 +98,14 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, I
     type: "list"
 };
 
-const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, InstanceId> = {
+const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, ResourceAndGroupId> = {
     type: "list",
     actions: [
         {
             type: "create",
-            createResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.sources.post(ids.instanceName, newValue),
+            createResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
             loadContext: async (service, ids) => {
-                const response = await service.resourceProviders.backupservices.backupvault._any_.deploymentdata.get(ids.instanceName);
+                const response = await service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
                 const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok === false)
                     throw new Error("TODO");
@@ -116,13 +116,13 @@ const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, Instanc
     boundActions: [
         {
             type: "delete",
-            deleteResource: (service, ids, config) => service.resourceProviders.backupservices.backupvault._any_.sources.delete(ids.instanceName, { fullInstanceSourceName: config.fullInstanceName }),
+            deleteResource: (service, ids, config) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, { fullInstanceSourceName: config.fullInstanceName }),
         }
     ],
     displayName: "Databases to backup",
     requestObjects: async (service, ids) => 
     {
-        const response = await service.resourceProviders.backupservices.backupvault._any_.sources.get(ids.instanceName);
+        const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
         const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
@@ -137,60 +137,60 @@ const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, Instanc
     schemaName: "BackupVaultDatabaseConfig"
 };
 
-const triggerConfigViewModel: ObjectViewModel<BackupVaultTrigger, InstanceId> = {
+const triggerConfigViewModel: ObjectViewModel<BackupVaultTrigger, ResourceAndGroupId> = {
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "BackupVaultTrigger",
-            requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.trigger.get(ids.instanceName),
-            updateResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.trigger.put(ids.instanceName, newValue)
+            requestObject: async (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.trigger.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.trigger.put(ids.resourceGroupName, ids.resourceName, newValue)
         }
     ],
     formTitle: _ => "Backup trigger configuration",
-    requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.trigger.get(ids.instanceName),
+    requestObject: async (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.trigger.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "BackupVaultTrigger",
     type: "object"
 };
 
-const retentionConfigViewModel: ObjectViewModel<BackupVaultRetentionConfig, InstanceId> = {
+const retentionConfigViewModel: ObjectViewModel<BackupVaultRetentionConfig, ResourceAndGroupId> = {
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "BackupVaultRetentionConfig",
-            requestObject: async (service, ids) => service.resourceProviders.backupservices.backupvault._any_.retention.get(ids.instanceName),
-            updateResource: (service, ids, newValue) => service.resourceProviders.backupservices.backupvault._any_.retention.put(ids.instanceName, newValue)
+            requestObject: async (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.retention.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.retention.put(ids.resourceGroupName, ids.resourceName, newValue)
         }
     ],
     formTitle: _ => "Retention configuration",
-    requestObject: (service, ids) => service.resourceProviders.backupservices.backupvault._any_.retention.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.backupservices.backupvault._any_.retention.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "BackupVaultRetentionConfig",
     type: "object"
 };
 
-const logViewModel: ObjectViewModel<InstanceLog, InstanceId & { logId: number}> = {
+const logViewModel: ObjectViewModel<InstanceLog, ResourceAndGroupId & { logId: number}> = {
     type: "object",
     actions: [],
     formTitle: _ => "Log",
-    requestObject: (service, ids) => service.instances.logs._any_.get(ids.logId),
+    requestObject: (service, ids) => service.resources.logs._any_.get(ids.logId),
     schemaName: "InstanceLog",
 };
 
-const logsViewModel: CollectionViewModel<InstanceLogOverviewData, InstanceId> = {
+const logsViewModel: CollectionViewModel<InstanceLogOverviewData, ResourceAndGroupId> = {
     type: "collection",
     actions: [],
     child: logViewModel,
     displayName: "Logs",
     extractId: x => x.logId,
     idKey: "logId",
-    requestObjects: (service, ids) => service.instances.logs.get({ fullInstanceName: BuildFullInstanceName(ids.instanceName) }),
+    requestObjects: (service, ids) => service.resources.logs.get({ fullInstanceName: BuildResourceId(ids.resourceGroupName, ids.resourceName) }),
     schemaName: "InstanceLogOverviewData",
 };
  
-export const backupVaultViewModel: MultiPageViewModel<InstanceId> = {
+export const backupVaultViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -235,6 +235,6 @@ export const backupVaultViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

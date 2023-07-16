@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -40,8 +40,8 @@ export class FileManagerComponent extends Component
             </div>
 
             <div className="row evenly-spaced">
-                <div className="col"><DirectoryViewComponent instanceName={this.routerState.routeParams.instanceName!} /></div>
-                {this.showTwoColumns ? <div className="col"><DirectoryViewComponent instanceName={this.routerState.routeParams.instanceName!} /></div> : null}
+                <div className="col"><DirectoryViewComponent resourceGroupName={this.routerState.routeParams.resourceGroupName!} instanceName={this.routerState.routeParams.instanceName!} /></div>
+                {this.showTwoColumns ? <div className="col"><DirectoryViewComponent resourceGroupName={this.routerState.routeParams.resourceGroupName!} instanceName={this.routerState.routeParams.instanceName!} /></div> : null}
             </div>
         </fragment>;
     }

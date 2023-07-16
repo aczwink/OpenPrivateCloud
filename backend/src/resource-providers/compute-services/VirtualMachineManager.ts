@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,14 +23,14 @@ import { DeploymentContext, ResourceDeletionError } from "../ResourceProvider";
 import { OSImageDownloader } from "./OSImageDownloader";
 import { OSQueryService } from "./OSQueryService";
 import { VirtualMachineProperties } from "./Properties";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { linuxSystemGroupsWithPrivileges, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { HostStoragesManager } from "../../services/HostStoragesManager";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { InstanceContext } from "../../common/InstanceContext";
+import { ResourceReference } from "../../common/InstanceReference";
 
 type VMState = "running" | "shut off";
 
@@ -38,20 +38,19 @@ type VMState = "running" | "shut off";
 export class VirtualMachineManager
 {
     constructor(private remoteCommandExecutor: RemoteCommandExecutor, private modulesManager: ModulesManager, private osQueryService: OSQueryService,
-        private osImageDownloader: OSImageDownloader, private instancesManager: InstancesManager, private hostUsersManager: HostUsersManager,
+        private osImageDownloader: OSImageDownloader, private instancesManager: ResourcesManager, private hostUsersManager: HostUsersManager,
         private remoteRootFileSystemManager: RemoteRootFileSystemManager, private hostStoragesManager: HostStoragesManager,
         private hostStoragesController: HostStoragesController, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
 
     //Public methods
-    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        const fullInstanceName = instanceContext.fullInstanceName;
-        const hostId = instanceContext.hostId;
+        const fullInstanceName = resourceReference.externalId;
+        const hostId = resourceReference.hostId;
 
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        const state = await this.QueryVMState(hostId, parts.instanceName);
+        const state = await this.QueryVMState(hostId, resourceReference.name);
         if(state === "running")
         {
             return {
@@ -60,8 +59,8 @@ export class VirtualMachineManager
             };
         }
 
-        await this.remoteCommandExecutor.ExecuteCommand(["virsh", "--connect", "qemu:///system", "undefine", "--domain", parts.instanceName], hostId);
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, instanceContext.hostStoragePath, fullInstanceName);
+        await this.remoteCommandExecutor.ExecuteCommand(["virsh", "--connect", "qemu:///system", "undefine", "--domain", resourceReference.name], hostId);
+        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, resourceReference.hostStoragePath, fullInstanceName);
 
         return null;
     }
@@ -130,7 +129,7 @@ export class VirtualMachineManager
     {
         const hostId = context.hostId;
 
-        const vmDir = await this.instancesManager.CreateInstanceStorageDirectory(hostId, context.storagePath, context.fullInstanceName);
+        const vmDir = await this.instancesManager.CreateInstanceStorageDirectory(hostId, context.storagePath, context.resourceReference.externalId);
         const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
         const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, linuxSystemGroupsWithPrivileges.kvm);
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, vmDir, uid, gid);

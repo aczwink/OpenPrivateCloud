@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { c_jdownloaderResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { SessionsManager } from "../../services/SessionsManager";
 import { JdownloaderManager, MyJDownloaderCredentials } from "./JdownloaderManager";
 
@@ -32,21 +32,22 @@ interface JdownloaderInfoDto
     storagePath: string;
 }
 
-@APIController(`resourceProviders/${c_webServicesResourceProviderName}/${c_jdownloaderResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_jdownloaderResourceTypeName}/{instanceName}`)
 class JdownloaderAPIController
 {
-    constructor(private jdownloaderManager: JdownloaderManager, private instancesManager: InstancesManager,
+    constructor(private jdownloaderManager: JdownloaderManager, private instancesManager: ResourcesManager,
         private hostsController: HostsController, private sessionsManager: SessionsManager)
     {
     }
 
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.jdownloaderResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.jdownloaderResourceType.name, instanceName);
+        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
         if(instanceContext === undefined)
             return NotFound("instance not found");
 

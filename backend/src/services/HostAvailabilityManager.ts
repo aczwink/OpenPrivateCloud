@@ -19,7 +19,7 @@
 import { Injectable } from "acts-util-node";
 import { HealthController, HealthStatus } from "../data-access/HealthController";
 import { HostsController } from "../data-access/HostsController";
-import { InstancesController } from "../data-access/InstancesController";
+import { ResourcesController } from "../data-access/ResourcesController";
 import { ModulesManager } from "./ModulesManager";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 import { ResourceProviderManager } from "./ResourceProviderManager";
@@ -28,7 +28,7 @@ import { ResourceProviderManager } from "./ResourceProviderManager";
 @Injectable
 export class HostAvailabilityManager
 {
-    constructor(private modulesManager: ModulesManager, private hostsController: HostsController, private instancesController: InstancesController,
+    constructor(private modulesManager: ModulesManager, private hostsController: HostsController, private instancesController: ResourcesController,
         private resourceProviderManager: ResourceProviderManager, private remoteConnectionsManager: RemoteConnectionsManager,
         private healthController: HealthController)
     {
@@ -86,10 +86,10 @@ export class HostAvailabilityManager
 
     private async CheckInstanceAvailability(instanceId: number)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         try
         {
-            await this.resourceProviderManager.CheckInstanceAvailability(instance!.fullName);
+            await this.resourceProviderManager.CheckInstanceAvailability(instance!.name);
         }
         catch(e)
         {

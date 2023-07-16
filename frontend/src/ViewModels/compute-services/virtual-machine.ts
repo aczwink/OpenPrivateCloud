@@ -20,45 +20,45 @@ import { resourceProviders } from "openprivatecloud-common";
 import { VMInfo } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.computeServices.name + "/" + resourceProviders.computeServices.virtualMachineResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.computeServices.name + "/" + resourceProviders.computeServices.virtualMachineResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<VMInfo, InstanceId>  = {
+const overviewViewModel: ObjectViewModel<VMInfo, ResourceAndGroupId>  = {
     type: "object",
     actions: [
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.computeservices.virtualmachine._any_.post(ids.instanceName, { action: "start"}),
+            execute: (service, ids) => service.resourceProviders._any_.computeservices.virtualmachine._any_.post(ids.resourceGroupName, ids.resourceName, { action: "start"}),
             matIcon: "play_arrow",
             title: "Start"
         },
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.computeservices.virtualmachine._any_.post(ids.instanceName, { action: "shutdown"}),
+            execute: (service, ids) => service.resourceProviders._any_.computeservices.virtualmachine._any_.post(ids.resourceGroupName, ids.resourceName, { action: "shutdown"}),
             matIcon: "power_settings_new",
             title: "Shutdown"
         },
         {
             type: "activate",
-            execute: (service, ids) => service.resourceProviders.computeservices.virtualmachine._any_.post(ids.instanceName, { action: "destroy"}),
+            execute: (service, ids) => service.resourceProviders._any_.computeservices.virtualmachine._any_.post(ids.resourceGroupName, ids.resourceName, { action: "destroy"}),
             matIcon: "dangerous",
             title: "Force shutdown"
         }
     ],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.computeservices.virtualmachine._any_.info.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.computeservices.virtualmachine._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "VMInfo",
 };
 
-export const virtualMachineViewModel: MultiPageViewModel<InstanceId> = {
+export const virtualMachineViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -77,6 +77,6 @@ export const virtualMachineViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

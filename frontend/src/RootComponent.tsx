@@ -19,6 +19,7 @@
 import { BootstrapIcon, Component, Injectable, JSX_CreateElement, Navigation, NavItem, RouterComponent } from "acfrontend";
 import { AuthenticationService } from "./Services/AuthenticationService";
 import { SessionComponent } from "./SessionComponent";
+import { MainComponent } from "./MainComponent";
 
 @Injectable
 export class RootComponent extends Component
@@ -37,7 +38,7 @@ export class RootComponent extends Component
             
         return <fragment>
             {this.RenderNav()}
-            <div className="container-fluid"><RouterComponent/></div>
+            <div className="container-fluid"><MainComponent/></div>
         </fragment>;
     }
 
@@ -50,7 +51,7 @@ export class RootComponent extends Component
         return <Navigation>
             <ul className="nav nav-pills">
                 <NavItem route="/"><BootstrapIcon>speedometer2</BootstrapIcon> Dashboard</NavItem>
-                <NavItem route="/instances"><BootstrapIcon>server</BootstrapIcon> Instances</NavItem>
+                <NavItem route="/resourceGroups"><BootstrapIcon>collection-fill</BootstrapIcon> Resource groups</NavItem>
                 <NavItem route="/hosts"><BootstrapIcon>pc</BootstrapIcon> Hosts</NavItem>
                 <NavItem route="/usersandgroups"><BootstrapIcon>people-fill</BootstrapIcon> IAM</NavItem>
                 <NavItem route="/settings"><BootstrapIcon>gear-fill</BootstrapIcon> Settings</NavItem>

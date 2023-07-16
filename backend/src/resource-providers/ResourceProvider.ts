@@ -17,7 +17,9 @@
  * */
 
 import { InstanceContext } from "../common/InstanceContext";
+import { ResourceReference } from "../common/InstanceReference";
 import { TimeSchedule } from "../common/TimeSchedule";
+import { ResourceGroup } from "../data-access/ResourceGroupsController";
 
 export interface BaseResourceProperties
 {
@@ -46,7 +48,7 @@ export interface ResourceDeletionError
 
 export interface DeploymentContext
 {
-    fullInstanceName: string;
+    resourceReference: ResourceReference;
     hostId: number;
     storagePath: string
     userId: number;
@@ -64,7 +66,7 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
 
     CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>;
     CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>;
-    DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>;
-    InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>;
+    DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>;
+    InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
 }

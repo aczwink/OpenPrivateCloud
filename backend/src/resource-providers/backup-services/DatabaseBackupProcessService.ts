@@ -22,7 +22,7 @@ import { ProcessTracker } from "../../services/ProcessTrackerManager";
 import { TargetFileSystemType } from "./BackupTargetMountService";
 import { ReplaceSpecialCharacters, CreateGPGEncryptionCommandOrPipe, ParseReplacedName } from "./Shared";
 import { BackupVaultDatabaseConfig, BackupVaultRetentionConfig } from "./models";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { TempFilesManager } from "../../services/TempFilesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
@@ -30,7 +30,7 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 @Injectable
 export class DatabaseBackupProcessService
 {
-    constructor(private instancesManager: InstancesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
+    constructor(private instancesManager: ResourcesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private tempFilesManager: TempFilesManager, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }

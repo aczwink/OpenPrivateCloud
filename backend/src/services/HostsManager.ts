@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -36,13 +36,14 @@ export class HostsManager
     //Public methods
     public async TakeOverHost(hostName: string)
     {
-        const pw = crypto.randomBytes(32).toString("hex");
+        const standardPassword = "opchostuser";
+        const newPassword = crypto.randomBytes(31).toString("hex") + "#";
 
-        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host, "opc");
-        await this.ChangeUserPassword(conn, opcSpecialUsers.host, pw);
+        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host, standardPassword);
+        await this.ChangeUserPassword(conn, standardPassword, newPassword);
         conn.Close();
 
-        const hostId = await this.hostsController.AddHost(hostName, pw);
+        const hostId = await this.hostsController.AddHost(hostName, newPassword);
         await this.modulesManager.EnsureModuleIsInstalled(hostId, "core");
 
         //await this.GenerateKeyPair(hostName);

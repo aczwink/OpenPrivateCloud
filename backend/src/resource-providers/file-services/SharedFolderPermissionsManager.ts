@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,10 +18,10 @@
 
 import { Injectable } from "acts-util-node";
 import { permissions } from "openprivatecloud-common";
-import { InstanceContext } from "../../common/InstanceContext";
 import { PermissionsController } from "../../data-access/PermissionsController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { ResourceReference } from "../../common/InstanceReference";
 
 @Injectable
 export class SharedFolderPermissionsManager
@@ -31,11 +31,11 @@ export class SharedFolderPermissionsManager
     }
 
     //Public methods
-    public async SetPermissions(instanceContext: InstanceContext, dirPath: string, readOnly: boolean)
+    public async SetPermissions(resourceReference: ResourceReference, dirPath: string, readOnly: boolean)
     {
         const acl = ["u::rwX", "g::rwX", "o::-"];
 
-        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.read);
+        const readGroups = await this.permissionsController.QueryGroupsWithPermission(resourceReference.id, permissions.data.read);
         const readLinuxGroups = readGroups.Map(x => this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
         for (const readLinuxGroup of readLinuxGroups)
@@ -43,7 +43,7 @@ export class SharedFolderPermissionsManager
 
         if(!readOnly)
         {
-            const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.write);
+            const writeGroups = await this.permissionsController.QueryGroupsWithPermission(resourceReference.id, permissions.data.write);
             const writeLinuxGroups = writeGroups.Map(x => this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
             for (const writeLinuxGroup of writeLinuxGroups)
@@ -53,7 +53,7 @@ export class SharedFolderPermissionsManager
         const aclString = acl.join(",");
 
         //TODO: without the "-R" and without the default acl every user can only edit his own files inside the share. Maybe this is desired some day
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "setfacl", "-R", "--set", aclString, dirPath], instanceContext.hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "setfacl", "-R", "-d", "--set", aclString, dirPath], instanceContext.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "setfacl", "-R", "--set", aclString, dirPath], resourceReference.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "setfacl", "-R", "-d", "--set", aclString, dirPath], resourceReference.hostId);
     }
 }

@@ -18,8 +18,8 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesController } from "../../data-access/ResourcesController";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { DeploymentContext } from "../ResourceProvider";
@@ -44,7 +44,7 @@ export interface NodeAppConfig
 @Injectable
 export class NodeAppServiceManager
 {
-    constructor(private instancesManager: InstancesManager, private modulesManager: ModulesManager, private instancesController: InstancesController,
+    constructor(private instancesManager: ResourcesManager, private modulesManager: ModulesManager, private instancesController: ResourcesController,
         private hostStoragesController: HostStoragesController, private remoteFileSystemManager: RemoteFileSystemManager,
         private systemServicesManager: SystemServicesManager)
     {
@@ -80,8 +80,8 @@ export class NodeAppServiceManager
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "node");
 
-        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
-        await this.UpdateService(context.hostId, context.storagePath, context.fullInstanceName, {});
+        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
+        await this.UpdateService(context.hostId, context.storagePath, context.resourceReference.externalId, {});
     }
 
     public async QueryConfig(instanceContext: InstanceContext): Promise<NodeAppConfig>
@@ -115,10 +115,10 @@ export class NodeAppServiceManager
 
     public async UpdateContent(instanceId: number, buffer: Buffer)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
-        const instancesDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.fullName);
+        const instancesDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.name);
 
         await this.remoteFileSystemManager.WriteFile(storage!.hostId, path.join(instancesDir, "index.js"), buffer);
     }

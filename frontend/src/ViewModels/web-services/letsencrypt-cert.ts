@@ -21,22 +21,22 @@ import { LetsEncryptCertInfoDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildInstanceGeneralPageGroupEntry } from "../shared/instancegeneral";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
 function BuildFullInstanceName(instanceName: string)
 {
     return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.letsencryptCertResourceType.name + "/" + instanceName;
 }
 
-const overviewViewModel: ObjectViewModel<LetsEncryptCertInfoDto, InstanceId> = {
+const overviewViewModel: ObjectViewModel<LetsEncryptCertInfoDto, ResourceAndGroupId> = {
     type: "object",
     actions: [],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.webservices.letsencryptcert._any_.info.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.letsencryptcert._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "LetsEncryptCertInfoDto"
 };
 
-export const letsEncryptViewModel: MultiPageViewModel<InstanceId> = {
+export const letsEncryptViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [],
     entries: [
         {
@@ -51,6 +51,6 @@ export const letsEncryptViewModel: MultiPageViewModel<InstanceId> = {
         },
         BuildInstanceGeneralPageGroupEntry(BuildFullInstanceName),
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

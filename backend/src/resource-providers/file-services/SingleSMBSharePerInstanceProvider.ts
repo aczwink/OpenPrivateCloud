@@ -23,6 +23,7 @@ import { HostsController } from "../../data-access/HostsController";
 import { PermissionsController } from "../../data-access/PermissionsController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { SambaSharesManager } from "./SambaSharesManager";
+import { ResourceReference } from "../../common/InstanceReference";
 
 interface SMBShareConfig
 {
@@ -48,12 +49,12 @@ export class SingleSMBSharePerInstanceProvider
         return this.sambaSharesManager.GetConnectionInfo(host!.hostName, this.MapFullInstanceNameToSMBShareName(instanceContext.fullInstanceName), userName);
     }
 
-    public async UpdateSMBConfig(shareConfig: SMBShareConfig, instanceContext: InstanceContext)
+    public async UpdateSMBConfig(shareConfig: SMBShareConfig, resourceReference: ResourceReference)
     {
-        const hostId = instanceContext.hostId;
-        const fullInstanceName = instanceContext.fullInstanceName;
+        const hostId = resourceReference.hostId;
+        const fullInstanceName = resourceReference.externalId;
 
-        const readGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.read);
+        const readGroups = await this.permissionsController.QueryGroupsWithPermission(resourceReference.id, permissions.data.read);
         const readGroupsLinux = readGroups.Map(x => "+" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
         const shareName = this.MapFullInstanceNameToSMBShareName(fullInstanceName);
@@ -71,7 +72,7 @@ export class SingleSMBSharePerInstanceProvider
             let writeGroupsLinux: string[] = [];
             if(!shareConfig.readOnly)
             {
-                const writeGroups = await this.permissionsController.QueryGroupsWithPermission(instanceContext.instanceId, permissions.data.write);
+                const writeGroups = await this.permissionsController.QueryGroupsWithPermission(resourceReference.id, permissions.data.write);
                 await this.hostUsersManager.SyncSambaGroupsMembers(hostId, writeGroups.ToArray());
                 writeGroupsLinux = writeGroups.Map(x => "+" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
             }

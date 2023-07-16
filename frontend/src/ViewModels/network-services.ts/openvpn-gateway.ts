@@ -23,53 +23,53 @@ import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 
-type InstanceId = { instanceName: string };
+type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.networkServices.name + "/" + resourceProviders.networkServices.openVPNGatewayResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.networkServices.name + "/" + resourceProviders.networkServices.openVPNGatewayResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<OpenVPNGatewayInfo, InstanceId>  = {
+const overviewViewModel: ObjectViewModel<OpenVPNGatewayInfo, ResourceAndGroupId>  = {
     type: "object",
     actions: [
     ],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.info.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "OpenVPNGatewayInfo",
 };
 
-const connectionsViewModel: ListViewModel<OpenVPNGatewayConnectedClientEntry, InstanceId> = {
+const connectionsViewModel: ListViewModel<OpenVPNGatewayConnectedClientEntry, ResourceAndGroupId> = {
     type: "list",
     actions: [],
     boundActions: [],
     displayName: "Connections",
-    requestObjects: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.connections.get(ids.instanceName),
+    requestObjects: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.connections.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "OpenVPNGatewayConnectedClientEntry"
 };
 
-const logsViewModel: ListViewModel<OpenVPNGatewayLogEntry, InstanceId> = {
+const logsViewModel: ListViewModel<OpenVPNGatewayLogEntry, ResourceAndGroupId> = {
     type: "list",
     actions: [],
     boundActions: [],
     displayName: "Logs",
-    requestObjects: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.logs.get(ids.instanceName),
+    requestObjects: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.logs.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "OpenVPNGatewayLogEntry"
 };
 
-const clientsViewModel: ListViewModel<OpenVPNGatewayClient, InstanceId> = {
+const clientsViewModel: ListViewModel<OpenVPNGatewayClient, ResourceAndGroupId> = {
     type: "list",
     actions: [
         {
             type: "create",
-            createResource: (service, ids, client) => service.resourceProviders.networkservices.openvpngateway._any_.clients.post(ids.instanceName, client)
+            createResource: (service, ids, client) => service.resourceProviders._any_.networkservices.openvpngateway._any_.clients.post(ids.resourceGroupName, ids.resourceName, client)
         }
     ],
     boundActions: [
         {
             type: "custom",
             action: async (service, ids, client) => {
-                const response = await service.resourceProviders.networkservices.openvpngateway._any_.clientconfig.get(ids.instanceName, { clientName: client.name });
+                const response = await service.resourceProviders._any_.networkservices.openvpngateway._any_.clientconfig.get(ids.resourceGroupName, ids.resourceName, { clientName: client.name });
                 const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok)
                 {
@@ -81,34 +81,34 @@ const clientsViewModel: ListViewModel<OpenVPNGatewayClient, InstanceId> = {
         },
         {
             type: "delete",
-            deleteResource: (service, ids, client) => service.resourceProviders.networkservices.openvpngateway._any_.clients.delete(ids.instanceName, client)
+            deleteResource: (service, ids, client) => service.resourceProviders._any_.networkservices.openvpngateway._any_.clients.delete(ids.resourceGroupName, ids.resourceName, client)
         },
     ],
     displayName: "Clients",
-    requestObjects: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.clients.get(ids.instanceName),
+    requestObjects: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.clients.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "OpenVPNGatewayClient",
 };
 
-const configViewModel: ObjectViewModel<OpenVPNGatewayExternalConfig, InstanceId> = {
+const configViewModel: ObjectViewModel<OpenVPNGatewayExternalConfig, ResourceAndGroupId> = {
     type: "object",
     actions: [
         {
             type: "edit",
             propertiesSchemaName: "OpenVPNGatewayExternalConfig",
-            requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
-            updateResource: (service, ids, props) => service.resourceProviders.networkservices.openvpngateway._any_.config.put(ids.instanceName, props),
+            requestObject: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, props) => service.resourceProviders._any_.networkservices.openvpngateway._any_.config.put(ids.resourceGroupName, ids.resourceName, props),
         }
     ],
     formTitle: _ => "Server configuration",
-    requestObject: (service, ids) => service.resourceProviders.networkservices.openvpngateway._any_.config.get(ids.instanceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.config.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "OpenVPNGatewayExternalConfig"
 };
 
-export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
+export const openVPNGatewayViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         {
             type: "delete",
-            deleteResource: (service, ids) => service.instances.delete({ fullInstanceName: BuildFullInstanceName(ids.instanceName) })
+            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
         }
     ],
     entries: [
@@ -143,6 +143,6 @@ export const openVPNGatewayViewModel: MultiPageViewModel<InstanceId> = {
             ]
         }
     ],
-    formTitle: ids => ids.instanceName,
+    formTitle: ids => ids.resourceName,
     type: "multiPage"
 };

@@ -19,9 +19,9 @@ import { Injectable } from "acts-util-node";
 import path from "path";
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstancesController } from "../../data-access/InstancesController";
+import { ResourcesController } from "../../data-access/ResourcesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
@@ -31,6 +31,7 @@ import { SharedFolderPermissionsManager } from "../file-services/SharedFolderPer
 import { SingleSMBSharePerInstanceProvider } from "../file-services/SingleSMBSharePerInstanceProvider";
 import { DeploymentContext } from "../ResourceProvider";
 import { JdownloaderProperties } from "./Properties";
+import { ResourceReference } from "../../common/InstanceReference";
 
 export interface MyJDownloaderCredentials
 {
@@ -44,10 +45,10 @@ export interface MyJDownloaderCredentials
 @Injectable
 export class JdownloaderManager
 {
-    constructor(private modulesManager: ModulesManager, private hostUsersManager: HostUsersManager, private instancesManager: InstancesManager,
+    constructor(private modulesManager: ModulesManager, private hostUsersManager: HostUsersManager, private instancesManager: ResourcesManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private instancesController: InstancesController, private hostStoragesController: HostStoragesController,
+        private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider,
         private sharedFolderPermissionsManager: SharedFolderPermissionsManager)
     {
@@ -86,7 +87,7 @@ export class JdownloaderManager
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "java");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o775);
 
         const authority = await this.hostUsersManager.CreateHostServicePrincipal(context.hostId, "jdownloader");
@@ -127,19 +128,19 @@ export class JdownloaderManager
         };
     }
 
-    public async RefreshPermissions(instanceContext: InstanceContext)
+    public async RefreshPermissions(resourceReference: ResourceReference)
     {
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const instanceDir = this.instancesManager.BuildInstanceStoragePath(resourceReference.hostStoragePath, resourceReference.externalId);
 
         const downloadsPath = path.join(instanceDir, "Downloads");
-        await this.sharedFolderPermissionsManager.SetPermissions(instanceContext, downloadsPath, true);
+        await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, downloadsPath, true);
 
         await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
             enabled: true,
             sharePath: path.join(instanceDir, "Downloads"),
             readOnly: true,
             transportEncryption: false
-        }, instanceContext);
+        }, resourceReference);
     }
 
     public async SetCredentials(instanceId: number, settings: MyJDownloaderCredentials)
@@ -180,13 +181,13 @@ export class JdownloaderManager
 
     private async QueryInstanceData(instanceId: number)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
 
         return {
             hostId: storage!.hostId,
             hostStoragePath: storage!.path,
-            fullInstanceName: instance!.fullName
+            fullInstanceName: instance!.name
         };
     }
 

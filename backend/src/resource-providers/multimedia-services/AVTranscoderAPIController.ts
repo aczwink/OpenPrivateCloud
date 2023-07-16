@@ -22,8 +22,8 @@ import { c_avTranscoderResourceTypeName, c_multimediaServicesResourceProviderNam
 import { HostsController } from "../../data-access/HostsController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { InstancesController } from "../../data-access/InstancesController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesController } from "../../data-access/ResourcesController";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { AVTranscoderConfig } from "./AVTranscoderConfig";
 import { AVTranscoderService } from "./AVTranscoderService";
 
@@ -32,26 +32,29 @@ interface AVTranscoderInstanceInfo
     hostName: string;
 }
 
-@APIController(`resourceProviders/${c_multimediaServicesResourceProviderName}/${c_avTranscoderResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_multimediaServicesResourceProviderName}/${c_avTranscoderResourceTypeName}/{instanceName}`)
 class AVTranscoderAPIController
 {
-    constructor(private instanceConfigController: InstanceConfigController, private instancesManager: InstancesManager,
-        private instancesController: InstancesController, private avTranscoderService: AVTranscoderService,
+    constructor(private instanceConfigController: InstanceConfigController, private instancesManager: ResourcesManager,
+        private instancesController: ResourcesController, private avTranscoderService: AVTranscoderService,
         private hostStoragesController: HostStoragesController, private hostsController: HostsController)
     {
     }
 
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.multimediaServices.name, resourceProviders.multimediaServices.avTranscoderResourceType.name, instanceName);
-        const instance = await this.instancesController.QueryInstance(fullInstanceName);
+        throw new Error("TODO: reimplement me");
+        /*
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.multimediaServices.name, resourceProviders.multimediaServices.avTranscoderResourceType.name, instanceName);
+        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
         if(instance === undefined)
             return NotFound("instance not found");
 
-        return instance.id;
+        return instance.id;*/
     }
 
     @Get("info")
@@ -59,7 +62,7 @@ class AVTranscoderAPIController
         @Common instanceId: number,
     )
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.instancesController.QueryResource(instanceId);
         const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
         const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
             

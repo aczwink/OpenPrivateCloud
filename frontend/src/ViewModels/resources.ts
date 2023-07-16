@@ -18,7 +18,6 @@
 
 
 import { RoutingViewModel } from "../UI/ViewModel";
-import { InstancesListComponent } from "../Views/instances/InstancesListComponent";
 import { resourceProviders } from "openprivatecloud-common/resourceProviders";
 import { backupVaultViewModel } from "./backup-services/backup-vault";
 import { virtualMachineViewModel } from "./compute-services/virtual-machine";
@@ -26,7 +25,6 @@ import { mariadbViewModel } from "./database-services/mariadb";
 import { fileStorageViewModel } from "./file-services/file-storage";
 import { openVPNGatewayViewModel } from "./network-services.ts/openvpn-gateway";
 import { nextcloudViewModel } from "./web-services/nextcloud";
-import { AddInstanceComponent } from "../Views/instances/AddInstanceComponent";
 import { jdownloaderViewModel } from "./web-services/jdownloader";
 import { avTranscoderViewModel } from "./multimedia-services/av-transcoder";
 import { staticWebsiteViewModel } from "./web-services/staticWebsite";
@@ -34,29 +32,15 @@ import { nodeAppServiceViewodel } from "./web-services/nodeAppService";
 import { dockerContainerViewModel } from "./compute-services/docker-container";
 import { letsEncryptViewModel } from "./web-services/letsencrypt-cert";
 
-const root: RoutingViewModel = {
+export const resourcesRoutes: RoutingViewModel = {
     type: "routing",
     entries: [
-        {
-            key: "instances",
-            viewModel: {
-                type: "component",
-                component: InstancesListComponent
-            },
-        },
-        {
-            key: "instances/add",
-            viewModel: {
-                type: "component",
-                component: AddInstanceComponent,
-            }
-        },
         {
             key: `instances/${resourceProviders.backupServices.name}/${resourceProviders.backupServices.backupVaultResourceType.name}/:instanceName`,
             viewModel: backupVaultViewModel
         },
         {
-            key: `instances/${resourceProviders.computeServices.name}/${resourceProviders.computeServices.dockerContainerResourceType.name}/:instanceName`,
+            key: `${resourceProviders.computeServices.name}/${resourceProviders.computeServices.dockerContainerResourceType.name}/:resourceName`,
             viewModel: dockerContainerViewModel
         },
         {
@@ -101,5 +85,3 @@ const root: RoutingViewModel = {
         }
     ]
 }
-
-export default root;

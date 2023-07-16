@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { NextcloudManager } from "./NextcloudManager";
 import { LetsEncryptManager } from "./LetsEncryptManager";
@@ -26,11 +26,12 @@ import { StaticWebsitesManager } from "./StaticWebsitesManager";
 import { NodeAppServiceManager } from "./NodeAppServiceManager";
 import { InstanceContext } from "../../common/InstanceContext";
 import { WebServicesResourceProperties } from "./Properties";
+import { ResourceReference } from "../../common/InstanceReference";
 
 @Injectable
 export class WebServicesResourceProvider implements ResourceProvider<WebServicesResourceProperties>
 { 
-    constructor(private instancesManager: InstancesManager, private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager,
+    constructor(private instancesManager: ResourcesManager, private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager,
         private jdownloaderManager: JdownloaderManager, private staticWebsitesManager: StaticWebsitesManager, private nodeAppServiceManager: NodeAppServiceManager)
     {
     }
@@ -82,7 +83,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
 
     public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
+        const parts = this.instancesManager.TODO_DEPRECATED_ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
         switch(parts.resourceTypeName)
         {
             case resourceProviders.webServices.letsencryptCertResourceType.name:
@@ -91,14 +92,13 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
         }
     }
     
-    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        const hostId = instanceContext.hostId;
-        const hostStoragePath = instanceContext.hostStoragePath;
-        const fullInstanceName = instanceContext.fullInstanceName;
+        const hostId = resourceReference.hostId;
+        const hostStoragePath = resourceReference.hostStoragePath;
+        const fullInstanceName = resourceReference.externalId;
 
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(fullInstanceName);
-        switch(parts.resourceTypeName)
+        switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.webServices.jdownloaderResourceType.name:
                 await this.jdownloaderManager.DeleteResource(hostId, hostStoragePath, fullInstanceName);
@@ -118,13 +118,12 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
         return null;
     }
 
-    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
+    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        switch(parts.resourceTypeName)
+        switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.webServices.jdownloaderResourceType.name:
-                await this.jdownloaderManager.RefreshPermissions(instanceContext);
+                await this.jdownloaderManager.RefreshPermissions(resourceReference);
                 break;
         }
     }

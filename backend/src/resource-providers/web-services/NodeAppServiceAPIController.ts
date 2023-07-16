@@ -22,7 +22,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { c_nodeAppServiceResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { NodeAppConfig, NodeAppServiceManager } from "./NodeAppServiceManager";
 
 interface NodeAppServiceInfoDto
@@ -41,20 +41,21 @@ interface NodeAppServiceStatus
     status: string;
 }
 
-@APIController(`resourceProviders/${c_webServicesResourceProviderName}/${c_nodeAppServiceResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_nodeAppServiceResourceTypeName}/{instanceName}`)
 class NodeAppServiceAPIController
 {
-    constructor(private instancesManager: InstancesManager, private nodeAppServiceManager: NodeAppServiceManager, private hostsController: HostsController)
+    constructor(private instancesManager: ResourcesManager, private nodeAppServiceManager: NodeAppServiceManager, private hostsController: HostsController)
     {
     }
     
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.nodeAppServiceResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.nodeAppServiceResourceType.name, instanceName);
+        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
         if(instanceContext === undefined)
             return NotFound("instance not found");
 

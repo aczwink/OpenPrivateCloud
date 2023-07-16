@@ -18,17 +18,17 @@
 import { Injectable } from "acts-util-node";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
-import { InstancesManager } from "../../services/InstancesManager";
 import { VirtualMachineManager } from "./VirtualMachineManager";
 import { InstanceContext } from "../../common/InstanceContext";
 import { DockerContainerManager } from "./DockerContainerManager";
 import { ComputeServicesProperties } from "./Properties";
 import { DockerManager } from "./DockerManager";
+import { ResourceReference } from "../../common/InstanceReference";
  
 @Injectable
 export class ComputeServicesResourceProvider implements ResourceProvider<ComputeServicesProperties>
 {
-    constructor(private instancesManager: InstancesManager, private virtualMachineManager: VirtualMachineManager,
+    constructor(private virtualMachineManager: VirtualMachineManager,
         private dockerContainerManager: DockerContainerManager, private dockerManager: DockerManager)
     {
     }
@@ -64,21 +64,20 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
     {
     }
     
-    public async DeleteResource(instanceContext: InstanceContext): Promise<ResourceDeletionError | null>
+    public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        const parts = this.instancesManager.ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        switch(parts.resourceTypeName)
+        switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.computeServices.dockerContainerResourceType.name:
-                return await this.dockerContainerManager.DeleteResource(instanceContext.hostId, parts.instanceName);
+                return await this.dockerContainerManager.DeleteResource(resourceReference);
             case resourceProviders.computeServices.virtualMachineResourceType.name:
-                return await this.virtualMachineManager.DeleteResource(instanceContext);
+                return await this.virtualMachineManager.DeleteResource(resourceReference);
         }
 
         return null;
     }
 
-    public async InstancePermissionsChanged(instanceContext: InstanceContext): Promise<void>
+    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 

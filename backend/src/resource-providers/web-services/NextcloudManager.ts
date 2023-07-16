@@ -18,7 +18,7 @@
 import crypto from "crypto";
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
@@ -34,7 +34,7 @@ import { LetsEncryptManager } from "./LetsEncryptManager";
 @Injectable
 export class NextcloudManager
 {
-    constructor(private instancesManager: InstancesManager, private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager,
+    constructor(private instancesManager: ResourcesManager, private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager,
         private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager,
         private usersController: UsersController, private remoteCommandExecutor: RemoteCommandExecutor, private letsEncryptManager: LetsEncryptManager)
     {
@@ -63,19 +63,19 @@ export class NextcloudManager
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "apache");
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "nextcloud-dependencies");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.fullInstanceName);
+        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o775);
 
         await this.DownloadNextcloudApp(context.hostId, instanceDir);
 
-        const dbName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(context.fullInstanceName);
+        const dbName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(context.resourceReference.externalId);
         const dbUser = dbName;
         const dbPw = crypto.randomBytes(16).toString("hex");
 
         await this.SetupDatabase(context.hostId, dbName, dbUser, dbPw);
         await this.SetupNextcloud(context.hostId, instanceDir, dbName, dbUser, dbPw, context.userId);        
 
-        await this.CreateApacheSite(context.hostId, instanceDir, context.fullInstanceName, context.userId, instanceProperties.certFullInstanceName);
+        await this.CreateApacheSite(context.hostId, instanceDir, context.resourceReference.externalId, context.userId, instanceProperties.certFullInstanceName);
     }
 
     //Private methods

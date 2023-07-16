@@ -21,10 +21,10 @@ import path from "path";
 import { ProcessTracker } from "../../services/ProcessTrackerManager";
 import { TargetFileSystemType } from "./BackupTargetMountService";
 import { BackupVaultFileStorageConfig, BackupVaultRetentionConfig } from "./models";
-import { InstancesController } from "../../data-access/InstancesController";
+import { ResourcesController } from "../../data-access/ResourcesController";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
-import { InstancesManager } from "../../services/InstancesManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { TempFilesManager } from "../../services/TempFilesManager";
@@ -33,8 +33,8 @@ import { CreateGPGEncryptionCommandOrPipe, ParseReplacedName, ReplaceSpecialChar
 @Injectable
 export class FileStorageBackupProcessService
 {
-    constructor(private instancesController: InstancesController, private hostStoragesController: HostStoragesController,
-        private fileStoragesManager: FileStoragesManager, private instancesManager: InstancesManager,
+    constructor(private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
+        private fileStoragesManager: FileStoragesManager, private instancesManager: ResourcesManager,
         private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private remoteCommandExecutor: RemoteCommandExecutor,
         private tempFilesManager: TempFilesManager)
@@ -44,7 +44,8 @@ export class FileStorageBackupProcessService
     //Public methods
     public async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker)
     {
-        const instance = await this.instancesController.QueryInstance(fileStorage.fullInstanceName);
+        throw new Error("TODO: reimplement me");
+        /*const instance = await this.instancesController.QueryResourceByName(fileStorage.fullInstanceName);
         if(instance === undefined)
         {
             processTracker.Add("ERROR! FileStorage not found:", fileStorage.fullInstanceName);
@@ -98,7 +99,7 @@ export class FileStorageBackupProcessService
             }
 
             processTracker.Add("Finished copying snapshot", snapshotName);
-        }
+        }*/
     }
 
     public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, retention: BackupVaultRetentionConfig, processTracker: ProcessTracker)

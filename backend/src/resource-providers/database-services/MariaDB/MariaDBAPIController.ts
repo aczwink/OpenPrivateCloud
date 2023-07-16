@@ -20,7 +20,7 @@ import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Pos
 import { resourceProviders } from "openprivatecloud-common";
 import { c_databaseServicesResourceProviderName, c_mariadbResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { InstanceContext } from "../../../common/InstanceContext";
-import { InstancesManager } from "../../../services/InstancesManager";
+import { ResourcesManager } from "../../../services/ResourcesManager";
 import { MySQLGrant } from "../MySQLClient";
 import { MariaDBManager, MySQLDatabaseEntry } from "./MariaDBManager";
 
@@ -31,20 +31,21 @@ interface MySQLUserCreationData
     password: string;
 }
 
-@APIController(`resourceProviders/${c_databaseServicesResourceProviderName}/${c_mariadbResourceTypeName}/{instanceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_databaseServicesResourceProviderName}/${c_mariadbResourceTypeName}/{instanceName}`)
 class MariaDBAPIController
 {
-    constructor(private instancesManager: InstancesManager, private mariaDBManager: MariaDBManager)
+    constructor(private instancesManager: ResourcesManager, private mariaDBManager: MariaDBManager)
     {
     }
 
     @Common()
     public async ExtractCommonAPIData(
+        @Path resourceGroupName: string,
         @Path instanceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.CreateUniqueInstanceName(resourceProviders.databaseServices.name, resourceProviders.databaseServices.mariadbResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.CreateInstanceContext(fullInstanceName);
+        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.databaseServices.name, resourceProviders.databaseServices.mariadbResourceType.name, instanceName);
+        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
         if(instanceContext === undefined)
             return NotFound("instance not found");
 

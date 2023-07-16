@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,16 +18,17 @@
 
 import { Injectable } from "acts-util-node";
 import { HealthController, HealthStatus } from "../data-access/HealthController";
-import { Instance, InstancesController } from "../data-access/InstancesController";
+import { Resource, ResourcesController } from "../data-access/ResourcesController";
 import { UserGroupsController } from "../data-access/UserGroupsController";
 import { NotificationsManager } from "./NotificationsManager";
 import { ResourceProviderManager } from "./ResourceProviderManager";
 import { TaskScheduler } from "./TaskScheduler";
+import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
   
 @Injectable
 export class InstanceHealthManager
 {
-    constructor(private instancesController: InstancesController, private resourceProviderManager: ResourceProviderManager,
+    constructor(private resourcesController: ResourcesController, private resourceProviderManager: ResourceProviderManager, private resourceGroupController: ResourceGroupsController,
         private healthController: HealthController, private taskScheduler: TaskScheduler, private notificationsManager: NotificationsManager,
         private userGroupsController: UserGroupsController)
     {
@@ -36,17 +37,21 @@ export class InstanceHealthManager
     //Public methods
     public async ScheduleInstanceChecks()
     {
-        const instanceIds = await this.instancesController.QueryAllInstanceIds();
-        for (const instanceId of instanceIds)
+        const resourceGroups = await this.resourceGroupController.QueryAllGroups();
+        for (const resourceGroup of resourceGroups)
         {
-            this.ScheduleInstanceCheck(instanceId);
+            const resourceIds = await this.resourcesController.QueryAllResourceIdsInResourceGroup(resourceGroup.id);
+            for (const resourceId of resourceIds)
+            {
+                this.ScheduleInstanceCheck(resourceId);
+            }   
         }
     }
 
     //Private methods
     private async CheckInstance(instanceId: number)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
+        const instance = await this.resourcesController.QueryResource(instanceId);
         if(instance === undefined)
             return false; //instance was deleted
 
@@ -56,7 +61,7 @@ export class InstanceHealthManager
 
         try
         {
-            await this.resourceProviderManager.CheckInstanceHealth(instance.fullName);
+            await this.resourceProviderManager.CheckInstanceHealth(instance.name);
         }
         catch(e)
         {
@@ -70,7 +75,7 @@ export class InstanceHealthManager
         return true;
     }
 
-    private async FindGroupAssociatedWithInstance(instance: Instance)
+    private async FindGroupAssociatedWithInstance(resource: Resource)
     {
         //TODO: instances would need an owner or creator
         const groups = await this.userGroupsController.QueryUserGroups();
@@ -79,9 +84,7 @@ export class InstanceHealthManager
 
     private async ScheduleInstanceCheck(instanceId: number)
     {
-        const instance = await this.instancesController.QueryInstanceById(instanceId);
-
-        const schedule = this.resourceProviderManager.RetrieveInstanceCheckSchedule(instance!.fullName);
+        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(instanceId);
         if(schedule === null)
             return;
 
