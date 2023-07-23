@@ -253,7 +253,8 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
             {
                 const idx = schema.format.indexOf("[");
                 const arg = schema.format.substring(idx+1, schema.format.length - 1);
-                return <HostResourceSelectionComponent type={arg} hostName={this.input.context!.hostName} value={value} valueChanged={valueChanged} />;
+                const parts = arg.split("/");
+                return <HostResourceSelectionComponent resourceProviderName={parts[0]} resourceTypeName={parts[1]} hostName={this.input.context!.hostName} value={value} valueChanged={valueChanged} />;
             }
         }
 

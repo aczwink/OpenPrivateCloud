@@ -16,16 +16,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, RouterButton, RouterState } from "acfrontend";
-import { Dictionary, OpenAPI } from "acts-util-core";
+import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, PopupManager, ProgressSpinner, RouterButton, RouterState } from "acfrontend";
+import { Dictionary, EqualsAny, OpenAPI } from "acts-util-core";
 import { ResponseData } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
 import { IdBoundResourceAction } from "../IdBoundActions";
-import { DeleteAction, ObjectBoundAction } from "../ObjectBoundActions";
+import { DeleteAction, EditAction, ObjectBoundAction } from "../ObjectBoundActions";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
 import { ReplaceRouteParams } from "../Shared";
 import { UnboundResourceAction } from "../UnboundActions";
 import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
+import { ObjectEditorComponent } from "./ObjectEditorComponent";
+import { APISchemaService } from "../../Services/APISchemaService";
 
 interface ObjectListInput<ObjectType>
 {
@@ -43,7 +45,7 @@ interface ObjectListInput<ObjectType>
 @Injectable
 export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<ObjectType>>
 {
-    constructor(private routerState: RouterState, private apiService: APIService)
+    constructor(private routerState: RouterState, private apiService: APIService, private popupManager: PopupManager, private apiSchemaService: APISchemaService)
     {
         super();
 
@@ -90,7 +92,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)
             this.data = result.value;
-        const firstColumnKey = this.input.elementSchema.properties.OwnKeys().First();
+        const firstColumnKey = this.input.elementSchema.required[0];
         this.Sort(firstColumnKey, true);
     }
 
@@ -127,6 +129,9 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         {
             case "custom":
                 return <a role="button" onclick={() => action.action(this.apiService, this.routerState.routeParams, object)}><MatIcon>{action.matIcon}</MatIcon></a>;
+
+            case "edit":
+                return <a className="link-primary" role="button" onclick={this.OnEdit.bind(this, action, object)}><MatIcon>edit</MatIcon></a>;
 
             case "delete":
                 return <a className="link-danger" role="button" onclick={this.OnDelete.bind(this, action, object)}><MatIcon>delete_forever</MatIcon></a>;
@@ -189,6 +194,22 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
             await action.deleteResource(this.apiService, this.routerState.routeParams, object);
             this.QueryData();
         }
+    }
+
+    private OnEdit(action: EditAction<any, any>, object: object)
+    {
+        const index = this.data!.findIndex(x => EqualsAny(x, object));
+        const clone = object.DeepClone();
+        const schema = this.apiSchemaService.GetSchema(action.schemaName);
+        const ref = this.popupManager.OpenDialog(<ObjectEditorComponent object={clone} schema={schema} />, { title: "Edit" });
+        ref.onAccept.Subscribe( async () => {
+            this.data = null;
+            ref.Close();
+
+            await action.updateResource(this.apiService, this.routerState.routeParams, index, clone);
+
+            this.QueryData();
+        });
     }
 
     public override OnInitiated()

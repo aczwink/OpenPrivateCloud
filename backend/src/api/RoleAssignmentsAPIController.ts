@@ -22,7 +22,7 @@ import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAs
 import { PermissionsManager } from "../services/PermissionsManager";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { ResourcesManager } from "../services/ResourcesManager";
-import { ResourceReference } from "../common/InstanceReference";
+import { ResourceReference } from "../common/ResourceReference";
 
  
 @APIController("roleAssignments")

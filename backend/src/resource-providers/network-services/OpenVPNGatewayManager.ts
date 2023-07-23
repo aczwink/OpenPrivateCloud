@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
-import { InstanceConfigController } from "../../data-access/InstanceConfigController";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { CertKeyFiles, OpenVPNServerConfig } from "./models";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
@@ -27,11 +27,16 @@ import { ConfigParser, KeyValueEntry } from "../../common/config/ConfigParser";
 import { ConfigDialect } from "../../common/config/ConfigDialect";
 import { ConfigModel } from "../../common/config/ConfigModel";
 import { ConfigWriter } from "../../common/config/ConfigWriter";
-import { InstanceContext } from "../../common/InstanceContext";
 import path from "path";
 import { Dictionary } from "acts-util-core";
 import { HostNATService } from "../../services/HostNATService";
 import { CIDRRange } from "../../common/CIDRRange";
+import { LightweightResourceReference } from "../../common/ResourceReference";
+import { DeploymentContext } from "../ResourceProvider";
+import { ModulesManager } from "../../services/ModulesManager";
+import { SysCtlConfService } from "./SysCtlConfService";
+import { EasyRSAManager } from "./EasyRSAManager";
+import { OpenVPNGatewayProperties } from "./properties";
 
 export interface OpenVPNGatewayConnectedClientEntry
 {
@@ -71,86 +76,27 @@ const openVPNConfigDialect: ConfigDialect = {
 @Injectable
 export class OpenVPNGatewayManager
 {
-    constructor(private instancesManager: ResourcesManager, private instanceConfigController: InstanceConfigController,
-        private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
+    constructor(private resourcesManager: ResourcesManager, private instanceConfigController: ResourceConfigController, private modulesManager: ModulesManager, private sysCtlConfService: SysCtlConfService,
+        private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager, private easyRSAManager: EasyRSAManager,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private hostNATService: HostNATService)
     {
     }
     
     //Public methods
-    public async AutoStartServer(hostId: number, fullInstanceName: string)
+    public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        const config = await this.ReadServerConfig(hostId, fullInstanceName);
-        await this.hostNATService.AddSourceNATRule(hostId, config.virtualServerAddressRange);
-
-        const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
-
-        await this.systemServicesManager.EnableService(hostId, serviceName);
-        await this.systemServicesManager.StartService(hostId, serviceName);
+        await this.StopServer(resourceReference.hostId, resourceReference.id);
+        await this.remoteRootFileSystemManager.RemoveFile(resourceReference.hostId, this.BuildConfigPath(resourceReference.id));
+        await this.systemServicesManager.Reload(resourceReference.hostId);
+        
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
-    public BuildConfigPath(fullInstanceName: string)
+    public async GenerateClientConfig(hostId: number, resourceId: number, serverDir: string, clientCertKeyPaths: CertKeyFiles)
     {
-        const name = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
-        return "/etc/openvpn/server/" + name + ".conf";
-    }
-
-    public CreateDefaultConfig(): OpenVPNServerConfig
-    {
-        return {
-            authenticationAlgorithm: "SHA256",
-            cipher: "AES-256-CBC",
-            port: 1194,
-            protocol: "udp",
-            verbosity: 3,
-            virtualServerAddressRange: "10.8.0.0/24",
-        };
-    }
-
-    public async CreateServerConfig(hostId: number, serverDir: string, fullInstanceName: string, data: OpenVPNServerConfig, certKeyFiles: CertKeyFiles)
-    {
-        await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", serverDir + "/ta.key"], hostId);
-
-        const range = new CIDRRange(data.virtualServerAddressRange);
-        const config = `
-dev tun
-topology subnet
-keepalive 10 120
-user nobody
-group nogroup
-persist-key
-persist-tun
-remote-cert-tls client
-
-ifconfig-pool-persist ${serverDir}/ipp.txt
-tls-auth ${serverDir}/ta.key 0
-status ${serverDir}/openvpn-status.log
-log ${serverDir}/openvpn.log
-
-server ${range.netAddress} ${range.GenerateSubnetMask()}
-port ${data.port}
-proto ${data.protocol}
-cipher ${data.cipher}
-auth ${data.authenticationAlgorithm}
-verb ${data.verbosity}
-
-ca ${certKeyFiles.caCertPath}
-cert ${certKeyFiles.certPath}
-key ${certKeyFiles.keyPath}
-dh ${certKeyFiles.dhPath}
-crl-verify ${certKeyFiles.crlPath}
-        `;
-
-        await this.remoteRootFileSystemManager.WriteTextFile(hostId, this.BuildConfigPath(fullInstanceName), config);
-
-        await this.systemServicesManager.Reload(hostId);
-    }
-
-    public async GenerateClientConfig(hostId: number, instanceId: number, serverDir: string, fullInstanceName: string, clientCertKeyPaths: CertKeyFiles)
-    {
-        const serverConfig = await this.ReadServerConfig(hostId, fullInstanceName);
-        const instanceConfig = await this.ReadInstanceConfig(instanceId);
+        const serverConfig = await this.ReadServerConfig(hostId, resourceId);
+        const instanceConfig = await this.ReadInstanceConfig(resourceId);
 
         const caCertData = await this.remoteFileSystemManager.ReadTextFile(hostId, clientCertKeyPaths.caCertPath);
         const certData = await this.remoteFileSystemManager.ReadTextFile(hostId, clientCertKeyPaths.certPath);
@@ -194,25 +140,47 @@ ${taData}
 `;
     }
 
+    public async ProvideResource(instanceProperties: OpenVPNGatewayProperties, context: DeploymentContext)
+    {
+        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "openvpn");
+        await this.sysCtlConfService.SetIPForwardingState(context.hostId, true);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(context.resourceReference);
+
+        await this.easyRSAManager.CreateCADir(context.hostId, resourceDir);
+        await this.easyRSAManager.CreateCA(context.hostId, resourceDir, instanceProperties.name, instanceProperties.keySize);
+        await this.easyRSAManager.CreateServer(context.hostId, resourceDir, instanceProperties.publicEndpoint.domainName, instanceProperties.keySize);
+
+        const paths = this.easyRSAManager.GetCertPaths(resourceDir, instanceProperties.publicEndpoint.domainName);
+        await this.CreateServerConfig(context.hostId, resourceDir, context.resourceReference.id, this.CreateDefaultConfig(), paths);
+        await this.AutoStartServer(context.hostId, context.resourceReference.id);
+
+        const config: OpenVPNGatewayInternalConfig = {
+            pki: {
+                keySize: instanceProperties.keySize
+            },
+            publicEndpoint: instanceProperties.publicEndpoint,
+        };
+    }
+
     public async ReadInstanceConfig(instanceId: number): Promise<OpenVPNGatewayInternalConfig>
     {
         const config = await this.instanceConfigController.QueryConfig<OpenVPNGatewayInternalConfig>(instanceId);
         return config!;
     }
 
-    public async ReadInstanceLogs(instanceContext: InstanceContext)
+    public async ReadInstanceLogs(resourceReference: LightweightResourceReference)
     {
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const instanceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        const log = await this.remoteRootFileSystemManager.ReadTextFile(instanceContext.hostId, path.join(instanceDir, "openvpn.log"));
+        const log = await this.remoteRootFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(instanceDir, "openvpn.log"));
         return log.split("\n").map(this.ParseLogLine.bind(this));
     }
 
-    public async ReadInstanceStatus(instanceContext: InstanceContext)
+    public async ReadInstanceStatus(resourceReference: LightweightResourceReference)
     {
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(instanceContext.hostStoragePath, instanceContext.fullInstanceName);
+        const instanceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        const statusText = await this.remoteRootFileSystemManager.ReadTextFile(instanceContext.hostId, path.join(instanceDir, "openvpn-status.log"));
+        const statusText = await this.remoteRootFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(instanceDir, "openvpn-status.log"));
         const lines = statusText.split("\n");
 
         let lastHeaderFields: string[] = [];
@@ -249,9 +217,9 @@ ${taData}
         return clients;
     }
 
-    public async ReadServerConfig(hostId: number, fullInstanceName: string): Promise<OpenVPNServerConfig>
+    public async ReadServerConfig(hostId: number, resourceId: number): Promise<OpenVPNServerConfig>
     {
-        const parsed = await this.ParseConfig(hostId, fullInstanceName);
+        const parsed = await this.ParseConfig(hostId, resourceId);
         const mdl = new ConfigModel(parsed);
 
         const data = mdl.WithoutSectionAsDictionary() as any;
@@ -267,19 +235,10 @@ ${taData}
         };
     }
 
-    public async RestartServer(hostId: number, fullInstanceName: string)
+    public async RestartServer(hostId: number, resourceId: number)
     {
-        const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
+        const serviceName = this.DeriveSystemDServiceName(resourceId);
         await this.systemServicesManager.RestartService(hostId, serviceName);
-    }
-
-    public async StopServer(hostId: number, fullInstanceName: string)
-    {
-        const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
-        await this.systemServicesManager.StopService(hostId, serviceName);
-
-        const config = await this.ReadServerConfig(hostId, fullInstanceName);
-        await this.hostNATService.RemoveSourceNATRule(hostId, config.virtualServerAddressRange);
     }
 
     public async UpdateInstanceConfig(instanceId: number, publicEndpointConfig: OpenVPNGatewayPublicEndpointConfig)
@@ -291,12 +250,12 @@ ${taData}
         await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
     }
 
-    public async UpdateServerConfig(hostId: number, fullInstanceName: string, config: OpenVPNServerConfig)
+    public async UpdateServerConfig(hostId: number, resourceId: number, config: OpenVPNServerConfig)
     {
-        const oldConfig = await this.ReadServerConfig(hostId, fullInstanceName);
+        const oldConfig = await this.ReadServerConfig(hostId, resourceId);
         if(oldConfig.virtualServerAddressRange !== config.virtualServerAddressRange)
         {
-            const serviceName = this.DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName);
+            const serviceName = this.DeriveSystemDServiceName(resourceId);
             const isRunning = await this.systemServicesManager.IsServiceActive(hostId, serviceName);
             if(isRunning)
             {
@@ -307,7 +266,7 @@ ${taData}
 
         const range = new CIDRRange(config.virtualServerAddressRange);
 
-        const parsed = await this.ParseConfig(hostId, fullInstanceName);
+        const parsed = await this.ParseConfig(hostId, resourceId);
         const mdl = new ConfigModel(parsed);
         mdl.SetProperties("", {
             auth: config.authenticationAlgorithm,
@@ -328,20 +287,93 @@ ${taData}
             }
         }
 
-        const configPath = this.BuildConfigPath(fullInstanceName);
+        const configPath = this.BuildConfigPath(resourceId);
 
         const writer = new OpenVPNConfigWriter(openVPNConfigDialect, (filePath, content) => this.remoteRootFileSystemManager.WriteTextFile(hostId, filePath, content));
         await writer.Write(configPath, parsed);
     }
 
     //Private methods
-    private DeriveSystemDServiceNameFromFullInstanceName(fullInstanceName: string)
+    private async AutoStartServer(hostId: number, resourceId: number)
     {
-        const name = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const config = await this.ReadServerConfig(hostId, resourceId);
+        await this.hostNATService.AddSourceNATRule(hostId, config.virtualServerAddressRange);
+
+        const serviceName = this.DeriveSystemDServiceName(resourceId);
+
+        await this.systemServicesManager.EnableService(hostId, serviceName);
+        await this.systemServicesManager.StartService(hostId, serviceName);
+    }
+
+    private BuildConfigPath(resourceId: number)
+    {
+        const name = this.DeriveServerName(resourceId);
+        return "/etc/openvpn/server/" + name + ".conf";
+    }
+
+    private CreateDefaultConfig(): OpenVPNServerConfig
+    {
+        return {
+            authenticationAlgorithm: "SHA256",
+            cipher: "AES-256-CBC",
+            port: 1194,
+            protocol: "udp",
+            verbosity: 3,
+            virtualServerAddressRange: "10.8.0.0/24",
+        };
+    }
+
+    private async CreateServerConfig(hostId: number, serverDir: string, resourceId: number, data: OpenVPNServerConfig, certKeyFiles: CertKeyFiles)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", serverDir + "/ta.key"], hostId);
+
+        const range = new CIDRRange(data.virtualServerAddressRange);
+        const config = `
+dev tun
+topology subnet
+keepalive 10 120
+user nobody
+group nogroup
+persist-key
+persist-tun
+remote-cert-tls client
+
+ifconfig-pool-persist ${serverDir}/ipp.txt
+tls-auth ${serverDir}/ta.key 0
+status ${serverDir}/openvpn-status.log
+log ${serverDir}/openvpn.log
+
+server ${range.netAddress} ${range.GenerateSubnetMask()}
+port ${data.port}
+proto ${data.protocol}
+cipher ${data.cipher}
+auth ${data.authenticationAlgorithm}
+verb ${data.verbosity}
+
+ca ${certKeyFiles.caCertPath}
+cert ${certKeyFiles.certPath}
+key ${certKeyFiles.keyPath}
+dh ${certKeyFiles.dhPath}
+crl-verify ${certKeyFiles.crlPath}
+        `;
+
+        await this.remoteRootFileSystemManager.WriteTextFile(hostId, this.BuildConfigPath(resourceId), config);
+
+        await this.systemServicesManager.Reload(hostId);
+    }
+
+    private DeriveServerName(resourceId: number)
+    {
+        return "opc-rovpng-" + resourceId;
+    }
+
+    private DeriveSystemDServiceName(resourceId: number)
+    {
+        const name = this.DeriveServerName(resourceId);
         return "openvpn-server@" + name;
     }
 
-    private ParseConfig(hostId: number, fullInstanceName: string)
+    private ParseConfig(hostId: number, resourceId: number)
     {
         class OpenVPNConfigParser extends ConfigParser
         {
@@ -370,7 +402,7 @@ ${taData}
             }
         }
 
-        const configPath = this.BuildConfigPath(fullInstanceName);
+        const configPath = this.BuildConfigPath(resourceId);
 
         const cfgParser = new OpenVPNConfigParser(openVPNConfigDialect);
         return cfgParser.Parse(hostId, configPath);
@@ -381,5 +413,14 @@ ${taData}
         return {
             message: line
         };
+    }
+
+    private async StopServer(hostId: number, resourceId: number)
+    {
+        const serviceName = this.DeriveSystemDServiceName(resourceId);
+        await this.systemServicesManager.StopService(hostId, serviceName);
+
+        const config = await this.ReadServerConfig(hostId, resourceId);
+        await this.hostNATService.RemoveSourceNATRule(hostId, config.virtualServerAddressRange);
     }
 }

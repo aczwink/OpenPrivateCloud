@@ -17,7 +17,6 @@
  * */
 
 import { DBExpression, Injectable } from "acts-util-node";
-import { ErrorService } from "../services/ErrorService";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
 export enum HealthStatus
@@ -28,20 +27,11 @@ export enum HealthStatus
     InDeployment = 4
 }
 
-interface InstanceHealthData
+interface ResourceHealthData
 {
     status: HealthStatus;
-    
-    /**
-     * @format multi-line
-     */
     availabilityLog: string;
-
     lastSuccessfulCheck: Date;
-
-    /**
-     * @format multi-line
-     */
     checkLog: string;
 }
 
@@ -54,7 +44,7 @@ export interface HealthStats
 @Injectable
 export class HealthController
 {
-    constructor(private dbConnMgr: DBConnectionsManager, private errorService: ErrorService)
+    constructor(private dbConnMgr: DBConnectionsManager)
     {
     }
 
@@ -76,7 +66,7 @@ export class HealthController
         return await conn.Select<HealthStats>(query);
     }
 
-    public async QueryInstanceHealthData(instanceId: number): Promise<InstanceHealthData | undefined>
+    public async QueryResourceHealthData(instanceId: number): Promise<ResourceHealthData | undefined>
     {
         const query = `
         SELECT status, availabilityLog, lastSuccessfulCheck, checkLog
@@ -108,11 +98,10 @@ export class HealthController
         return await conn.Select<HealthStats>(query);
     }
 
-    public async UpdateHostHealth(hostId: number, status: HealthStatus, logData?: unknown)
+    public async UpdateHostHealth(hostId: number, status: HealthStatus, log: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
 
-        const log = this.errorService.ExtractDataAsMultipleLines(logData);
         const result = await conn.UpdateRows("hosts_health", { status, log }, "hostId = ?", hostId);
 
         if(result.affectedRows === 0)
@@ -125,37 +114,35 @@ export class HealthController
         }
     }
 
-    public async UpdateInstanceAvailability(instanceId: number, status: HealthStatus, logData?: unknown)
+    public async UpdateResourceAvailability(resourceId: number, status: HealthStatus, logData: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
 
-        const log = this.errorService.ExtractDataAsMultipleLines(logData);
         const result = await conn.UpdateRows("instances_health", {
-            status: DBExpression(`IF((status = ${HealthStatus.Down}) or (status = ${HealthStatus.Up}), ${status}, status)`),
-            availabilityLog: log
-        }, "instanceId = ?", instanceId);
+            status,
+            availabilityLog: logData
+        }, "instanceId = ?", resourceId);
 
         if(result.affectedRows === 0)
         {
             await conn.InsertRow("instances_health", {
-                instanceId,
+                instanceId: resourceId,
                 status,
-                availabilityLog: log,
+                availabilityLog: logData,
                 lastSuccessfulCheck: "0000-00-00 00:00:00",
                 checkLog: ""
             });
         }
     }
 
-    public async UpdateInstanceHealth(instanceId: number, status: HealthStatus, logData?: unknown)
+    public async UpdateResourceHealth(instanceId: number, status: HealthStatus, log: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
 
         const lastSuccessfulCheck = (status === HealthStatus.Up) ? DBExpression("NOW()") : undefined;
-        const log = this.errorService.ExtractDataAsMultipleLines(logData);
 
         const result = await conn.UpdateRows("instances_health", {
-            status: DBExpression("GREATEST(status, " + status + ")"),
+            status,
             lastSuccessfulCheck,
             checkLog: log,
         }, "instanceId = ?", instanceId);

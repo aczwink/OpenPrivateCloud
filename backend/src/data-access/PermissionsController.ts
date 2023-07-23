@@ -45,6 +45,24 @@ export class PermissionsController
         return row !== undefined;
     }
 
+    public async HasUserResourceLevelPermission(resourceId: number, userId: number, permission: string)
+    {
+        const query = `
+        SELECT TRUE
+        FROM instances_roleAssignments ira
+        INNER JOIN usergroups_members ugm
+            ON ugm.groupId = ira.userGroupId
+        INNER JOIN roles_permissions rp
+            ON ira.roleId = rp.roleId
+        WHERE ira.instanceId = ? AND ugm.userId = ? AND rp.permission = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne(query, resourceId, userId, permission);
+
+        return row !== undefined;
+    }
+
     public async IsUserRequiredOnHost(hostId: number, userId: number)
     {
         let query = `

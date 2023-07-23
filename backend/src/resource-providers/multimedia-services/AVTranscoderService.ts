@@ -18,47 +18,38 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { AVTranscoderConfig, AVTranscoderFormat, AVTranscoderQuality } from "./AVTranscoderConfig";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { ResourcesController } from "../../data-access/ResourcesController";
-import { HostStorage, HostStoragesController } from "../../data-access/HostStoragesController";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
 import { CodecService, FFProbe_StreamInfo } from "./CodecService";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { EnumeratorBuilder } from "acts-util-core/dist/Enumeration/EnumeratorBuilder";
+import { LightweightResourceReference } from "../../common/ResourceReference";
+import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 
 @Injectable
 export class AVTranscoderService
 {
-    constructor(private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
-        private remoteFileSystemManager: RemoteFileSystemManager, private fileStoragesManager: FileStoragesManager, private codecService: CodecService,
-        private remoteCommandExecutor: RemoteCommandExecutor, private instancesManager: ResourcesManager,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager)
+    constructor(private fileStoragesManager: FileStoragesManager, private codecService: CodecService, private remoteCommandExecutor: RemoteCommandExecutor, private resourcesManager: ResourcesManager,
+        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
 
     //Public methods
-    public async Transcode(instanceId: number, config: AVTranscoderConfig)
+    public async Transcode(resourceReference: LightweightResourceReference, config: AVTranscoderConfig)
     {
-        throw new Error("TODO: reimplement me");
-        /*
-        const sourceFileStorageInstance = await this.instancesController.QueryResourceByName(config.source.fullInstanceName);
-        const sourceFileStorageInstanceStorage = await this.hostStoragesController.RequestHostStorage(sourceFileStorageInstance!.storageId);
-        const hostId = sourceFileStorageInstanceStorage!.hostId;
+        const sourceResourceRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.source.sourceFileStorageExternalId);
+        if(sourceResourceRef === undefined)
+            throw new Error("Source file storage does not exist anymore!");
 
-        const instance = await this.instancesController.QueryResource(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.name);
+        const files = await this.ReadInputFiles(sourceResourceRef, config.source.sourcePath);
 
-        const files = await this.ReadInputFiles(config.source.fullInstanceName, config.source.sourcePath, sourceFileStorageInstanceStorage!);
-
-        const dataPath = this.fileStoragesManager.GetDataPath(sourceFileStorageInstanceStorage!.path, config.source.fullInstanceName);
+        const dataPath = this.fileStoragesManager.GetDataPath(sourceResourceRef);
         const targetPath = path.join(dataPath, config.targetPath);
         for (const file of files)
-            await this.TranscodeFile(hostId, file, config.format, instanceDir, targetPath);
-            */
+            await this.TranscodeFile(sourceResourceRef.hostId, file, config.format, resourceDir, targetPath);
     }
 
     //Private methods
@@ -168,12 +159,12 @@ export class AVTranscoderService
         }
     }
 
-    private async ReadInputFiles(fullInstanceName: string, localPath: string, storage: HostStorage)
+    private async ReadInputFiles(resourceReference: LightweightResourceReference, localPath: string)
     {
-        const dataPath = this.fileStoragesManager.GetDataPath(storage.path, fullInstanceName);
+        const dataPath = this.fileStoragesManager.GetDataPath(resourceReference);
         const dirPath = path.join(dataPath, localPath);
 
-        const children = await this.remoteFileSystemManager.ListDirectoryContents(storage.hostId, dirPath);
+        const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, dirPath);
         return children.map(x => path.join(dirPath, x));
     }
 
@@ -186,9 +177,21 @@ export class AVTranscoderService
 
         const fileName = path.basename(filePath);
         const targetPath = path.join(instanceDir, "tmp", fileName.substring(0, fileName.length - path.extname(fileName).length) + "." + targetFormat.containerFormat);
-        await this.remoteCommandExecutor.ExecuteCommand(["ffmpeg", "-i", filePath, ...vcodecParams, ...acodecParams, targetPath], hostId);
+        const command = [
+            "ffmpeg",
+            "-i", filePath,
+            "-y", //overwrite file if exists (file is in tmp folder so no problem overwriting it. Files may remain in temp if there were problems moving it for example)
+            ...vcodecParams,
+            ...acodecParams,
+            targetPath
+        ];
+        await this.remoteCommandExecutor.ExecuteCommand(command, hostId);
 
         //move to target dir
+        const exists = await this.remoteFileSystemManager.Exists(hostId, targetDirPath);
+        if(!exists)
+            await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetDirPath);
+
         const finalPath = path.join(targetDirPath, path.basename(targetPath));
         await this.remoteRootFileSystemManager.MoveFile(hostId, targetPath, finalPath);
     }

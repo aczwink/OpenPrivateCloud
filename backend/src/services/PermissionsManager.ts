@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ import { ResourcesController } from "../data-access/ResourcesController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { HostUsersManager } from "./HostUsersManager";
+import { ResourceReference } from "../common/ResourceReference";
   
 @Injectable
 export class PermissionsManager
@@ -50,5 +51,17 @@ export class PermissionsManager
 
         if(!userGroupIds.has(roleAssignment.userGroupId))
             await this.hostUsersManager.RemoveGroupFromHost(hostId!, roleAssignment.userGroupId);
+    }
+
+    public async HasUserPermissionOnResourceScope(resourceReference: ResourceReference, userId: number, permission: string)
+    {
+        const clusterWide = await this.permissionsController.HasUserClusterWidePermission(userId, permission);
+        if(clusterWide)
+            return true;
+
+        //TODO: RG level
+
+        const resourceLevel = await this.permissionsController.HasUserResourceLevelPermission(resourceReference.id, userId, permission);
+        return resourceLevel;
     }
 }

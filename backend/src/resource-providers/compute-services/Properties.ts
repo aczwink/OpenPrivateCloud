@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ export interface DockerContainerProperties extends BaseResourceProperties
 export interface VirtualMachineProperties extends BaseResourceProperties
 {
     type: "virtual-machine";
-    os: "ubuntu-latest" | "ubuntu-server-latest";
+    os: "ubuntu-lts-latest" | "ubuntu-server-lts-latest" | "ubuntu-latest" | "ubuntu-server-latest";
     /**
      * @title Size of the OS Disk in GB
      * @default 25

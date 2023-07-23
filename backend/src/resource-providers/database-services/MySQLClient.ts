@@ -50,7 +50,7 @@ export interface MySQLGrant
  
 export class MySQLClient
 {
-    constructor(private spawnShell: () => Promise<ShellFrontend>, private commandPrefix: string[], private rootPassword: string)
+    constructor(private spawnShell: () => Promise<ShellFrontend>, private clientProg: "mysql" | "mariadb", private commandPrefix: string[], private rootPassword: string)
     {
     }
 
@@ -80,7 +80,7 @@ export class MySQLClient
         let data = "";
 
         const shell = await this.spawnShell();
-        await shell.StartCommand(this.commandPrefix.concat(["mysql", "-u", "root", "-p", "--xml", "-e", '"' + query + '"']));
+        await shell.StartCommand(this.commandPrefix.concat([this.clientProg, "-u", "root", "-p", "--xml", "-e", '"' + query + '"']));
 
         await this.LogIn(shell);
 
@@ -116,7 +116,7 @@ export class MySQLClient
     private async ExecuteMySQLQuery(mysqlQuery: string)
     {
         const shell = await this.spawnShell();
-        await shell.StartCommand(this.commandPrefix.concat(["mysql", "-u", "root", "-p", "-e", '"' + mysqlQuery + '"']));
+        await shell.StartCommand(this.commandPrefix.concat([this.clientProg, "-u", "root", "-p", "-e", '"' + mysqlQuery + '"']));
 
         await this.LogIn(shell);
 
@@ -135,6 +135,6 @@ export class MySQLClient
     //Class functions
     public static CreateStandardHostClient(hostId: number)
     {
-        return new MySQLClient(() => GlobalInjector.Resolve(RemoteCommandExecutor).SpawnShell(hostId), ["sudo"], "");
+        return new MySQLClient(() => GlobalInjector.Resolve(RemoteCommandExecutor).SpawnShell(hostId), "mysql", ["sudo"], "");
     }
 }

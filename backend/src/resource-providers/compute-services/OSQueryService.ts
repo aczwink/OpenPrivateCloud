@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -42,9 +42,20 @@ export class OSQueryService
 
         switch(instanceProperties.os)
         {
+            case "ubuntu-lts-latest":
+            case "ubuntu-server-lts-latest":
+            {
+                const entry = entries.Values().Filter(x => x.osId.startsWith("ubuntu") && x.osName.includes("LTS")).OrderByDescending(x => x.osVersion).First();
+                return {
+                    type: instanceProperties.os === "ubuntu-lts-latest" ? "ubuntu" : "ubuntu-server",
+                    id: entry.osId,
+                    version: entry.osVersion,
+                    versionString: entry.osVersionString,
+                };
+            }
             case "ubuntu-latest":
             case "ubuntu-server-latest":
-                const entry = entries.Values().Filter(x => x.osId.startsWith("ubuntu")).OrderByDescending(x => x.osVersion).First();
+                const entry = entries.Values().Filter(x => x.osId.startsWith("ubuntu") && x.releaseDate !== undefined).OrderByDescending(x => x.osVersion).First();
                 return {
                     type: instanceProperties.os === "ubuntu-latest" ? "ubuntu" : "ubuntu-server",
                     id: entry.osId,
@@ -58,14 +69,17 @@ export class OSQueryService
     private async FetchOSEntries(hostId: number, instanceProperties: VirtualMachineProperties)
     {
         const vendor = this.MapOSTypeToVendor(instanceProperties);
-        const { stdOut } = await this.remoteCommandExecutor.ExecuteBufferedCommand(["osinfo-query", "--fields=short-id,version", "os", 'vendor="' + vendor + '"'], hostId);
+        const { stdOut } = await this.remoteCommandExecutor.ExecuteBufferedCommand(["osinfo-query", "--fields=short-id,name,version,release-date", "os", 'vendor=' + vendor], hostId);
         const lines = stdOut.trimEnd().split("\n");
         return lines.slice(2).map(x => {
             const parts = x.split("|");
+            const rd = new Date(parts[3].trim());
             return {
                 osId: parts[0].trim(),
-                osVersion: parseFloat(parts[1].trim()),
-                osVersionString: parts[1].trim()
+                osName: parts[1].trim(),
+                osVersion: parseFloat(parts[2].trim()),
+                osVersionString: parts[2].trim(),
+                releaseDate: (isNaN(rd.valueOf()) ? undefined : rd)
             };
         });
     }
@@ -74,6 +88,8 @@ export class OSQueryService
     {
         switch(instanceProperties.os)
         {
+            case "ubuntu-lts-latest":
+            case "ubuntu-server-lts-latest":
             case "ubuntu-latest":
             case "ubuntu-server-latest":
                 return "Canonical Ltd";

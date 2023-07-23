@@ -20,6 +20,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { StaticWebsiteConfig, StaticWebsiteInfoDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadStaticWebsiteContentComponent } from "../../Views/static-website/UploadStaticWebsiteContentComponent";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -53,10 +54,7 @@ const configViewModel: ObjectViewModel<StaticWebsiteConfig, ResourceAndGroupId> 
 
 export const staticWebsiteViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId)
     ],
     entries: [
         {
@@ -81,7 +79,8 @@ export const staticWebsiteViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     }
                 }
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

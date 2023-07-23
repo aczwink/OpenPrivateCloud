@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -89,7 +89,11 @@ export class OSImageDownloader
         }
         const matchingIsos = isos.Filter(x => x.includes(flavorName)).ToArray();
         if(matchingIsos.length != 1)
+        {
+            console.log(osInfo);
+            console.log(isos.ToArray());
             throw new Error("unknown number of matching isos");
+        }
 
         const fileName = matchingIsos[0];
         return {

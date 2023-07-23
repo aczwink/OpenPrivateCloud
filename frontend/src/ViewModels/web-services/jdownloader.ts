@@ -20,6 +20,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { JdownloaderInfoDto, MyJDownloaderCredentials, SMBConnectionInfo } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -74,10 +75,7 @@ const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, ResourceAndGrou
 
 export const jdownloaderViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId)
     ],
     entries: [
         {
@@ -88,7 +86,6 @@ export const jdownloaderViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     displayName: "Overview",
                     child: overviewViewModel,
                 },
-                BuildAccessControlPageEntry(BuildResourceId),
                 {
                     key: "credentials",
                     displayName: "Credentials",
@@ -100,7 +97,8 @@ export const jdownloaderViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     displayName: "SMB connection"
                 },
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

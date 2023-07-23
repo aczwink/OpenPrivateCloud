@@ -21,7 +21,7 @@ import { MySQLDatabaseEntry, MySQLGrant, MySQLUserCreationData, MySQLUserEntry }
 import { PageNotFoundComponent } from "../../PageNotFoundComponent";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
-import { BuildInstanceGeneralPageGroupEntry } from "../shared/instancegeneral";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type ResourceAndGroupIdAndUserId = ResourceAndGroupId & { user: string };
@@ -134,10 +134,7 @@ const databasesViewModel: ListViewModel<MySQLDatabaseEntry, ResourceAndGroupId> 
 
 export const mariadbViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId),
     ],
     entries: [
         {
@@ -167,7 +164,7 @@ export const mariadbViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                 }
             ]
         },
-        BuildInstanceGeneralPageGroupEntry(BuildResourceId),
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

@@ -24,7 +24,7 @@ type UserIdRouteParams = { userId: number };
 
 const userViewModel: ObjectViewModel<PublicUserData, UserIdRouteParams> = {
     actions: [],
-    formTitle: user => user.emailAddress,
+    formTitle: (_, user) => user.emailAddress,
     requestObject: (service, ids) => service.users._any_.get(ids.userId),
     schemaName: "PublicUserData",
     type: "object"
@@ -51,7 +51,7 @@ type GroupIdRouteParams = { groupId: number };
 
 const userGroupOverviewViewModel: ObjectViewModel<UserGroup, GroupIdRouteParams> = {
     actions: [],
-    formTitle: x => x.name,
+    formTitle: (_, x) => x.name,
     requestObject: (service, ids) => service.usergroups._any_.get(ids.groupId),
     schemaName: "UserGroup",
     type: "object"
@@ -64,7 +64,7 @@ const userGroupMemberViewModel: ObjectViewModel<PublicUserData, GroupIdRoutePara
             deleteResource: (service, ids) => service.usergroups._any_.members.delete(ids.groupId, { userId: ids.userId }),
         }
     ],
-    formTitle: user => user.emailAddress,
+    formTitle: (_, user) => user.emailAddress,
     requestObject: (service, ids) => service.users._any_.get(ids.userId),
     schemaName: "PublicUserData",
     type: "object"

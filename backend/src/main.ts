@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,14 +25,14 @@ import { HTTPAuthHandler } from "./HTTPAuthHandler";
 import { DBConnectionsManager } from "./data-access/DBConnectionsManager";
 import { APISchemaService } from "./services/APISchemaService";
 import { HostAvailabilityManager } from "./services/HostAvailabilityManager";
-import { InstanceHealthManager } from "./services/InstanceHealthManager";
+import { ResourceHealthManager } from "./services/ResourceHealthManager";
 
 const port = 8078;
 
 async function EnableHealthManagement()
 {
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
-    GlobalInjector.Resolve(InstanceHealthManager).ScheduleInstanceChecks();
+    GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
 }
 
 async function SetupServer()

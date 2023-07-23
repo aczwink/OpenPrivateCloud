@@ -16,13 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Query } from "acts-util-apilib";
-import { resourceProviders } from "openprivatecloud-common";
+import { APIController, Body, BodyProp, Common, Delete, Get, Path, Post, Query } from "acts-util-apilib";
 import { c_databaseServicesResourceProviderName, c_mariadbResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { InstanceContext } from "../../../common/InstanceContext";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { MySQLGrant } from "../MySQLClient";
 import { MariaDBManager, MySQLDatabaseEntry } from "./MariaDBManager";
+import { ResourceReference } from "../../../common/ResourceReference";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 
 interface MySQLUserCreationData
 {
@@ -31,92 +31,88 @@ interface MySQLUserCreationData
     password: string;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_databaseServicesResourceProviderName}/${c_mariadbResourceTypeName}/{instanceName}`)
-class MariaDBAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_databaseServicesResourceProviderName}/${c_mariadbResourceTypeName}/{resourceName}`)
+class MariaDBAPIController extends ResourceAPIControllerBase
 {
-    constructor(private instancesManager: ResourcesManager, private mariaDBManager: MariaDBManager)
+    constructor(resourcesManager: ResourcesManager, private mariaDBManager: MariaDBManager)
     {
+        super(resourcesManager, c_databaseServicesResourceProviderName, c_mariadbResourceTypeName);
     }
 
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.databaseServices.name, resourceProviders.databaseServices.mariadbResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
-        if(instanceContext === undefined)
-            return NotFound("instance not found");
-
-        return instanceContext;
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Post("databases")
     public async AddDatabase(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Body data: MySQLDatabaseEntry,
     )
     {
-        await this.mariaDBManager.CreateDatabase(instanceContext, data.Database);
+        await this.mariaDBManager.CreateDatabase(resourceReference, data.Database);
     }
 
     @Get("databases")
     public async QueryDatabases(
-        @Common instanceContext: InstanceContext
+        @Common resourceReference: ResourceReference
     )
     {
-        const result = await this.mariaDBManager.QueryDatabases(instanceContext);
+        const result = await this.mariaDBManager.QueryDatabases(resourceReference);
         return result;
     }
 
     @Post("permissions")
     public async AddUserPermission(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @BodyProp userName: string,
         @BodyProp hostName: string,
         @BodyProp permission: MySQLGrant
     )
     {
-        await this.mariaDBManager.AddUserPermission(instanceContext, userName, hostName, permission);
+        await this.mariaDBManager.AddUserPermission(resourceReference, userName, hostName, permission);
     }
 
     @Get("permissions")
     public async QueryUserPermissions(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Query userName: string,
         @Query hostName: string
     )
     {
-        const result = await this.mariaDBManager.QueryUserPermissions(instanceContext, userName, hostName);
+        const result = await this.mariaDBManager.QueryUserPermissions(resourceReference, userName, hostName);
         return result;
     }
 
     @Post("users")
     public async AddUser(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Body data: MySQLUserCreationData,
     )
     {
-        await this.mariaDBManager.CreateUser(instanceContext, data.userName, data.hostName, data.password);
+        await this.mariaDBManager.CreateUser(resourceReference, data.userName, data.hostName, data.password);
     }
 
     @Delete("users")
     public async DeleteUser(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @BodyProp userName: string,
         @BodyProp hostName: string
     )
     {
-        await this.mariaDBManager.DeleteUser(instanceContext, userName, hostName);
+        await this.mariaDBManager.DeleteUser(resourceReference, userName, hostName);
     }
 
     @Get("users")
     public async QueryUsers(
-        @Common instanceContext: InstanceContext
+        @Common resourceReference: ResourceReference
     )
     {
-        const result = await this.mariaDBManager.QueryUsers(instanceContext);
+        const result = await this.mariaDBManager.QueryUsers(resourceReference);
         return result;
     }
 }

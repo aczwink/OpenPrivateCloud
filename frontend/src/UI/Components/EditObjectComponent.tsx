@@ -25,7 +25,7 @@ import { ObjectEditorComponent, ObjectEditorContext } from "./ObjectEditorCompon
 
 interface ObjectInput<ObjectType>
 {
-    formTitle: (obj: any) => string;
+    formTitle: (ids: any, object: any) => string;
     loadContext?: (routeParams: Dictionary<string>) => Promise<ObjectEditorContext>;
     postUpdateUrl: string;
     requestObject: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType>>;
@@ -73,7 +73,7 @@ export class EditObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)
             this.data = result.value;
-        this.heading = this.input.formTitle(this.data);
+        this.heading = this.input.formTitle(this.routerState.routeParams, this.data);
     }
 
     private OnObjectUpdated(newValue: ObjectType)

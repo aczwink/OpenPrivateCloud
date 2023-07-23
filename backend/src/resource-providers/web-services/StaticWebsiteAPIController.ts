@@ -16,16 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Common, FormField, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Body, Common, FormField, Get, Path, Post, Put } from "acts-util-apilib";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
-import { resourceProviders } from "openprivatecloud-common";
 import { c_staticWebsiteResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { InstanceContext } from "../../common/InstanceContext";
-import { HostsController } from "../../data-access/HostsController";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { ResourcesController } from "../../data-access/ResourcesController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { StaticWebsiteConfig, StaticWebsitesManager } from "./StaticWebsitesManager";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourceReference } from "../../common/ResourceReference";
 
 interface StaticWebsiteInfoDto
 {
@@ -34,68 +31,59 @@ interface StaticWebsiteInfoDto
     port: number;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_staticWebsiteResourceTypeName}/{instanceName}`)
-class StaticWebsiteAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_staticWebsiteResourceTypeName}/{resourceName}`)
+class StaticWebsiteAPIController extends ResourceAPIControllerBase
 {
-    constructor(private instancesManager: ResourcesManager, private instancesController: ResourcesController, private staticWebsitesManager: StaticWebsitesManager,
-        private hostStoragesController: HostStoragesController, private hostsController: HostsController)
+    constructor(resourcesManager: ResourcesManager, private staticWebsitesManager: StaticWebsitesManager)
     {
+        super(resourcesManager, c_webServicesResourceProviderName, c_staticWebsiteResourceTypeName);
     }
     
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.staticWebsiteResourceType.name, instanceName);
-        const instanceContext = this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
-        if(instanceContext === undefined)
-            return NotFound("instance not found");
-
-        return instanceContext;
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Get("config")
     public async QueryConfig(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
     )
     {
-        return await this.staticWebsitesManager.QueryConfig(instanceContext);
+        return await this.staticWebsitesManager.QueryConfig(resourceReference);
     }
 
     @Put("config")
     public async UpdateConfig(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Body config: StaticWebsiteConfig
     )
     {
-        return await this.staticWebsitesManager.UpdateConfig(instanceContext, config);
+        return await this.staticWebsitesManager.UpdateConfig(resourceReference, config);
     }
 
     @Get("info")
     public async QueryInfo(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
     )
-    {
-        const instance = await this.instancesController.QueryResource(instanceContext.instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-        const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
-            
+    {            
         const result: StaticWebsiteInfoDto = {
-            hostName: host!.hostName,
-            storagePath: storage!.path,
-            port: await this.staticWebsitesManager.QueryPort(storage!.hostId, instance!.name)
+            hostName: resourceReference.hostName,
+            storagePath: resourceReference.hostStoragePath,
+            port: await this.staticWebsitesManager.QueryPort(resourceReference)
         };
         return result;
     }
 
     @Post()
     public async UpdateContent(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @FormField file: UploadedFile
     )
     {
-        await this.staticWebsitesManager.UpdateContent(instanceContext.instanceId, file.buffer);
+        await this.staticWebsitesManager.UpdateContent(resourceReference, file.buffer);
     }
 }

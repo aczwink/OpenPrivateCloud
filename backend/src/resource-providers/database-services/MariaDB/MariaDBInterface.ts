@@ -15,17 +15,16 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { InstanceContext } from "../../../common/InstanceContext";
-import { ResourceReference } from "../../../common/InstanceReference";
+import { LightweightResourceReference, ResourceReference } from "../../../common/ResourceReference";
 import { MySQLGrant } from "../MySQLClient";
 
 export interface MariaDBInterface
 {
-    AddUserPermission(instanceContext: InstanceContext, userName: string, hostName: string, permission: MySQLGrant): Promise<void>;
-    CheckAllDatabases(instanceContext: InstanceContext): Promise<string>;
-    CreateDatabase(instanceContext: InstanceContext, databaseName: string): Promise<void>;
-    CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string): Promise<void>;
+    AddUserPermission(resourceReference: LightweightResourceReference, userName: string, hostName: string, permission: MySQLGrant): Promise<void>;
+    CheckAllDatabases(resourceReference: LightweightResourceReference): Promise<string>;
+    CreateDatabase(resourceReference: LightweightResourceReference, databaseName: string): Promise<void>;
+    CreateUser(resourceReference: LightweightResourceReference, userName: string, hostName: string, password: string): Promise<void>;
     DeleteResource(resourceReference: ResourceReference): Promise<void>;
-    DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string): Promise<void>;
-    ExecuteSelectQuery(instanceContext: InstanceContext, query: string): Promise<any[]>;
+    DeleteUser(resourceReference: LightweightResourceReference, userName: string, hostName: string): Promise<void>;
+    ExecuteSelectQuery(resourceReference: LightweightResourceReference, query: string): Promise<any[]>;
 }

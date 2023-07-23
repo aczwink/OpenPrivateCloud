@@ -20,11 +20,10 @@ import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { InstanceContext } from "../../common/InstanceContext";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
 import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
-import { ResourceReference } from "../../common/InstanceReference";
+import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 
 interface SMBConfig
 {
@@ -44,20 +43,20 @@ export interface FileStorageConfig
 @Injectable
 export class FileStoragesManager
 {
-    constructor(private instancesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
+    constructor(private resourcesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
         private remoteFileSystemManager: RemoteFileSystemManager,
-        private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: InstanceConfigController,
+        private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: ResourceConfigController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
     {
     }
     
     //Public methods
-    public async CreateSnapshot(resourceReference: ResourceReference)
+    public async CreateSnapshot(resourceReference: LightweightResourceReference)
     {
         await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference);
 
-        const dataPath = this.GetDataPath(resourceReference.hostStoragePath, resourceReference.externalId);
-        const snapsPath = this.GetSnapshotsPath(resourceReference.hostStoragePath, resourceReference.externalId);
+        const dataPath = this.GetDataPath(resourceReference);
+        const snapsPath = this.GetSnapshotsPath(resourceReference);
         const snapName = new Date().toISOString();
         const fullSnapPath = path.join(snapsPath, snapName);
         
@@ -65,14 +64,14 @@ export class FileStoragesManager
         await this.remoteCommandExecutor.ExecuteCommand(["sync"], resourceReference.hostId);
     }
 
-    public async DeleteAllSnapshots(resourceReference: ResourceReference)
+    public async DeleteAllSnapshots(resourceReference: LightweightResourceReference)
     {
-        const snapshots = await this.QuerySnapshotsOrdered(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
+        const snapshots = await this.QuerySnapshotsOrdered(resourceReference);
         for (const snapshot of snapshots)
             await this.DeleteSnapshot(resourceReference, snapshot.snapshotName);
     }
 
-    public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference: ResourceReference)
+    public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference: LightweightResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
         if(config.snapshotRetentionDays === undefined)
@@ -81,7 +80,7 @@ export class FileStoragesManager
         const msToDay = 1000 * 60 * 60 * 24;
         const currentDay = Date.now() / msToDay;
 
-        const snapshots = await this.QuerySnapshotsOrdered(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
+        const snapshots = await this.QuerySnapshotsOrdered(resourceReference);
         for (const snapshot of snapshots)
         {
             const snapshotDay = snapshot.creationDate.valueOf() / msToDay;
@@ -92,28 +91,38 @@ export class FileStoragesManager
         }
     }
 
-    public GetDataPath(storagePath: string, fullInstanceName: string)
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string)
     {
-        const instancePath = this.instancesManager.BuildInstanceStoragePath(storagePath, fullInstanceName);
-        return path.join(instancePath, "data");
+        const config = await this.ReadConfig(resourceReference.id);
+        if(config.smb.enabled)
+        {
+            await this.singleSMBSharePerInstanceProvider.ClearShareIfExisting(resourceReference.hostId, oldExternalResourceId);
+            await this.UpdateSMBConfig(resourceReference, config);
+        }
     }
 
-    public async GetSMBConnectionInfo(data: InstanceContext, userId: number)
+    public GetDataPath(resourceReference: LightweightResourceReference)
     {
-        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(data, userId);
+        const resourcePath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(resourcePath, "data");
     }
 
-    public GetSnapshotsPath(storagePath: string, fullInstanceName: string)
+    public async GetSMBConnectionInfo(resourceReference: ResourceReference, userId: number)
     {
-        const instancePath = this.instancesManager.BuildInstanceStoragePath(storagePath, fullInstanceName);
-        return path.join(instancePath, "snapshots");
+        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(resourceReference, userId);
     }
 
-    public async QuerySnapshotsOrdered(hostId: number, storagePath: string, fullInstanceName: string)
+    public GetSnapshotsPath(resourceReference: LightweightResourceReference)
     {
-        const snapsPath = this.GetSnapshotsPath(storagePath, fullInstanceName);
+        const resourcePath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(resourcePath, "snapshots");
+    }
 
-        const snapshots = await this.remoteFileSystemManager.ListDirectoryContents(hostId, snapsPath);
+    public async QuerySnapshotsOrdered(resourceReference: LightweightResourceReference)
+    {
+        const snapsPath = this.GetSnapshotsPath(resourceReference);
+
+        const snapshots = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, snapsPath);
         return snapshots.Values().OrderBy(x => x).Map(x => ({
             snapshotName: x,
             creationDate: new Date(x)
@@ -137,7 +146,7 @@ export class FileStoragesManager
 
     public async RefreshPermissions(resourceReference: ResourceReference)
     {
-        const dataPath = this.GetDataPath(resourceReference.hostStoragePath, resourceReference.externalId);
+        const dataPath = this.GetDataPath(resourceReference);
         await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, dataPath, false);
 
         const cfg = await this.ReadConfig(resourceReference.id);
@@ -146,12 +155,7 @@ export class FileStoragesManager
     
     public async UpdateConfig(resourceReference: ResourceReference, config: FileStorageConfig)
     {
-        const result = await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
-            enabled: config.smb.enabled,
-            sharePath: this.GetDataPath(resourceReference.hostStoragePath, resourceReference.externalId),
-            readOnly: false,
-            transportEncryption: config.smb.transportEncryption,
-        }, resourceReference);
+        const result = await this.UpdateSMBConfig(resourceReference, config);
         if(result !== undefined)
             return result;
 
@@ -161,9 +165,9 @@ export class FileStoragesManager
     }
 
     //Private methods
-    private async DeleteSnapshot(resourceReference: ResourceReference, snapshotName: string)
+    private async DeleteSnapshot(resourceReference: LightweightResourceReference, snapshotName: string)
     {
-        const snapshotsPath = this.GetSnapshotsPath(resourceReference.hostStoragePath, resourceReference.externalId);
+        const snapshotsPath = this.GetSnapshotsPath(resourceReference);
         const snapshotPath = path.join(snapshotsPath, snapshotName);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "btrfs", "subvolume", "delete", snapshotPath], resourceReference.hostId);
     }
@@ -171,5 +175,15 @@ export class FileStoragesManager
     private async WriteConfig(instanceId: number, config: FileStorageConfig)
     {
         await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
+    }
+
+    private async UpdateSMBConfig(resourceReference: ResourceReference, config: FileStorageConfig)
+    {
+        return await this.singleSMBSharePerInstanceProvider.UpdateSMBConfig({
+            enabled: config.smb.enabled,
+            sharePath: this.GetDataPath(resourceReference),
+            readOnly: false,
+            transportEncryption: config.smb.transportEncryption,
+        }, resourceReference);
     }
 }

@@ -73,7 +73,7 @@ export interface ObjectViewModel<ObjectType, IdType>
     type: "object";
 
     actions: IdBoundResourceAction<IdType, ObjectType, APIService>[];
-    formTitle: (object: ObjectType) => string;
+    formTitle: (ids: IdType, object: ObjectType) => string;
     requestObject: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType>>;
     schemaName: string;
 }

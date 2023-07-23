@@ -21,7 +21,7 @@ import { ComputeServicesProperties } from "./compute-services/Properties";
 import { MariadbProperties } from "./database-services/MariaDB/MariadbProperties";
 import { FileStorageProperties } from "./file-services/FileStorageProperties";
 import { AVTranscoderProperties } from "./multimedia-services/AVTranscoderProperties";
-import { OpenVPNGatewayProperties } from "./network-services/OpenVPNGatewayProperties";
+import { NetworkServicesProperties } from "./network-services/properties";
 import { WebServicesResourceProperties } from "./web-services/Properties";
 
 export type AnyResourceProperties = 
@@ -30,5 +30,5 @@ export type AnyResourceProperties =
     | ComputeServicesProperties
     | FileStorageProperties
     | MariadbProperties
-    | OpenVPNGatewayProperties
+    | NetworkServicesProperties
     | WebServicesResourceProperties;

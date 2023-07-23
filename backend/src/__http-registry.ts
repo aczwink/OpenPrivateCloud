@@ -17,7 +17,7 @@
  * */
 
 import "./api/ClusterConfigAPIController";
-import "./api/HealthAPIController";
+import "./api/health";
 import "./api/HostsAPIController";
 import "./api/HostStorageDevicesAPIController";
 import "./api/HostStoragesAPIController";
@@ -38,6 +38,7 @@ import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/database-services/MariaDB/MariaDBAPIController";
 import "./resource-providers/file-services/FileStorageAPIController";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
+import "./resource-providers/network-services/DNS_ServerAPI_Controller";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";
 import "./resource-providers/web-services/JdownloaderAPIController";
 import "./resource-providers/web-services/LetsEncryptAPIController";

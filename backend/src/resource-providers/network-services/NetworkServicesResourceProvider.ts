@@ -17,24 +17,16 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
-import { OpenVPNGatewayProperties } from "./OpenVPNGatewayProperties";
-import { EasyRSAManager } from "./EasyRSAManager";
-import { OpenVPNGatewayInternalConfig, OpenVPNGatewayManager } from "./OpenVPNGatewayManager";
-import { SystemServicesManager } from "../../services/SystemServicesManager";
-import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { SysCtlConfService } from "./SysCtlConfService";
-import { InstanceContext } from "../../common/InstanceContext";
-import { ResourceReference } from "../../common/InstanceReference";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { OpenVPNGatewayManager } from "./OpenVPNGatewayManager";
+import { ResourceReference } from "../../common/ResourceReference";
+import { NetworkServicesProperties } from "./properties";
+import { DNS_ServerManager } from "./DNS_ServerManager";
  
 @Injectable
-export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPNGatewayProperties>
+export class NetworkServicesResourceProvider implements ResourceProvider<NetworkServicesProperties>
 {
-    constructor(private instancesManager: ResourcesManager, private modulesManager: ModulesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private easyRSAManager: EasyRSAManager, private openVPNGatwayManager: OpenVPNGatewayManager, private systemServicesManager: SystemServicesManager,
-        private sysCtlConfService: SysCtlConfService)
+    constructor(private openVPNGatwayManager: OpenVPNGatewayManager, private dnsServerManager: DNS_ServerManager)
     {
     }
 
@@ -48,6 +40,11 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
     {
         return [
             {
+                fileSystemType: "btrfs",
+                healthCheckSchedule: null,
+                schemaName: "DNS_ServerProperties"
+            },
+            {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
                 schemaName: "OpenVPNGatewayProperties"
@@ -56,50 +53,61 @@ export class NetworkServicesResourceProvider implements ResourceProvider<OpenVPN
     }
 
     //Public methods
-    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
     {
     }
 
-    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        await this.openVPNGatwayManager.StopServer(resourceReference.hostId, resourceReference.externalId);
-        await this.remoteRootFileSystemManager.RemoveFile(resourceReference.hostId, this.openVPNGatwayManager.BuildConfigPath(resourceReference.externalId));
-        await this.systemServicesManager.Reload(resourceReference.hostId);
-        
-        await this.instancesManager.RemoveInstanceStorageDirectory(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.networkServices.dnsServerResourceType.name:
+                await this.dnsServerManager.DeleteResource(resourceReference);
+                break;
+            case resourceProviders.networkServices.openVPNGatewayResourceType.name:
+                await this.openVPNGatwayManager.DeleteResource(resourceReference);
+                break;
+        }
+
         return null;
+    }
+
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
+    {
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 
-    public async ProvideResource(instanceProperties: OpenVPNGatewayProperties, context: DeploymentContext): Promise<DeploymentResult>
+    public async ProvideResource(instanceProperties: NetworkServicesProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "openvpn");
-        await this.sysCtlConfService.SetIPForwardingState(context.hostId, true);
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(context.storagePath, context.resourceReference.externalId);
+        switch(instanceProperties.type)
+        {
+            case "dns-server":
+                await this.dnsServerManager.ProvideResource(instanceProperties, context);
+                return {};
+            case "openvpn-gateway":
+                const config = await this.openVPNGatwayManager.ProvideResource(instanceProperties, context);
+                return {
+                    config
+                };
+        }
+    }
 
-        await this.easyRSAManager.CreateCADir(context.hostId, instanceDir);
-        await this.easyRSAManager.CreateCA(context.hostId, instanceDir, instanceProperties.name, instanceProperties.keySize);
-        await this.easyRSAManager.CreateServer(context.hostId, instanceDir, instanceProperties.publicEndpoint.domainName, instanceProperties.keySize);
-
-        const paths = this.easyRSAManager.GetCertPaths(instanceDir, instanceProperties.publicEndpoint.domainName);
-        await this.openVPNGatwayManager.CreateServerConfig(context.hostId, instanceDir, context.resourceReference.externalId, this.openVPNGatwayManager.CreateDefaultConfig(), paths);
-        await this.openVPNGatwayManager.AutoStartServer(context.hostId, context.resourceReference.externalId);
-
-        const config: OpenVPNGatewayInternalConfig = {
-            pki: {
-                keySize: instanceProperties.keySize
-            },
-            publicEndpoint: instanceProperties.publicEndpoint,
-        };
-        return {
-            config
-        };
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.networkServices.dnsServerResourceType.name:
+                return await this.dnsServerManager.QueryResourceState(resourceReference);
+            case resourceProviders.networkServices.openVPNGatewayResourceType.name:
+                return "running";
+        }
+        return "corrupt";
     }
 }

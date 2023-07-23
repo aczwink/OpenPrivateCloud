@@ -22,6 +22,7 @@ import { FileManagerComponent } from "../../Views/file-manager/FileManagerCompon
 import { resourceProviders } from "openprivatecloud-common";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -78,10 +79,7 @@ const snapshotsViewModel: ListViewModel<SnapshotDto, ResourceAndGroupId> = {
 
 export const fileStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId),
     ],
     entries: [
         {
@@ -92,7 +90,6 @@ export const fileStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     child: overviewViewModel,
                     displayName: "Overview"
                 },
-                BuildAccessControlPageEntry(BuildResourceId),
                 {
                     key: "file-manager",
                     child: {
@@ -115,9 +112,10 @@ export const fileStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "snapshots",
                     child: snapshotsViewModel,
                     displayName: "Snapshots"
-                }
+                },
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

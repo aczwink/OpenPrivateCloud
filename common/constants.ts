@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -33,6 +33,7 @@ export const c_multimediaServicesResourceProviderName = "multimedia-services";
 export const c_avTranscoderResourceTypeName = "av-transcoder";
 
 export const c_networkServicesResourceProviderName = "network-services";
+export const c_dnsServerResourceTypeName = "dns-server";
 export const c_openVPNGatewayResourceTypeName = "openvpn-gateway";
 
 export const c_webServicesResourceProviderName = "web-services";

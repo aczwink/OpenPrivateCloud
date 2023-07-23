@@ -16,13 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { APIController, Get, NotFound, Path, Query } from "acts-util-apilib";
-import { InstanceLogsController } from "../data-access/InstanceLogsController";
+import { ResourceLogsController } from "../data-access/ResourceLogsController";
 import { ResourcesController } from "../data-access/ResourcesController";
+import { ResourcesManager } from "../services/ResourcesManager";
 
 @APIController("resources")
 class _api_
 {
-    constructor(private instanceLogsController: InstanceLogsController, private instancesController: ResourcesController)
+    constructor(private resourceLogsController: ResourceLogsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager)
     {
     }
 
@@ -31,7 +32,7 @@ class _api_
         @Path logId: number
     )
     {
-        const log = await this.instanceLogsController.QueryInstanceLog(logId);
+        const log = await this.resourceLogsController.QueryInstanceLog(logId);
         if(log === undefined)
             return NotFound("instance or log not found");
 
@@ -39,21 +40,28 @@ class _api_
     }
 
     @Get("logs")
-    public async QueryInstanceLogs(
-        @Query fullInstanceName: string
+    public async QueryResourceLogs(
+        @Query resourceId: string
     )
     {
-        const logs = await this.instanceLogsController.QueryInstanceLogs(fullInstanceName);
+        const ref = await this.resourcesManager.CreateResourceReferenceFromExternalId(resourceId);
+        if(ref === undefined)
+            return NotFound("resource not found");
+
+        const logs = await this.resourceLogsController.QueryResourceLogs(ref.id);
         return logs;
     }
 
     @Get("search")
-    public async SearchForInstance(
+    public async SearchForResource(
         @Query hostName: string,
-        @Query type: string,
-        @Query instanceNameFilter: string
+        @Query resourceProviderName: string,
+        @Query resourceTypeName: string,
+        @Query resourceNameFilter: string
     )
     {
-        return await this.instancesController.Search(hostName, "/" + type + "%" + instanceNameFilter + "%");
+        const ids = await this.resourcesController.Search(hostName, resourceProviderName, resourceTypeName, resourceNameFilter);
+        const all = await ids.Values().Map(x => this.resourcesManager.CreateResourceReference(x)).PromiseAll();
+        return all.Values().NotUndefined().Map(x => x.externalId).ToArray();
     }
 }

@@ -26,10 +26,17 @@ interface CustomAction<ObjectType, IdType>
     matIcon: string;
 }
 
+export interface EditAction<ObjectType, IdType>
+{
+    type: "edit";
+    schemaName: string;
+    updateResource: (service: APIService, ids: IdType, index: number, properties: ObjectType) => Promise<ResponseData<number, number, void>>;
+}
+
 export interface DeleteAction<ObjectType, IdType>
 {
     type: "delete";
     deleteResource: (service: APIService, ids: IdType, object: ObjectType) => Promise<ResponseData<number, number, void>>;
 }
 
-export type ObjectBoundAction<ObjectType, IdType> = CustomAction<ObjectType, IdType> | DeleteAction<ObjectType, IdType>;
+export type ObjectBoundAction<ObjectType, IdType> = CustomAction<ObjectType, IdType> | EditAction<ObjectType, IdType> | DeleteAction<ObjectType, IdType>;

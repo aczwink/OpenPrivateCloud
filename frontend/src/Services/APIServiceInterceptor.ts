@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@
 
 import { HTTPInterceptor, Injectable } from "acfrontend";
 import { ResponseData } from "acfrontend/dist/Services/HTTPService";
+import { ShowErrorMessageOnErrorFromResponse } from "../UI/ResponseHandler";
 
 @Injectable
 export class APIServiceInterceptor implements HTTPInterceptor
@@ -33,6 +34,12 @@ export class APIServiceInterceptor implements HTTPInterceptor
             case 401:
                 this.logout();
                 return false;
+            case 500:
+                ShowErrorMessageOnErrorFromResponse({
+                    data: response.body,
+                    rawBody: response.body,
+                    statusCode: response.statusCode
+                });
         }
 
         return true;

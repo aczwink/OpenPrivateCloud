@@ -26,5 +26,5 @@ export interface AVTranscoderProperties extends BaseResourceProperties
      * @title Source file storage
      * @format instance-same-host[file-services/file-storage]
      */
-    fullInstanceName: string;
+    sourceFileStorageExternalId: string;
 }

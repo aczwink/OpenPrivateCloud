@@ -16,15 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Delete, Get, Path, Post, Put } from "acts-util-apilib";
 import { c_backupServicesResourceProviderName, c_backupVaultResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { HostsController } from "../../data-access/HostsController";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { ResourcesController } from "../../data-access/ResourcesController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
 import { BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
 import { BackupProcessService } from "./BackupProcessService";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourceReference } from "../../common/ResourceReference";
 
 interface BackupVaultDeploymentDataDto
 {
@@ -33,57 +32,49 @@ interface BackupVaultDeploymentDataDto
 
 type BackupVaultAnySourceConfigDto = BackupVaultFileStorageConfig | BackupVaultDatabaseConfig;
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_backupServicesResourceProviderName}/${c_backupVaultResourceTypeName}/{instanceName}`)
-class BackupVaultAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_backupServicesResourceProviderName}/${c_backupVaultResourceTypeName}/{resourceName}`)
+class BackupVaultAPIController extends ResourceAPIControllerBase
 {
-    constructor(private instancesController: ResourcesController, private instancesManager: ResourcesManager, private backupVaultManager: BackupVaultManager,
-        private hostStoragesController: HostStoragesController, private hostsController: HostsController,
-        private backupProcessService: BackupProcessService)
+    constructor(resourcesManager: ResourcesManager, private backupVaultManager: BackupVaultManager, private backupProcessService: BackupProcessService)
     {
+        super(resourcesManager, c_backupServicesResourceProviderName, c_backupVaultResourceTypeName);
     }
 
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string
     )
     {
-        throw new Error("TODO: reimplement me");
-        /*const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, instanceName);
-        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
-        if(instance === undefined)
-            return NotFound("instance not found");
-
-        return instance.id;
-        */
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Post("sources")
     public async AddSource(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
         @Body source: BackupVaultAnySourceConfigDto
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         if("createSnapshotBeforeBackup" in source)
             config.sources.fileStorages.push(source);
         else
             config.sources.databases.push(source);
-        await this.backupVaultManager.WriteConfig(instanceId, config);
+        await this.backupVaultManager.WriteConfig(resourceReference.id, config);
     }
 
     @Delete("sources")
     public async DeleteSource(
-        @Common instanceId: number,
-        @BodyProp fullInstanceSourceName: string
+        @Common resourceReference: ResourceReference,
+        @BodyProp sourceResourceId: string
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
 
-        const idx = config.sources.fileStorages.findIndex(x => x.fullInstanceName === fullInstanceSourceName);
+        const idx = config.sources.fileStorages.findIndex(x => x.externalId === sourceResourceId);
         if(idx === -1)
         {
-            const idx = config.sources.databases.findIndex(x => x.fullInstanceName === fullInstanceSourceName);
+            const idx = config.sources.databases.findIndex(x => (x.externalId === sourceResourceId));
             config.sources.databases.Remove(idx);
         }
         else
@@ -91,104 +82,98 @@ class BackupVaultAPIController
             config.sources.fileStorages.Remove(idx);
         }
 
-        await this.backupVaultManager.WriteConfig(instanceId, config);
+        await this.backupVaultManager.WriteConfig(resourceReference.id, config);
     }
 
     @Get("deploymentdata")
     public async QueryDeploymentData(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
     )
     {
-        const instance = await this.instancesController.QueryResource(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-        const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
-
         const result: BackupVaultDeploymentDataDto = {
-            hostName: host!.hostName,
+            hostName: resourceReference.hostName,
         };
         return result;
     }
 
     @Get("retention")
     public async QueryRetentionConfig(
-        @Common instanceId: number
+        @Common resourceReference: ResourceReference,
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         return config.retention;
     }
     
     @Get("sources")
     public async QuerySourcesConfig(
-        @Common instanceId: number
+        @Common resourceReference: ResourceReference,
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         return config.sources;
     }
 
     @Get("target")
     public async QueryTargetConfig(
-        @Common instanceId: number
+        @Common resourceReference: ResourceReference,
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         return config.target;
     }
 
     @Get("trigger")
     public async QueryTriggerConfig(
-        @Common instanceId: number
+        @Common resourceReference: ResourceReference,
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         return config.trigger;
     }
 
     @Post()
     public async StartBackupProcess(
-        @Common instanceId: number
+        @Common resourceReference: ResourceReference,
     )
     {
-        this.backupVaultManager.StartBackupProcess(instanceId);
+        this.backupVaultManager.StartBackupProcess(resourceReference.id);
     }
 
     @Put("retention")
     public async UpdateRetentionConfig(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
         @Body targetConfig: BackupVaultRetentionConfig
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         config.retention = targetConfig;
-        await this.backupVaultManager.WriteConfig(instanceId, config);
+        await this.backupVaultManager.WriteConfig(resourceReference.id, config);
 
-        this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(instanceId, config.sources, config.target, config.retention);
+        this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(resourceReference.id, config.sources, config.target, config.retention);
     }
 
     @Put("target")
     public async UpdateTargetConfig(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
         @Body targetConfig: BackupVaultTargetConfig
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         config.target = targetConfig;
-        await this.backupVaultManager.WriteConfig(instanceId, config);
+        await this.backupVaultManager.WriteConfig(resourceReference.id, config);
     }
 
     @Put("trigger")
     public async UpdateTriggerConfig(
-        @Common instanceId: number,
-        @Path instanceName: string,
+        @Common resourceReference: ResourceReference,
         @Body targetConfig: BackupVaultTrigger
     )
     {
-        const config = await this.backupVaultManager.ReadConfig(instanceId);
+        const config = await this.backupVaultManager.ReadConfig(resourceReference.id);
         config.trigger = targetConfig;
-        await this.backupVaultManager.WriteConfig(instanceId, config);
+        await this.backupVaultManager.WriteConfig(resourceReference.id, config);
 
-        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, instanceName);
-        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(fullInstanceName);
+        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
     }
 }

@@ -31,9 +31,8 @@ import { SystemServicesManager } from "../../../services/SystemServicesManager";
 import { DeploymentContext } from "../../ResourceProvider";
 import { MariadbProperties } from "./MariadbProperties";
 import { MariaDBInterface } from "./MariaDBInterface";
-import { InstanceContext } from "../../../common/InstanceContext";
 import { MySQLClient, MySQLGrant } from "../MySQLClient";
-import { ResourceReference } from "../../../common/InstanceReference";
+import { LightweightResourceReference, ResourceReference } from "../../../common/ResourceReference";
 
 interface MysqldSettings
 {
@@ -67,34 +66,34 @@ export class MariaDBConfigParser extends ConfigParser
 @Injectable
 export class MariaDBHostManager implements MariaDBInterface
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private modulesManager: ModulesManager, private instancesManager: ResourcesManager,
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private modulesManager: ModulesManager, private resourcesManager: ResourcesManager,
         private remoteFileSystemManager: RemoteFileSystemManager, private hostUsersManager: HostUsersManager,
         private remoteRootFileSystemManager: RemoteRootFileSystemManager, private systemServicesManager: SystemServicesManager)
     {
     }
 
     //Public methods
-    public async AddUserPermission(instanceContext: InstanceContext, userName: string, hostName: string, permission: MySQLGrant): Promise<void>
+    public async AddUserPermission(resourceReference: LightweightResourceReference, userName: string, hostName: string, permission: MySQLGrant): Promise<void>
     {
-        const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);
+        const client = MySQLClient.CreateStandardHostClient(resourceReference.hostId);
         await client.GrantPrivileges(userName, hostName, permission);
     }
     
-    public async CheckAllDatabases(instanceContext: InstanceContext): Promise<string> 
+    public async CheckAllDatabases(resourceReference: LightweightResourceReference): Promise<string> 
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "mysqlcheck", "--all-databases", "-u", "root"], instanceContext.hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "mysqlcheck", "--all-databases", "-u", "root"], resourceReference.hostId);
         return result.stdOut;
     }
 
-    public async CreateDatabase(instanceContext: InstanceContext, databaseName: string): Promise<void>
+    public async CreateDatabase(resourceReference: LightweightResourceReference, databaseName: string): Promise<void>
     {
-        const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);
+        const client = MySQLClient.CreateStandardHostClient(resourceReference.hostId);
         await client.CreateDatabase(databaseName);
     }
 
-    public async CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string): Promise<void>
+    public async CreateUser(resourceReference: LightweightResourceReference, userName: string, hostName: string, password: string): Promise<void>
     {
-        const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);
+        const client = MySQLClient.CreateStandardHostClient(resourceReference.hostId);
         await client.CreateUser(userName, hostName, password);
     }
 
@@ -105,18 +104,18 @@ export class MariaDBHostManager implements MariaDBInterface
         await this.systemServicesManager.StopService(hostId, "mariadb");
         await this.modulesManager.Uninstall(hostId, "mariadb");
 
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, resourceReference.hostStoragePath, resourceReference.externalId);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
-    public async DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string): Promise<void>
+    public async DeleteUser(resourceReference: LightweightResourceReference, userName: string, hostName: string): Promise<void>
     {
-        const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);
+        const client = MySQLClient.CreateStandardHostClient(resourceReference.hostId);
         await client.DropUser(userName, hostName);
     }
 
-    public async ExecuteSelectQuery(instanceContext: InstanceContext, query: string): Promise<any[]>
+    public async ExecuteSelectQuery(resourceReference: LightweightResourceReference, query: string): Promise<any[]>
     {
-        const client = MySQLClient.CreateStandardHostClient(instanceContext.hostId);
+        const client = MySQLClient.CreateStandardHostClient(resourceReference.hostId);
         const resultSet = await client.ExecuteSelectQuery(query);
         return resultSet;
     }
@@ -129,21 +128,21 @@ export class MariaDBHostManager implements MariaDBInterface
 
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "mariadb");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o755);
+        const resourceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, resourceDir, 0o755);
         const uid = await this.hostUsersManager.ResolveHostUserId(context.hostId, "mysql");
         const gid = await this.hostUsersManager.ResolveHostGroupId(context.hostId, "mysql");
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, uid, gid);
+        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, resourceDir, uid, gid);
 
         await this.systemServicesManager.StopService(context.hostId, "mariadb");
         //TODO: should actually install a new db
         //await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mysql_install_db", "--user=mysql", "--datadir=" + instanceDir], context.hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rsync", "-av", "/var/lib/mysql", instanceDir], context.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "rsync", "-av", "/var/lib/mysql", resourceDir], context.hostId);
 
 
         const config = await this.QueryMysqldSettings(context.hostId);
         config["bind-address"] = "0.0.0.0";
-        config["datadir"] = path.join(instanceDir, "mysql");
+        config["datadir"] = path.join(resourceDir, "mysql");
         config["default-time-zone"] = '"+00:00"';
         await this.SetMysqldSettings(context.hostId, config);
 
@@ -154,7 +153,9 @@ export class MariaDBHostManager implements MariaDBInterface
     //Private methods
     private async CheckIfProgramExists(hostId: number, programName: string)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["which", programName], hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["which", programName], hostId);
+        if(result.exitCode === 1)
+            return false;
         return result.stdOut.trimEnd().length > 0;
     }
 

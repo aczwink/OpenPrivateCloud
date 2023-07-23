@@ -29,11 +29,9 @@ import { ApacheManager } from "./ApacheManager";
 import { StaticWebsiteProperties } from "./Properties";
 import { VirtualHost } from "./VirtualHost";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { ResourcesController } from "../../data-access/ResourcesController";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { TempFilesManager } from "../../services/TempFilesManager";
 import { linuxSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
-import { InstanceContext } from "../../common/InstanceContext";
+import { LightweightResourceReference } from "../../common/ResourceReference";
 
 export interface StaticWebsiteConfig
 {
@@ -43,29 +41,28 @@ export interface StaticWebsiteConfig
 @Injectable
 export class StaticWebsitesManager
 {
-    constructor(private modulesManager: ModulesManager, private instancesManager: ResourcesManager,
+    constructor(private modulesManager: ModulesManager, private resourcesManager: ResourcesManager,
         private hostUsersManager: HostUsersManager, private apacheManager: ApacheManager, private usersController: UsersController,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
         private remoteFileSystemManager: RemoteFileSystemManager, private remoteCommandExecutor: RemoteCommandExecutor,
-        private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
         private tempFilesMangager: TempFilesManager)
     {
     }
 
     //Public methods
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string)
+    public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
-        const site = await this.apacheManager.QuerySite(hostId, siteName);
+        const siteName = this.DeriveSiteName(resourceReference);
+        const site = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
         const port = parseInt(site.addresses.split(":")[1]);
 
-        await this.apacheManager.DisableSite(hostId, siteName);
-        await this.apacheManager.DisablePort(hostId, port);
-        await this.systemServicesManager.RestartService(hostId, "apache2");
+        await this.apacheManager.DisableSite(resourceReference.hostId, siteName);
+        await this.apacheManager.DisablePort(resourceReference.hostId, port);
+        await this.systemServicesManager.RestartService(resourceReference.hostId, "apache2");
 
-        await this.apacheManager.DeleteSite(hostId, siteName);
-        
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.apacheManager.DeleteSite(resourceReference.hostId, siteName);
+
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
     public async ProvideResource(instanceProperties: StaticWebsiteProperties, context: DeploymentContext)
@@ -75,7 +72,7 @@ export class StaticWebsitesManager
         const gid = await this.hostUsersManager.ResolveHostGroupId(context.hostId, linuxSpecialGroups["www-data"]);
         const uid = await this.hostUsersManager.ResolveHostUserId(context.hostId, opcSpecialUsers.host);
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
+        const instanceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, uid, gid);
 
         const user = await this.usersController.QueryUser(context.userId);
@@ -89,57 +86,55 @@ export class StaticWebsitesManager
             }
         ];
 
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(context.resourceReference.externalId);
+        const siteName = this.DeriveSiteName(context.resourceReference)
         await this.apacheManager.CreateSite(context.hostId, siteName, vHost);
         await this.apacheManager.EnableSite(context.hostId, siteName);
         await this.apacheManager.EnablePort(context.hostId, instanceProperties.port);
         await this.systemServicesManager.RestartService(context.hostId, "apache2");
     }
 
-    public async QueryConfig(instanceContext: InstanceContext): Promise<StaticWebsiteConfig>
+    public async QueryConfig(resourceReference: LightweightResourceReference): Promise<StaticWebsiteConfig>
     {
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(instanceContext.fullInstanceName);
-        const vHost = await this.apacheManager.QuerySite(instanceContext.hostId, siteName);
+        const siteName = this.DeriveSiteName(resourceReference);
+        const vHost = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
 
         return {
             defaultRoute: vHost.directories[0].fallbackResource
         };
     }
 
-    public async QueryPort(hostId: number, fullInstanceName: string)
+    public async QueryPort(resourceReference: LightweightResourceReference)
     {
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
-        const vHost = await this.apacheManager.QuerySite(hostId, siteName);
+        const siteName = this.DeriveSiteName(resourceReference);
+        const vHost = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
 
         return parseInt(vHost.addresses.split(":")[1]);
     }
 
-    public async UpdateConfig(instanceContext: InstanceContext, config: StaticWebsiteConfig)
+    public async UpdateConfig(resourceReference: LightweightResourceReference, config: StaticWebsiteConfig)
     {
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(instanceContext.fullInstanceName);
-        const vHost = await this.apacheManager.QuerySite(instanceContext.hostId, siteName);
+        const siteName = this.DeriveSiteName(resourceReference);
+        const vHost = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
 
         vHost.directories[0].fallbackResource = config.defaultRoute;
 
-        this.apacheManager.SetSite(instanceContext.hostId, siteName, vHost);
-        await this.systemServicesManager.RestartService(instanceContext.hostId, "apache2");
+        this.apacheManager.SetSite(resourceReference.hostId, siteName, vHost);
+        await this.systemServicesManager.RestartService(resourceReference.hostId, "apache2");
     }
 
-    public async UpdateContent(instanceId: number, buffer: Buffer)
+    public async UpdateContent(resourceReference: LightweightResourceReference, buffer: Buffer)
     {
-        const instance = await this.instancesController.QueryResource(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-        const hostId = storage!.hostId;
+        const hostId = resourceReference.hostId;
 
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.name);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        await this.CleanUpFolder(hostId, instanceDir);
+        await this.CleanUpFolder(hostId, resourceDir);
 
         const zipFilePath = await this.tempFilesMangager.CreateFile(hostId, buffer);
-        await this.remoteCommandExecutor.ExecuteCommand(["unzip", zipFilePath, "-d", instanceDir], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["unzip", zipFilePath, "-d", resourceDir], hostId);
         await this.tempFilesMangager.Cleanup(hostId, zipFilePath);
 
-        await this.SetPermissionsRecursive(hostId, instanceDir);
+        await this.SetPermissionsRecursive(hostId, resourceDir);
     }
 
     //Private methods
@@ -155,6 +150,11 @@ export class StaticWebsitesManager
             else
                 await this.remoteFileSystemManager.UnlinkFile(hostId, childPath);
         }
+    }
+
+    private DeriveSiteName(resourceReference: LightweightResourceReference)
+    {
+        return "opc-rsw-" + resourceReference.id;
     }
 
     private async SetPermissionsRecursive(hostId: number, dirPath: string)

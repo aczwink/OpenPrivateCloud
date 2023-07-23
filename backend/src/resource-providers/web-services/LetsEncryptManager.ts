@@ -17,39 +17,49 @@
  * */
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../../data-access/UsersController";
-import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
-import { DeploymentContext } from "../ResourceProvider";
+import { DeploymentContext, ResourceState } from "../ResourceProvider";
 import { ApacheManager } from "./ApacheManager";
 import { CertBotListParser } from "./CertBotListParser";
 import { LetsEncryptProperties } from "./Properties";
+import { LightweightResourceReference } from "../../common/ResourceReference";
   
 @Injectable
 export class LetsEncryptManager
 {
     constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private modulesManager: ModulesManager,
-        private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager, private instancesManager: ResourcesManager)
+        private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager)
     {
     }
 
     //Public methods
-    public async GetCert(hostId: number, fullInstanceName: string)
+    public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        const certName = this.MapFullInstanceNameToCertificateName(fullInstanceName);
+        const cert = await this.GetCert(resourceReference);
+        if(cert === undefined)
+            return; //failed deployment
 
-        const certs = await this.ListCertificates(hostId);
-        const cert = certs.find(x => x.name === certName);
-        return cert!;
+        const certName = this.DeriveCertificateName(resourceReference);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "certbot", "delete", "--cert-name", certName, "--non-interactive"], resourceReference.hostId);
     }
 
-    public async RenewCertificateIfRequired(hostId: number, fullInstanceName: string)
+    public async GetCert(resourceReference: LightweightResourceReference)
     {
-        const cert = await this.GetCert(hostId, fullInstanceName);
+        const certName = this.DeriveCertificateName(resourceReference);
+
+        const certs = await this.ListCertificates(resourceReference.hostId);
+        const cert = certs.find(x => x.name === certName);
+        return cert;
+    }
+
+    public async RenewCertificateIfRequired(resourceReference: LightweightResourceReference)
+    {
+        const cert = await this.GetCert(resourceReference);
         const leftTimeUntilRenewal = (Date.now() - cert!.expiryDate.valueOf());
         if(leftTimeUntilRenewal < 30 * 24 * 60 * 60 *1000) //letsencrypt recommends renewing after 60 days. Cert is valid for 90 days.
-            await this.RenewCertificate(hostId, this.MapFullInstanceNameToCertificateName(fullInstanceName));
+            await this.RenewCertificate(resourceReference.hostId, this.DeriveCertificateName(resourceReference));
     }
 
     public async ProvideResource(instanceProperties: LetsEncryptProperties, context: DeploymentContext)
@@ -62,7 +72,7 @@ export class LetsEncryptManager
         const enabledSiteNames = await this.SaveApacheState(context.hostId);
         await this.PrepareApacheForCertbot(context.hostId, enabledSiteNames);
 
-        const certName = this.MapFullInstanceNameToCertificateName(context.resourceReference.externalId);
+        const certName = this.DeriveCertificateName(context.resourceReference);
         const command = ["sudo", "certbot", "certonly", "--cert-name", certName, "--webroot", "-w", "/var/www/html/", "-d", instanceProperties.domainName, "-m", user!.emailAddress, "--agree-tos"];
         try
         {
@@ -78,17 +88,29 @@ export class LetsEncryptManager
         }
     }
 
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    {
+        const cert = await this.GetCert(resourceReference);
+        if(cert === undefined)
+            return "corrupt"; //probably failed deployment
+
+        if(cert.expiryDate < new Date())
+            return "down";
+
+        return "running";
+    }
+
     //Private methods
+    private DeriveCertificateName(resourceReference: LightweightResourceReference)
+    {
+        return "opc-rlec-" + resourceReference.id;
+    }
+
     private async ListCertificates(hostId: number)
     {
         const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "certbot", "certificates"], hostId);
         const parser = new CertBotListParser();
         return parser.Parse(result.stdOut);
-    }
-
-    private MapFullInstanceNameToCertificateName(fullInstanceName: string)
-    {
-        return this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
     }
 
     private async PrepareApacheForCertbot(hostId: number, enabledSiteNames: string[])

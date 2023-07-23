@@ -21,7 +21,8 @@ import { permissions } from "openprivatecloud-common";
 import { PermissionsController } from "../../data-access/PermissionsController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { ResourceReference } from "../../common/InstanceReference";
+import { LightweightResourceReference } from "../../common/ResourceReference";
+import { opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
 
 @Injectable
 export class SharedFolderPermissionsManager
@@ -31,9 +32,9 @@ export class SharedFolderPermissionsManager
     }
 
     //Public methods
-    public async SetPermissions(resourceReference: ResourceReference, dirPath: string, readOnly: boolean)
+    public async SetPermissions(resourceReference: LightweightResourceReference, dirPath: string, readOnly: boolean)
     {
-        const acl = ["u::rwX", "g::rwX", "o::-"];
+        const acl = ["u::rwX", "g::-", "o::-"];
 
         const readGroups = await this.permissionsController.QueryGroupsWithPermission(resourceReference.id, permissions.data.read);
         const readLinuxGroups = readGroups.Map(x => this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
@@ -49,6 +50,8 @@ export class SharedFolderPermissionsManager
             for (const writeLinuxGroup of writeLinuxGroups)
                 acl.push("g:" + writeLinuxGroup + ":rwX");
         }
+
+        acl.push("u:" + opcSpecialUsers.host + ":rX"); //the user used by the controller has read access
 
         const aclString = acl.join(",");
 

@@ -18,12 +18,11 @@
 
 import { Injectable } from "acts-util-node";
 import { permissions } from "openprivatecloud-common";
-import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
 import { PermissionsController } from "../../data-access/PermissionsController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { SambaSharesManager } from "./SambaSharesManager";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
 
 interface SMBShareConfig
 {
@@ -40,24 +39,30 @@ export class SingleSMBSharePerInstanceProvider
         private permissionsController: PermissionsController)
     {
     }
-    
-    public async GetSMBConnectionInfo(instanceContext: InstanceContext, userId: number)
+
+    //Public methods
+    public async ClearShareIfExisting(hostId: number, oldExternalResourceId: string)
     {
-        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
+        const shareName = this.MapExternalIdToSMBShareName(oldExternalResourceId);
+        await this.DeleteShareIfExisting(hostId, shareName);
+    }
+    
+    public async GetSMBConnectionInfo(resourceReference: ResourceReference, userId: number)
+    {
+        const host = await this.hostsController.RequestHostCredentials(resourceReference.hostId);
         const userName = this.hostUsersManager.MapUserToLinuxUserName(userId);
         
-        return this.sambaSharesManager.GetConnectionInfo(host!.hostName, this.MapFullInstanceNameToSMBShareName(instanceContext.fullInstanceName), userName);
+        return this.sambaSharesManager.GetConnectionInfo(host!.hostName, this.MapExternalIdToSMBShareName(resourceReference.externalId), userName);
     }
 
     public async UpdateSMBConfig(shareConfig: SMBShareConfig, resourceReference: ResourceReference)
     {
         const hostId = resourceReference.hostId;
-        const fullInstanceName = resourceReference.externalId;
 
         const readGroups = await this.permissionsController.QueryGroupsWithPermission(resourceReference.id, permissions.data.read);
         const readGroupsLinux = readGroups.Map(x => "+" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
 
-        const shareName = this.MapFullInstanceNameToSMBShareName(fullInstanceName);
+        const shareName = this.MapExternalIdToSMBShareName(resourceReference.externalId);
 
         if(shareConfig.enabled && (readGroupsLinux.length === 0))
         {
@@ -97,8 +102,8 @@ export class SingleSMBSharePerInstanceProvider
             await this.sambaSharesManager.DeleteShare(hostId, shareName);
     }
 
-    private MapFullInstanceNameToSMBShareName(fullInstanceName: string)
+    private MapExternalIdToSMBShareName(externalId: string)
     {
-        return fullInstanceName.substring(1).ReplaceAll("/", "_");
+        return externalId.substring(1).ReplaceAll("/", "_");
     }
 }

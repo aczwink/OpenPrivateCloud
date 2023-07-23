@@ -31,12 +31,13 @@ import { staticWebsiteViewModel } from "./web-services/staticWebsite";
 import { nodeAppServiceViewodel } from "./web-services/nodeAppService";
 import { dockerContainerViewModel } from "./compute-services/docker-container";
 import { letsEncryptViewModel } from "./web-services/letsencrypt-cert";
+import { dnsServerViewModel } from "./network-services.ts/dns-server";
 
 export const resourcesRoutes: RoutingViewModel = {
     type: "routing",
     entries: [
         {
-            key: `instances/${resourceProviders.backupServices.name}/${resourceProviders.backupServices.backupVaultResourceType.name}/:instanceName`,
+            key: `${resourceProviders.backupServices.name}/${resourceProviders.backupServices.backupVaultResourceType.name}/:resourceName`,
             viewModel: backupVaultViewModel
         },
         {
@@ -44,43 +45,47 @@ export const resourcesRoutes: RoutingViewModel = {
             viewModel: dockerContainerViewModel
         },
         {
-            key: `instances/${resourceProviders.computeServices.name}/${resourceProviders.computeServices.virtualMachineResourceType.name}/:instanceName`,
+            key: `${resourceProviders.computeServices.name}/${resourceProviders.computeServices.virtualMachineResourceType.name}/:resourceName`,
             viewModel: virtualMachineViewModel
         },
         {
-            key: `instances/${resourceProviders.databaseServices.name}/${resourceProviders.databaseServices.mariadbResourceType.name}/:instanceName`,
+            key: `${resourceProviders.databaseServices.name}/${resourceProviders.databaseServices.mariadbResourceType.name}/:resourceName`,
             viewModel: mariadbViewModel
         },
         {
-            key: `instances/${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:instanceName`,
+            key: `${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:resourceName`,
             viewModel: fileStorageViewModel
         },
         {
-            key: `instances/${resourceProviders.multimediaServices.name}/${resourceProviders.multimediaServices.avTranscoderResourceType.name}/:instanceName`,
+            key: `${resourceProviders.multimediaServices.name}/${resourceProviders.multimediaServices.avTranscoderResourceType.name}/:resourceName`,
             viewModel: avTranscoderViewModel,
         },
         {
-            key: `instances/${resourceProviders.networkServices.name}/${resourceProviders.networkServices.openVPNGatewayResourceType.name}/:instanceName`,
+            key: `${resourceProviders.networkServices.name}/${resourceProviders.networkServices.dnsServerResourceType.name}/:resourceName`,
+            viewModel: dnsServerViewModel,
+        },
+        {
+            key: `${resourceProviders.networkServices.name}/${resourceProviders.networkServices.openVPNGatewayResourceType.name}/:resourceName`,
             viewModel: openVPNGatewayViewModel,
         },
         {
-            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.jdownloaderResourceType.name}/:instanceName`,
+            key: `${resourceProviders.webServices.name}/${resourceProviders.webServices.jdownloaderResourceType.name}/:resourceName`,
             viewModel: jdownloaderViewModel,
         },
         {
-            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.letsencryptCertResourceType.name}/:instanceName`,
+            key: `${resourceProviders.webServices.name}/${resourceProviders.webServices.letsencryptCertResourceType.name}/:resourceName`,
             viewModel: letsEncryptViewModel,
         },
         {
-            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.nextcloudResourceType.name}/:instanceName`,
+            key: `${resourceProviders.webServices.name}/${resourceProviders.webServices.nextcloudResourceType.name}/:resourceName`,
             viewModel: nextcloudViewModel,
         },
         {
-            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.nodeAppServiceResourceType.name}/:instanceName`,
+            key: `${resourceProviders.webServices.name}/${resourceProviders.webServices.nodeAppServiceResourceType.name}/:resourceName`,
             viewModel: nodeAppServiceViewodel,
         },
         {
-            key: `instances/${resourceProviders.webServices.name}/${resourceProviders.webServices.staticWebsiteResourceType.name}/:instanceName`,
+            key: `${resourceProviders.webServices.name}/${resourceProviders.webServices.staticWebsiteResourceType.name}/:resourceName`,
             viewModel: staticWebsiteViewModel,
         }
     ]

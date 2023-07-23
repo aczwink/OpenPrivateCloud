@@ -17,7 +17,7 @@
  * */
 
 import { Injectable, JSX_CreateElement, RootInjector, Route } from "acfrontend";
-import { OpenAPI } from "acts-util-core";
+import { Dictionary, EqualsAny, OpenAPI } from "acts-util-core";
 import { AuthGuard } from "../AuthGuard";
 import { APISchemaService } from "../Services/APISchemaService";
 import { APIService } from "../Services/APIService";
@@ -101,7 +101,7 @@ export class ViewModelsManager
     private viewModelsRoots: RoutingViewModel[];
 
     //Private methods
-    private BuildBoundActionComponent(action: IdBoundResourceAction<any, any, any>, formTitle: (ids: any) => string, parentNode: PathTraceNode)
+    private BuildBoundActionComponent(action: IdBoundResourceAction<any, any, any>, formTitle: (ids: any, object: any) => string, parentNode: PathTraceNode)
     {
         switch(action.type)
         {
@@ -119,14 +119,22 @@ export class ViewModelsManager
                     schema={this.apiSchemaService.GetSchema(action.propertiesSchemaName) as OpenAPI.ObjectSchema}
                     loadContext={(action.loadContext === undefined) ? undefined : (ids => action.loadContext!(RootInjector.Resolve(APIService), ids))}
                     />;
+            case "custom_edit":
+                return <EditObjectComponent
+                    formTitle={formTitle}
+                    postUpdateUrl={parentNode.path}
+                    requestObject={async ids => (await action.requestObject(RootInjector.Resolve(APIService), ids))}
+                    updateResource={(ids, obj) => action.updateResource(RootInjector.Resolve(APIService), ids, obj)}
+                    schema={this.apiSchemaService.GetSchema(action.propertiesSchemaName) as OpenAPI.ObjectSchema}
+                    />;
         }
     }
 
-    private BuildBoundActionRoute(action: IdBoundResourceAction<any, any, any>, formTitle: (ids: any) => string, parentNode: PathTraceNode): Route
+    private BuildBoundActionRoute(action: IdBoundResourceAction<any, any, any>, formTitle: (ids: any, object: any) => string, parentNode: PathTraceNode): Route
     {
         return {
             component: this.BuildBoundActionComponent(action, formTitle, parentNode),
-            path: action.type
+            path: (action.type === "custom_edit" ? action.key : action.type)
         };
     }
 
@@ -190,7 +198,35 @@ export class ViewModelsManager
 
     private BuildListViewModelRoutes(viewModel: ListViewModel<any, any>, parentNode: PathTraceNode): Route
     {
-        const schema = this.apiSchemaService.GetSchema(viewModel.schemaName) as OpenAPI.ObjectSchema;
+        function Combine(a: Dictionary<OpenAPI.Schema | OpenAPI.Reference>, b: Dictionary<OpenAPI.Schema | OpenAPI.Reference>): Dictionary<OpenAPI.Schema | OpenAPI.Reference>
+        {
+            const aOnly = a.OwnKeys().Filter(k => !(k in b));
+            const bOnly = b.OwnKeys().Filter(k => !(k in a));
+            const both = a.OwnKeys().ToSet().Without(aOnly.ToSet());
+
+            const dict = aOnly.ToDictionary(k => k, k => a[k]!);
+            bOnly.ForEach(k => dict[k] = b[k]);
+            both.forEach(k => dict[k] = a[k]); //TODO: should create union type
+
+            return dict;
+        }
+
+        const schema = this.apiSchemaService.GetSchema(viewModel.schemaName);
+        let mappedSchema;
+        if("oneOf" in schema)
+        {
+            const schemas = schema.oneOf.map(x => this.apiSchemaService.ResolveSchemaOrReference(x)) as OpenAPI.ObjectSchema[];
+            const intersection: OpenAPI.ObjectSchema = {
+                additionalProperties: false,
+                properties: schemas.Values().Map( x => x.properties).Accumulate(Combine),
+                required: schemas.Values().Map(x => x.required.Values().ToSet()).Accumulate( (x, y) => x.Intersect(y) ).ToArray(),
+                type: "object",
+            };
+            mappedSchema = intersection;
+        }
+        else
+            mappedSchema = schema as OpenAPI.ObjectSchema;
+
 
         return {
             children: [
@@ -199,7 +235,7 @@ export class ViewModelsManager
                     component: <ObjectListComponent
                         idBoundActions={[]}
                         baseUrl={parentNode.path}
-                        elementSchema={schema}
+                        elementSchema={mappedSchema}
                         extractId={_ => 0}
                         hasChild={false}
                         heading={viewModel.displayName}

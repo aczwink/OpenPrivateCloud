@@ -64,7 +64,7 @@ const storageViewModel: ObjectViewModel<HostStorageWithInfo, { hostName: string,
             deleteResource: (service, ids) => service.hostStorages._any_.delete(ids.storageId),
         }
     ],
-    formTitle: x => x.path,
+    formTitle: (_, x) => x.path,
     requestObject: (service, ids) => service.hostStorages._any_.get(ids.storageId),
     schemaName: "HostStorageWithInfo",
 };

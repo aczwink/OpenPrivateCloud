@@ -16,14 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Get, Header, NotFound, Path, Post, Put } from "acts-util-apilib";
-import { resourceProviders } from "openprivatecloud-common";
+import { APIController, Body, BodyProp, Common, Get, Header, Path, Post, Put } from "acts-util-apilib";
 import { c_jdownloaderResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { InstanceContext } from "../../common/InstanceContext";
-import { HostsController } from "../../data-access/HostsController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { SessionsManager } from "../../services/SessionsManager";
 import { JdownloaderManager, MyJDownloaderCredentials } from "./JdownloaderManager";
+import { ResourceReference } from "../../common/ResourceReference";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
 
 interface JdownloaderInfoDto
 {
@@ -32,75 +31,68 @@ interface JdownloaderInfoDto
     storagePath: string;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_jdownloaderResourceTypeName}/{instanceName}`)
-class JdownloaderAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_jdownloaderResourceTypeName}/{resourceName}`)
+class JdownloaderAPIController extends ResourceAPIControllerBase
 {
-    constructor(private jdownloaderManager: JdownloaderManager, private instancesManager: ResourcesManager,
-        private hostsController: HostsController, private sessionsManager: SessionsManager)
+    constructor(private jdownloaderManager: JdownloaderManager, resourcesManager: ResourcesManager, private sessionsManager: SessionsManager)
     {
+        super(resourcesManager, c_webServicesResourceProviderName, c_jdownloaderResourceTypeName);
     }
 
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.jdownloaderResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
-        if(instanceContext === undefined)
-            return NotFound("instance not found");
-
-        return instanceContext;
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Post()
     public async StartStop(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @BodyProp action: "start" | "stop"
     )
     {
-        await this.jdownloaderManager.StartOrStopService(instanceContext.instanceId, action);
+        await this.jdownloaderManager.StartOrStopService(resourceReference, action);
     }
 
     @Get("credentials")
     public async QueryCredentials(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
     )
     {
-        return await this.jdownloaderManager.QueryCredentials(instanceContext.instanceId);
+        return await this.jdownloaderManager.QueryCredentials(resourceReference);
     }
 
     @Put("credentials")
     public async UpdateCredentials(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Body credentials: MyJDownloaderCredentials
     )
     {
-        return await this.jdownloaderManager.SetCredentials(instanceContext.instanceId, credentials);
+        return await this.jdownloaderManager.SetCredentials(resourceReference, credentials);
     }
 
     @Get("info")
     public async QueryInfo(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
     )
-    {
-        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
-            
+    {            
         const result: JdownloaderInfoDto = {
-            hostName: host!.hostName,
-            isActive: await this.jdownloaderManager.IsActive(instanceContext.instanceId),
-            storagePath: instanceContext.hostStoragePath
+            hostName: resourceReference.hostName,
+            isActive: await this.jdownloaderManager.IsActive(resourceReference),
+            storagePath: resourceReference.hostStoragePath
         };
         return result;
     }
 
     @Get("smbconnect")
     public async QuerySMBConnectionInfo(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Header Authorization: string
     )
     {
-        return await this.jdownloaderManager.GetSMBConnectionInfo(instanceContext, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
+        return await this.jdownloaderManager.GetSMBConnectionInfo(resourceReference, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
     }
 }

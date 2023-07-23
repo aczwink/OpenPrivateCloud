@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ import { Injectable } from "acts-util-node";
 import { ProcessTracker } from "../services/ProcessTrackerManager";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
-interface InstanceLogOverviewData
+interface ResourceLogOverviewData
 {
     logId: number;
     startTime: Date;
@@ -39,7 +39,7 @@ interface InstanceLog
 }
 
 @Injectable
-export class InstanceLogsController
+export class ResourceLogsController
 {
     constructor(private dbConnMgr: DBConnectionsManager)
     {
@@ -79,17 +79,15 @@ export class InstanceLogsController
         return row;
     }
 
-    public async QueryInstanceLogs(fullInstanceName: string)
+    public async QueryResourceLogs(resourceId: number)
     {
         const query = `
         SELECT il.logId, il.startTime, il.endTime
         FROM instances_logs il
-        INNER JOIN instances i
-            ON i.id = il.instanceId
-        WHERE i.fullName = ?
+        WHERE il.instanceId = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select<InstanceLogOverviewData>(query, fullInstanceName);
+        const rows = await conn.Select<ResourceLogOverviewData>(query, resourceId);
 
         return rows;
     }

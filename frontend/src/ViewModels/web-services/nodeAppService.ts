@@ -20,6 +20,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { NodeAppConfig, NodeAppServiceInfoDto, NodeAppServiceStatus } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadNodeAppServieContentComponent } from "../../Views/node-app-service/UploadNodeAppServieContentComponent";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -74,10 +75,7 @@ const configViewModel: ObjectViewModel<NodeAppConfig, ResourceAndGroupId> = {
 
 export const nodeAppServiceViewodel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId)
     ],
     entries: [
         {
@@ -107,7 +105,8 @@ export const nodeAppServiceViewodel: MultiPageViewModel<ResourceAndGroupId> = {
                     }
                 }
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId)
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

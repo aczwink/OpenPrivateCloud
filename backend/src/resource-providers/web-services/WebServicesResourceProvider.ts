@@ -17,21 +17,19 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { NextcloudManager } from "./NextcloudManager";
 import { LetsEncryptManager } from "./LetsEncryptManager";
 import { JdownloaderManager } from "./JdownloaderManager";
 import { StaticWebsitesManager } from "./StaticWebsitesManager";
 import { NodeAppServiceManager } from "./NodeAppServiceManager";
-import { InstanceContext } from "../../common/InstanceContext";
 import { WebServicesResourceProperties } from "./Properties";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
 
 @Injectable
 export class WebServicesResourceProvider implements ResourceProvider<WebServicesResourceProperties>
 { 
-    constructor(private instancesManager: ResourcesManager, private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager,
+    constructor(private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager,
         private jdownloaderManager: JdownloaderManager, private staticWebsitesManager: StaticWebsitesManager, private nodeAppServiceManager: NodeAppServiceManager)
     {
     }
@@ -77,45 +75,45 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     }
 
     //Public methods
-    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
     {
     }
 
-    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
-        const parts = this.instancesManager.TODO_DEPRECATED_ExtractPartsFromFullInstanceName(instanceContext.fullInstanceName);
-        switch(parts.resourceTypeName)
+        switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.webServices.letsencryptCertResourceType.name:
-                await this.letsEncryptManager.RenewCertificateIfRequired(instanceContext.hostId, instanceContext.fullInstanceName);
+                await this.letsEncryptManager.RenewCertificateIfRequired(resourceReference);
                 break;
         }
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        const hostId = resourceReference.hostId;
-        const hostStoragePath = resourceReference.hostStoragePath;
-        const fullInstanceName = resourceReference.externalId;
-
         switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.webServices.jdownloaderResourceType.name:
-                await this.jdownloaderManager.DeleteResource(hostId, hostStoragePath, fullInstanceName);
+                await this.jdownloaderManager.DeleteResource(resourceReference);
                 break;
             case resourceProviders.webServices.letsencryptCertResourceType.name:
-                throw new Error("not implemented");
+                await this.letsEncryptManager.DeleteResource(resourceReference);
+                break;
             case resourceProviders.webServices.nextcloudResourceType.name:
-                await this.nextcloudManager.DeleteResource(hostId, hostStoragePath, fullInstanceName);
+                await this.nextcloudManager.DeleteResource(resourceReference);
                 break;
             case resourceProviders.webServices.nodeAppServiceResourceType.name:
-                await this.nodeAppServiceManager.DeleteResource(hostId, hostStoragePath, fullInstanceName);
+                await this.nodeAppServiceManager.DeleteResource(resourceReference);
                 break;
             case resourceProviders.webServices.staticWebsiteResourceType.name:
-                await this.staticWebsitesManager.DeleteResource(hostId, hostStoragePath, fullInstanceName);
+                await this.staticWebsitesManager.DeleteResource(resourceReference);
                 break;
         }
         return null;
+    }
+
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
+    {
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
@@ -150,5 +148,23 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
         }
 
         return {};
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.webServices.jdownloaderResourceType.name:
+                return await this.jdownloaderManager.QueryResourceState(resourceReference);
+            case resourceProviders.webServices.letsencryptCertResourceType.name:
+                return await this.letsEncryptManager.QueryResourceState(resourceReference);
+            case resourceProviders.webServices.nextcloudResourceType.name:
+                return "running";
+            case resourceProviders.webServices.nodeAppServiceResourceType.name:
+                return await this.nodeAppServiceManager.QueryResourceState(resourceReference);
+            case resourceProviders.webServices.staticWebsiteResourceType.name:
+                return "running";
+        }
+        return "corrupt";
     }
 }

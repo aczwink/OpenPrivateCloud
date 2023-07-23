@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2022-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,85 +16,71 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Common, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
-import { resourceProviders } from "openprivatecloud-common";
+import { APIController, Body, Common, Get, Path, Post, Put } from "acts-util-apilib";
 import { c_avTranscoderResourceTypeName, c_multimediaServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { HostsController } from "../../data-access/HostsController";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { ResourcesController } from "../../data-access/ResourcesController";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { AVTranscoderConfig } from "./AVTranscoderConfig";
 import { AVTranscoderService } from "./AVTranscoderService";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourceReference } from "../../common/ResourceReference";
 
 interface AVTranscoderInstanceInfo
 {
     hostName: string;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_multimediaServicesResourceProviderName}/${c_avTranscoderResourceTypeName}/{instanceName}`)
-class AVTranscoderAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_multimediaServicesResourceProviderName}/${c_avTranscoderResourceTypeName}/{resourceName}`)
+class AVTranscoderAPIController extends ResourceAPIControllerBase
 {
-    constructor(private instanceConfigController: InstanceConfigController, private instancesManager: ResourcesManager,
-        private instancesController: ResourcesController, private avTranscoderService: AVTranscoderService,
-        private hostStoragesController: HostStoragesController, private hostsController: HostsController)
+    constructor(private instanceConfigController: ResourceConfigController, resourcesManager: ResourcesManager, private avTranscoderService: AVTranscoderService)
     {
+        super(resourcesManager, c_multimediaServicesResourceProviderName, c_avTranscoderResourceTypeName);
     }
 
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string
     )
     {
-        throw new Error("TODO: reimplement me");
-        /*
-        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.multimediaServices.name, resourceProviders.multimediaServices.avTranscoderResourceType.name, instanceName);
-        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
-        if(instance === undefined)
-            return NotFound("instance not found");
-
-        return instance.id;*/
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Get("info")
     public async QueryInfo(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
     )
-    {
-        const instance = await this.instancesController.QueryResource(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-        const host = await this.hostsController.RequestHostCredentials(storage!.hostId);
-            
+    {            
         const result: AVTranscoderInstanceInfo = {
-            hostName: host!.hostName,
+            hostName: resourceReference.hostName,
         };
         return result;
     }
 
     @Get("config")
     public async RequestConfig(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
     )
     {
-        return await this.ReadConfig(instanceId);
+        return await this.ReadConfig(resourceReference.id);
     }
 
     @Post()
     public async StartTranscodingProcess(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
     )
     {
-        this.avTranscoderService.Transcode(instanceId, await this.ReadConfig(instanceId));
+        this.avTranscoderService.Transcode(resourceReference, await this.ReadConfig(resourceReference.id));
     }
 
     @Put("config")
     public async UpdateConfig(
-        @Common instanceId: number,
+        @Common resourceReference: ResourceReference,
         @Body config: AVTranscoderConfig
     )
     {
-        await this.instanceConfigController.UpdateOrInsertConfig(instanceId, config);
+        await this.instanceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
     }
 
     //Private methods

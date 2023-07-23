@@ -133,11 +133,26 @@ export class ApacheManager
         const lines = data.split("\n");
 
         const ports = [];
+        let findEnd = false;
         for (const line of lines)
         {
             const trimmed = line.trim();
             if( trimmed.startsWith("#") || (trimmed.length === 0) )
                 continue;
+
+            //we ignore IfModules for now
+            if(findEnd)
+            {
+                if(line === "</IfModule>")
+                    findEnd = false;
+                continue;
+            }
+            if(trimmed.startsWith("<IfModule "))
+            {
+                findEnd = true;
+                continue;
+            }
+
             ports.push(parseInt(trimmed.split(" ")[1]));
         }
         return ports;

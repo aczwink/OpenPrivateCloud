@@ -54,10 +54,15 @@ export class RemoteCommandExecutor
     public async ExecuteBufferedCommand(command: string[], hostId: number)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        const result = await this.sshCommandExecutor.ExecuteBufferedCommand(conn.value, command, { hostIdOrHostName: hostId });
-        conn.Release();
-
-        return result;
+        try
+        {
+            const result = await this.sshCommandExecutor.ExecuteBufferedCommand(conn.value, command, { hostIdOrHostName: hostId });
+            return result;
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 
     public async ExecuteBufferedCommandWithExitCode(command: string[], hostId: number)

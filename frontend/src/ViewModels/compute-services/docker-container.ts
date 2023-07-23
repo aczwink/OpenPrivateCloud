@@ -20,6 +20,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { DockerContainerConfig, DockerContainerInfo, DockerContainerLogDto } from "../../../dist/api";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -89,10 +90,7 @@ const logViewModel: ObjectViewModel<DockerContainerLogDto, ResourceAndGroupId> =
 
 export const dockerContainerViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId),
     ],
     entries: [
         {
@@ -114,7 +112,8 @@ export const dockerContainerViewModel: MultiPageViewModel<ResourceAndGroupId> = 
                     child: logViewModel,
                 }
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

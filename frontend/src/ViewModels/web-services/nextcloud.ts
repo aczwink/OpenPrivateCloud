@@ -19,6 +19,7 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { PageNotFoundComponent } from "../../PageNotFoundComponent";
 import { MultiPageViewModel } from "../../UI/ViewModel";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -29,10 +30,7 @@ function BuildResourceId(resourceGroupName: string, resourceName: string)
 
 export const nextcloudViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId),
     ],
     entries: [
         {
@@ -51,7 +49,8 @@ export const nextcloudViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     }
                 }
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

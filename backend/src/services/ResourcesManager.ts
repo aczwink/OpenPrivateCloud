@@ -19,36 +19,41 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
-import { InstanceContext } from "../common/InstanceContext";
 import { HostStoragesController } from "../data-access/HostStoragesController";
 import { ResourcesController } from "../data-access/ResourcesController";
-import { ResourceReference } from "../common/InstanceReference";
+import { LightweightResourceReference, ResourceReference } from "../common/ResourceReference";
 import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
 import { HostsController } from "../data-access/HostsController";
+import { ResourceProviderManager } from "./ResourceProviderManager";
  
 @Injectable
 export class ResourcesManager
 {
     constructor(private remoteFileSystemManager: RemoteFileSystemManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private resourceGroupsController: ResourceGroupsController,
-        private hostStoragesController: HostStoragesController, private resourcesController: ResourcesController, private hostsController: HostsController)
+        private hostStoragesController: HostStoragesController, private resourcesController: ResourcesController, private hostsController: HostsController, private resourceProviderManager: ResourceProviderManager)
     {
     }
     
     //Public methods
-    public BuildInstanceStoragePath(hostStoragePath: string, fullInstanceName: string)
+    public BuildResourceStoragePath(resourceReference: LightweightResourceReference)
     {
-        return path.join(hostStoragePath, this.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName));
+        return path.join(resourceReference.hostStoragePath, resourceReference.id.toString());
+    }
+
+    public async ChangeResourceGroup(resourceReference: ResourceReference, newResourceGroupId: number)
+    {
+        await this.resourcesController.UpdateResourceGroup(resourceReference.id, newResourceGroupId);
+
+        const newRef = await this.CreateResourceReference(resourceReference.id);
+        await this.resourceProviderManager.ExternalResourceIdChanged(newRef!, resourceReference.externalId);
     }
     
-    public async CreateInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string)
+    public async ChangeResourceName(resourceReference: ResourceReference, newResourceName: string)
     {
-        const instancePath = this.BuildInstanceStoragePath(hostStoragePath, fullInstanceName);
-        await this.remoteFileSystemManager.CreateDirectory(hostId, instancePath, {
-            mode: 0o770 //bug in ssh2? attributes does not seem to be set
-        });
-        await this.remoteFileSystemManager.ChangeMode(hostId, instancePath, 0o770);
+        await this.resourcesController.UpdateResourceName(resourceReference.id, newResourceName);
 
-        return instancePath;
+        const newRef = await this.CreateResourceReference(resourceReference.id);
+        await this.resourceProviderManager.ExternalResourceIdChanged(newRef!, resourceReference.externalId);
     }
 
     public async CreateResourceReference(resourceId: number)
@@ -100,38 +105,20 @@ export class ResourcesManager
         });
     }
 
-    public DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName: string)
+    public async CreateResourceStorageDirectory(resourceReference: LightweightResourceReference)
     {
-        return fullInstanceName.substring(1).ReplaceAll("/", "-");
+        const storagePath = this.BuildResourceStoragePath(resourceReference);
+        await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, storagePath, {
+            mode: 0o770 //bug in ssh2? attributes does not seem to be set
+        });
+        await this.remoteFileSystemManager.ChangeMode(resourceReference.hostId, storagePath, 0o770);
+
+        return storagePath;
     }
 
-    public async RemoveInstanceStorageDirectory(hostId: number, hostStoragePath: string, fullInstanceName: string)
+    public async RemoveResourceStorageDirectory(resourceReference: LightweightResourceReference)
     {
-        const instancePath = this.BuildInstanceStoragePath(hostStoragePath, fullInstanceName);
-        await this.remoteRootFileSystemManager.RemoveDirectoryRecursive(hostId, instancePath);
-    }
-
-
-
-
-
-    public async TODO_LEGACYCreateInstanceContext(fullInstanceName: string): Promise<InstanceContext | undefined>
-    {
-        return undefined;
-    }
-
-    public TODO_DEPRECATED_ExtractPartsFromFullInstanceName(fullInstanceName: string)
-    {
-        const parts = fullInstanceName.substring(1).split("/");
-        return {
-            resourceProviderName: parts[0],
-            resourceTypeName: parts[1],
-            instanceName: parts[2]
-        };
-    }
-
-    public TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviderName: string, instanceType: string, instanceName: string)
-    {
-        return "/" + resourceProviderName + "/" + instanceType + "/" + instanceName;
+        const storagePath = this.BuildResourceStoragePath(resourceReference);
+        await this.remoteRootFileSystemManager.RemoveDirectoryRecursive(resourceReference.hostId, storagePath);
     }
 }

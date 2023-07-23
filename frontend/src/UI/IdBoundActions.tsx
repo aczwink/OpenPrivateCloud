@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Anchor, JSX_CreateElement, MatIcon, RootInjector, RouterState } from "acfrontend";
+import { Anchor, BootstrapIcon, JSX_CreateElement, MatIcon, RootInjector, RouterState } from "acfrontend";
 import { Dictionary } from "acts-util-core";
 import { ResponseData } from "../../dist/api";
 import { APIService } from "../Services/APIService";
@@ -55,15 +55,27 @@ interface ManagedEditResourceAction<IdType, ObjectType>
     updateResource: (service: APIService, ids: IdType, properties: ObjectType) => Promise<ResponseData<number, number, void>>;
 }
 
+interface ManagedCustomEditResourceAction<IdType, ObjectType>
+{
+    type: "custom_edit";
+    key: string;
+    title: string;
+    icon: string;
+    propertiesSchemaName: string;
+    requestObject: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType>>;
+    updateResource: (service: APIService, ids: IdType, properties: ObjectType) => Promise<ResponseData<number, number, void>>;
+}
+
 export type IdBoundResourceAction<IdType, PropertiesType, ServiceType> =
     IdBoundActivateAction<IdType>
     | IdBoundConfirmAction<IdType>
     | ManagedDeleteResourceAction<IdType, ServiceType>
-    | ManagedEditResourceAction<IdType, PropertiesType>;
+    | ManagedEditResourceAction<IdType, PropertiesType>
+    | ManagedCustomEditResourceAction<IdType, PropertiesType>;
 
 export function RenderBoundAction(baseRoute: string, routeParams: Dictionary<string>, action: IdBoundResourceAction<any, any, any>, reloadData: (beginOrFinish: boolean) => void)
 {
-    const varRoute = baseRoute + "/" + action.type;
+    const varRoute = baseRoute + "/" + (action.type === "custom_edit" ? action.key : action.type);
     const route = RouterState.ReplaceRouteParams(varRoute, routeParams).join("/");
     switch(action.type)
     {
@@ -88,5 +100,7 @@ export function RenderBoundAction(baseRoute: string, routeParams: Dictionary<str
             return <Anchor class="d-flex align-items-center text-decoration-none link-danger" route={route}><MatIcon>delete_forever</MatIcon> Delete</Anchor>;
         case "edit":
             return <Anchor class="d-flex align-items-center text-decoration-none" route={route}><MatIcon>edit</MatIcon> Edit</Anchor>;
+        case "custom_edit":
+            return <Anchor class="d-flex align-items-center text-decoration-none" route={route}><BootstrapIcon>{action.icon}</BootstrapIcon> {action.title}</Anchor>;
     }
 }

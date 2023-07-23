@@ -84,4 +84,10 @@ export class ResourceGroupsController
         const rows = await conn.Select<ResourceGroup>(query);
         return rows;
     }
+
+    public async UpdateGroup(id: number, name: string)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.UpdateRows("instancegroups", { name }, "id = ?", id);
+    }
 }

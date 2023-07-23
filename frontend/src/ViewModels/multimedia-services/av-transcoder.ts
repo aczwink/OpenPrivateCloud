@@ -19,6 +19,7 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { AVTranscoderConfig, AVTranscoderInstanceInfo } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -59,10 +60,7 @@ const configViewModel: ObjectViewModel<AVTranscoderConfig, ResourceAndGroupId> =
 
 export const avTranscoderViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId)
     ],
     entries: [
         {
@@ -79,7 +77,8 @@ export const avTranscoderViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     child: configViewModel
                 }
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

@@ -16,15 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { InstanceContext } from "../../../common/InstanceContext";
-import { InstanceConfigController } from "../../../data-access/InstanceConfigController";
+import { ResourceConfigController } from "../../../data-access/ResourceConfigController";
 import { DeploymentContext, DeploymentResult } from "../../ResourceProvider";
 import { MySQLGrant } from "../MySQLClient";
 import { MariaDBContainerManager } from "./MariaDBContainerManager";
 import { MariaDBHostManager } from "./MariaDBHostManager";
 import { MariaDBInterface } from "./MariaDBInterface";
 import { MariadbProperties } from "./MariadbProperties";
-import { ResourceReference } from "../../../common/InstanceReference";
+import { ResourceReference } from "../../../common/ResourceReference";
 
 interface MariaDBConfig
 {
@@ -45,22 +44,22 @@ interface MySQLUserEntry
 @Injectable
 export class MariaDBManager
 {
-    constructor(private instanceConfigController: InstanceConfigController, private mariaDBHostManager: MariaDBHostManager,
+    constructor(private instanceConfigController: ResourceConfigController, private mariaDBHostManager: MariaDBHostManager,
         private mariaDBContainerManager: MariaDBContainerManager)
     {
     }
 
     //Public methods
-    public async AddUserPermission(instanceContext: InstanceContext, userName: string, hostName: string, permission: MySQLGrant)
+    public async AddUserPermission(resourceReference: ResourceReference, userName: string, hostName: string, permission: MySQLGrant)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        await mariaDBInterface.AddUserPermission(instanceContext, userName, hostName, permission);
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        await mariaDBInterface.AddUserPermission(resourceReference, userName, hostName, permission);
     }
 
-    public async CheckDatabaseIntegrity(instanceContext: InstanceContext)
+    public async CheckDatabaseIntegrity(resourceReference: ResourceReference)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        const stdOut = await mariaDBInterface.CheckAllDatabases(instanceContext);
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        const stdOut = await mariaDBInterface.CheckAllDatabases(resourceReference);
 
         const lines = stdOut.split("\n");
         const entries = lines.filter(line => line.trim().length > 0).map(line => {
@@ -78,16 +77,16 @@ export class MariaDBManager
         }
     }
 
-    public async CreateDatabase(instanceContext: InstanceContext, databaseName: string)
+    public async CreateDatabase(resourceReference: ResourceReference, databaseName: string)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        await mariaDBInterface.CreateDatabase(instanceContext, databaseName);
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        await mariaDBInterface.CreateDatabase(resourceReference, databaseName);
     }
 
-    public async CreateUser(instanceContext: InstanceContext, userName: string, hostName: string, password: string)
+    public async CreateUser(resourceReference: ResourceReference, userName: string, hostName: string, password: string)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        await mariaDBInterface.CreateUser(instanceContext, userName, hostName, password);
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        await mariaDBInterface.CreateUser(resourceReference, userName, hostName, password);
     }
 
     public async DeleteResource(resourceReference: ResourceReference)
@@ -96,29 +95,29 @@ export class MariaDBManager
         await mariaDBInterface.DeleteResource(resourceReference);
     }
 
-    public async DeleteUser(instanceContext: InstanceContext, userName: string, hostName: string)
+    public async DeleteUser(resourceReference: ResourceReference, userName: string, hostName: string)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        await mariaDBInterface.DeleteUser(instanceContext, userName, hostName);
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        await mariaDBInterface.DeleteUser(resourceReference, userName, hostName);
     }
 
-    public async ExecuteSelectQuery(instanceContext: InstanceContext, query: string)
+    public async ExecuteSelectQuery(resourceReference: ResourceReference, query: string)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        return mariaDBInterface.ExecuteSelectQuery(instanceContext, query);
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        return mariaDBInterface.ExecuteSelectQuery(resourceReference, query);
     }
 
-    public async QueryDatabases(instanceContext: InstanceContext)
+    public async QueryDatabases(resourceReference: ResourceReference)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        const result = await mariaDBInterface.ExecuteSelectQuery(instanceContext, "SHOW DATABASES");
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        const result = await mariaDBInterface.ExecuteSelectQuery(resourceReference, "SHOW DATABASES");
         return result as MySQLDatabaseEntry[];
     }
 
-    public async QueryUserPermissions(instanceContext: InstanceContext, userName: string, hostName: string)
+    public async QueryUserPermissions(resourceReference: ResourceReference, userName: string, hostName: string)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        const permissions = await mariaDBInterface.ExecuteSelectQuery(instanceContext, "SHOW GRANTS FOR '" + userName + "'@'" + hostName + "'");
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        const permissions = await mariaDBInterface.ExecuteSelectQuery(resourceReference, "SHOW GRANTS FOR '" + userName + "'@'" + hostName + "'");
 
         const result = [];
         for (const permission of permissions)
@@ -131,10 +130,10 @@ export class MariaDBManager
         return result;
     }
 
-    public async QueryUsers(instanceContext: InstanceContext)
+    public async QueryUsers(resourceReference: ResourceReference)
     {
-        const mariaDBInterface = await this.QueryInterface(instanceContext.instanceId);
-        const result = await mariaDBInterface.ExecuteSelectQuery(instanceContext, "SELECT Host, User FROM mysql.user");
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        const result = await mariaDBInterface.ExecuteSelectQuery(resourceReference, "SELECT Host, User FROM mysql.user");
         return result as MySQLUserEntry[];
     }
 

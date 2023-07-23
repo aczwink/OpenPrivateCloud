@@ -19,13 +19,13 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { LetsEncryptCertInfoDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
-import { BuildInstanceGeneralPageGroupEntry } from "../shared/instancegeneral";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
-function BuildFullInstanceName(instanceName: string)
+function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.letsencryptCertResourceType.name + "/" + instanceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.letsencryptCertResourceType.name + "/" + resourceName;
 }
 
 const overviewViewModel: ObjectViewModel<LetsEncryptCertInfoDto, ResourceAndGroupId> = {
@@ -37,7 +37,9 @@ const overviewViewModel: ObjectViewModel<LetsEncryptCertInfoDto, ResourceAndGrou
 };
 
 export const letsEncryptViewModel: MultiPageViewModel<ResourceAndGroupId> = {
-    actions: [],
+    actions: [
+        ...BuildCommonResourceActions(BuildResourceId),
+    ],
     entries: [
         {
             displayName: "",
@@ -49,7 +51,7 @@ export const letsEncryptViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                 }
             ]
         },
-        BuildInstanceGeneralPageGroupEntry(BuildFullInstanceName),
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

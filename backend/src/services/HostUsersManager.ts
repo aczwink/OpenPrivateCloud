@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ import { HostsController } from "../data-access/HostsController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { UsersController } from "../data-access/UsersController";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
+import { LinuxUsersManager } from "./LinuxUsersManager";
 
 interface SambaUser
 {
@@ -32,7 +33,7 @@ interface SambaUser
 @Injectable
 export class HostUsersManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController,
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private linuxUsersManager: LinuxUsersManager,
         private hostsController: HostsController, private permissionsController: PermissionsController)
     {
     }
@@ -245,9 +246,9 @@ export class HostUsersManager
 
     private async SyncGroupMembersToHost(hostId: number, linuxGroupName: string, desiredLinuxUserNames: Set<string>)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["getent", "group", linuxGroupName], hostId);
+        const currentLinuxUserNamesEnumeration = await this.linuxUsersManager.QueryMembersOfGroup(hostId, linuxGroupName);
+        const currentLinuxUserNames = currentLinuxUserNamesEnumeration.ToSet();
 
-        const currentLinuxUserNames = result.stdOut.trimEnd().split(":")[3].split(",").Values().Filter(x => x.length > 0).ToSet();
         const toRemove = currentLinuxUserNames.Without(desiredLinuxUserNames);
         const toAdd = desiredLinuxUserNames.Without(currentLinuxUserNames);
 
@@ -257,7 +258,7 @@ export class HostUsersManager
             await this.DeleteUserFromHostIfNotUsed(hostId, this.MapLinuxUserNameToUserId(linuxUserName));
         }
         for (const linuxUserName of toAdd)
-            await this.remoteCommandExecutor.ExecuteCommand(["sudo", "usermod", "-a", "-G", linuxGroupName, linuxUserName], hostId);
+            await this.linuxUsersManager.AddUserToGroup(hostId, linuxUserName, linuxGroupName);
     }
 
     /**
@@ -277,17 +278,21 @@ export class HostUsersManager
 
     private async TryResolveHostUserGroupId(hostId: number, linuxGroupName: string)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["getent", "group", linuxGroupName], hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["getent", "group", linuxGroupName], hostId);
         if(result.stdOut.length === 0)
+            return undefined;
+        if(result.exitCode === 2)
             return undefined;
         return parseInt(result.stdOut.split(":")[2]);
     }
 
     private async TryResolveHostUserId(hostId: number, linuxUserName: string)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["id", "-u", linuxUserName], hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["id", "-u", linuxUserName], hostId);
         const uid = parseInt(result.stdOut);
         if(isNaN(uid))
+            return undefined;
+        if(result.exitCode === 1)
             return undefined;
         return uid;
     }

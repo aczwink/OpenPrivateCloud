@@ -17,8 +17,10 @@
  * */
 
 import { APIController, Get, NotFound, Query } from "acts-util-apilib";
-import { HealthController, HealthStats } from "../data-access/HealthController";
+import { HealthController, HealthStats, HealthStatus } from "../data-access/HealthController";
 import { ResourcesManager } from "../services/ResourcesManager";
+import { ResourceProviderManager } from "../services/ResourceProviderManager";
+import { TimeSchedule } from "../common/TimeSchedule";
 
 interface ClusterHealthStats
 {
@@ -26,10 +28,33 @@ interface ClusterHealthStats
     instancesHealth: HealthStats[];
 }
 
+interface ResourceCheckDTO
+{
+    /**
+     * @format multi-line
+     */
+    log: string;
+
+    lastSuccessfulCheck: Date;
+    schedule: TimeSchedule;
+}
+
+interface ResourceHealthDTO
+{
+    status: HealthStatus;
+    
+    /**
+     * @format multi-line
+     */
+    availabilityLog: string;
+
+    checkData?: ResourceCheckDTO;
+}
+
 @APIController("health")
 class HealthAPIController
 {
-    constructor(private healthController: HealthController, private resourcesManager: ResourcesManager)
+    constructor(private healthController: HealthController, private resourcesManager: ResourcesManager, private resourceProviderManager: ResourceProviderManager)
     {
     }
 
@@ -43,8 +68,8 @@ class HealthAPIController
         return res;
     }
 
-    @Get("instance")
-    public async QueueInstanceHealth(
+    @Get("resource")
+    public async QueryResourceHealth(
         @Query id: string
     )
     {
@@ -52,6 +77,22 @@ class HealthAPIController
         if(ref === undefined)
             return NotFound("resource not found");
 
-        return this.healthController.QueryInstanceHealthData(ref.id);
+        const hd = await this.healthController.QueryResourceHealthData(ref.id);
+        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref.id);
+
+        const res: ResourceHealthDTO = {
+            availabilityLog: hd!.availabilityLog,
+            status: hd!.status,
+        };
+        if(schedule !== null)
+        {
+            res.checkData = {
+                log: hd!.checkLog,
+                schedule,
+                lastSuccessfulCheck: hd!.lastSuccessfulCheck,
+            };
+        }
+
+        return res;
     }
 }

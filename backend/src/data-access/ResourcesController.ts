@@ -139,34 +139,31 @@ export class ResourcesController
         return await conn.SelectOne<OverviewInstanceData>(query, instanceId);
     }
 
-    public async Search(hostName: string, fullNamePattern: string)
+    public async Search(hostName: string, resourceProviderName: string, resourceTypeName: string, resourceNameFilter: string)
     {
         const query = `
-        SELECT i.fullName, i.storageId
+        SELECT i.id
         FROM instances i
         INNER JOIN hosts_storages hs
             ON hs.id = i.storageId
         INNER JOIN hosts h
             ON h.id = hs.hostId
-        WHERE h.hostName = ? AND i.fullName LIKE ?
+        WHERE h.hostName = ? AND i.resourceProviderName = ? AND i.instanceType = ? AND name LIKE ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.Select<Resource>(query, hostName, fullNamePattern);
+        const rows = await conn.Select(query, hostName, resourceProviderName, resourceTypeName, "%" + resourceNameFilter + "%");
+        return rows.map(x => x.id as number);
     }
 
-    //Private methods
-    private async QueryInstanceId(fullInstanceName: string)
+    public async UpdateResourceGroup(id: number, newResourceGroupId: number)
     {
-        const query = `
-        SELECT id
-        FROM instances
-        WHERE fullName = ?
-        `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, fullInstanceName);
+        await conn.UpdateRows("instances", { instanceGroupId: newResourceGroupId }, "id = ?", id);
+    }
 
-        if(row === undefined)
-            return undefined;
-        return row.id as number;
+    public async UpdateResourceName(id: number, name: string)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.UpdateRows("instances", { name }, "id = ?", id);
     }
 }

@@ -69,6 +69,12 @@ const groupViewModel: MultiPageViewModel<ResourceGroupId> = {
     type: "multiPage",
     actions: [
         {
+            type: "edit",
+            propertiesSchemaName: "ResourceGroupDTO",
+            requestObject: (service, ids) => service.resourceGroups._any_.get(ids.resourceGroupName),
+            updateResource: (service, ids, newData) => service.resourceGroups._any_.patch(ids.resourceGroupName, { newResourceGroupName: newData.name })
+        },
+        {
             type: "delete",
             deleteResource: (service, ids) => service.resourceGroups._any_.delete(ids.resourceGroupName)
         }

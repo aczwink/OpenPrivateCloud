@@ -145,10 +145,13 @@ export class SSHCommandExecutor
         {
             if(part.includes(" "))
             {
-                if(!(part.startsWith('"') && part.endsWith('"')))
+                if(part.startsWith('"') && part.endsWith('"'))
                 {
-                    return '"' + part.ReplaceAll('"', '\\"') + '"';
+                    //TODO: handle case where this includes another unescaped double quote
                 }
+                else if(part.includes('"'))
+                    return part.ReplaceAll(" ", "\\ ");
+                return '"' + part.ReplaceAll('"', '\\"') + '"';
             }
 
             return part;

@@ -17,9 +17,6 @@
  * */
 import { Injectable } from "acts-util-node";
 import path from "path";
-import { InstanceContext } from "../../common/InstanceContext";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { ResourcesController } from "../../data-access/ResourcesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
@@ -29,9 +26,9 @@ import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystem
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { SharedFolderPermissionsManager } from "../file-services/SharedFolderPermissionsManager";
 import { SingleSMBSharePerInstanceProvider } from "../file-services/SingleSMBSharePerInstanceProvider";
-import { DeploymentContext } from "../ResourceProvider";
+import { DeploymentContext, ResourceState } from "../ResourceProvider";
 import { JdownloaderProperties } from "./Properties";
-import { ResourceReference } from "../../common/InstanceReference";
+import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 
 export interface MyJDownloaderCredentials
 {
@@ -45,60 +42,58 @@ export interface MyJDownloaderCredentials
 @Injectable
 export class JdownloaderManager
 {
-    constructor(private modulesManager: ModulesManager, private hostUsersManager: HostUsersManager, private instancesManager: ResourcesManager,
+    constructor(private modulesManager: ModulesManager, private hostUsersManager: HostUsersManager, private resourcesManager: ResourcesManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider,
         private sharedFolderPermissionsManager: SharedFolderPermissionsManager)
     {
     }
 
     //Public methods
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string)
+    public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         const serviceName = "jdownloader";
 
-        const running = await this.systemServicesManager.IsServiceActive(hostId, serviceName);
+        const running = await this.systemServicesManager.IsServiceActive(resourceReference.hostId, serviceName);
         if(running)
-            await this.systemServicesManager.StopService(hostId, serviceName);
-        const enabled = await this.systemServicesManager.IsServiceEnabled(hostId, serviceName);
+            await this.systemServicesManager.StopService(resourceReference.hostId, serviceName);
+        const enabled = await this.systemServicesManager.IsServiceEnabled(resourceReference.hostId, serviceName);
         if(enabled)
-            await this.systemServicesManager.DisableService(hostId, serviceName);
-        await this.systemServicesManager.DeleteService(hostId, serviceName);
+            await this.systemServicesManager.DisableService(resourceReference.hostId, serviceName);
+        await this.systemServicesManager.DeleteService(resourceReference.hostId, serviceName);
 
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
 
-        await this.hostUsersManager.DeleteHostServicePrincipal(hostId, "jdownloader");
+        await this.hostUsersManager.DeleteHostServicePrincipal(resourceReference.hostId, "jdownloader");
     }
 
-    public async GetSMBConnectionInfo(data: InstanceContext, userId: number)
+    public async GetSMBConnectionInfo(resourceReference: ResourceReference, userId: number)
     {
-        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(data, userId);
+        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(resourceReference, userId);
     }
 
-    public async IsActive(instanceId: number)
+    public async IsActive(resourceReference: LightweightResourceReference)
     {
-        const instanceData = await this.QueryInstanceData(instanceId);
-        return await this.systemServicesManager.IsServiceActive(instanceData.hostId, "jdownloader");
+        return await this.systemServicesManager.IsServiceActive(resourceReference.hostId, "jdownloader");
     }
 
     public async ProvideResource(instanceProperties: JdownloaderProperties, context: DeploymentContext)
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "java");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o775);
+        const resourceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, resourceDir, 0o775);
 
         const authority = await this.hostUsersManager.CreateHostServicePrincipal(context.hostId, "jdownloader");
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, authority.hostUserId, authority.hostGroupId);
+        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, resourceDir, authority.hostUserId, authority.hostGroupId);
 
-        const downloadsPath = path.join(instanceDir, "Downloads");
+        const downloadsPath = path.join(resourceDir, "Downloads");
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, downloadsPath);
 
         const shell = await this.remoteCommandExecutor.SpawnShell(context.hostId);
         await shell.ChangeUser(authority.linuxUserName);
-        await shell.ChangeDirectory(instanceDir);
+        await shell.ChangeDirectory(resourceDir);
 
         await shell.ExecuteCommand(["wget", "http://installer.jdownloader.org/JDownloader.jar"]);
         await shell.ExecuteCommand(["java", "-Djava.awt.headless=true", "-jar", "JDownloader.jar", "-norestart"]);
@@ -108,9 +103,9 @@ export class JdownloaderManager
         await shell.Close();
 
         await this.systemServicesManager.CreateOrUpdateService(context.hostId, {
-            command: "/usr/bin/java -Djava.awt.headless=true -jar " + instanceDir + "/JDownloader.jar",
+            command: "/usr/bin/java -Djava.awt.headless=true -jar " + resourceDir + "/JDownloader.jar",
             environment: {
-                JD_HOME: instanceDir
+                JD_HOME: resourceDir
             },
             groupName: authority.linuxGroupName,
             name: "JDownloader",
@@ -118,9 +113,9 @@ export class JdownloaderManager
         });
     }
 
-    public async QueryCredentials(instanceId: number): Promise<MyJDownloaderCredentials>
+    public async QueryCredentials(resourceReference: ResourceReference): Promise<MyJDownloaderCredentials>
     {
-        const myjd = await this.QueryMyJDownloaderSettings(instanceId);
+        const myjd = await this.QueryMyJDownloaderSettings(resourceReference);
         
         return {
             email: myjd.email,
@@ -128,9 +123,17 @@ export class JdownloaderManager
         };
     }
 
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    {
+        const isActive = await this.IsActive(resourceReference);
+        if(isActive)
+            return "running";
+        return "stopped";
+    }
+
     public async RefreshPermissions(resourceReference: ResourceReference)
     {
-        const instanceDir = this.instancesManager.BuildInstanceStoragePath(resourceReference.hostStoragePath, resourceReference.externalId);
+        const instanceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
         const downloadsPath = path.join(instanceDir, "Downloads");
         await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, downloadsPath, true);
@@ -143,60 +146,44 @@ export class JdownloaderManager
         }, resourceReference);
     }
 
-    public async SetCredentials(instanceId: number, settings: MyJDownloaderCredentials)
+    public async SetCredentials(resourceReference: ResourceReference, settings: MyJDownloaderCredentials)
     {
-        const myjd = await this.QueryMyJDownloaderSettings(instanceId);
+        const myjd = await this.QueryMyJDownloaderSettings(resourceReference);
         myjd.email = settings.email;
         myjd.password = settings.password;
 
-        const instanceData = await this.QueryInstanceData(instanceId);
-        const configPath = this.BuildConfigPath(instanceData.hostStoragePath, instanceData.fullInstanceName);
+        const configPath = this.BuildConfigPath(resourceReference);
 
-        await this.remoteRootFileSystemManager.WriteTextFile(instanceData.hostId, configPath, JSON.stringify(myjd));
+        await this.remoteRootFileSystemManager.WriteTextFile(resourceReference.hostId, configPath, JSON.stringify(myjd));
 
-        const sp = await this.hostUsersManager.ResolveHostServicePrinciple(instanceData.hostId, "jdownloader");
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(instanceData.hostId, configPath, sp.hostUserId, sp.hostGroupId);
+        const sp = await this.hostUsersManager.ResolveHostServicePrinciple(resourceReference.hostId, "jdownloader");
+        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(resourceReference.hostId, configPath, sp.hostUserId, sp.hostGroupId);
 
-        const running = await this.systemServicesManager.IsServiceActive(instanceData.hostId, "jdownloader");
+        const running = await this.systemServicesManager.IsServiceActive(resourceReference.hostId, "jdownloader");
         if(running)
-            await this.systemServicesManager.RestartService(instanceData.hostId, "jdownloader");
+            await this.systemServicesManager.RestartService(resourceReference.hostId, "jdownloader");
     }
 
-    public async StartOrStopService(instanceId: number, action: "start" | "stop")
+    public async StartOrStopService(resourceReference: LightweightResourceReference, action: "start" | "stop")
     {
-        const instanceData = await this.QueryInstanceData(instanceId);
-
         if(action === "start")
-            await this.systemServicesManager.StartService(instanceData.hostId, "jdownloader");
+            await this.systemServicesManager.StartService(resourceReference.hostId, "jdownloader");
         else
-            await this.systemServicesManager.StopService(instanceData.hostId, "jdownloader");
+            await this.systemServicesManager.StopService(resourceReference.hostId, "jdownloader");
     }
 
     //Private methods
-    private BuildConfigPath(hostStoragePath: string, fullInstanceName: string)
+    private BuildConfigPath(resourceReference: LightweightResourceReference)
     {
-        const instancePath = this.instancesManager.BuildInstanceStoragePath(hostStoragePath, fullInstanceName);
-        return path.join(instancePath, "cfg/org.jdownloader.api.myjdownloader.MyJDownloaderSettings.json");
+        const resourcePath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(resourcePath, "cfg/org.jdownloader.api.myjdownloader.MyJDownloaderSettings.json");
     }
 
-    private async QueryInstanceData(instanceId: number)
+    private async QueryMyJDownloaderSettings(resourceReference: ResourceReference)
     {
-        const instance = await this.instancesController.QueryResource(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+        const hostId = resourceReference.hostId;
 
-        return {
-            hostId: storage!.hostId,
-            hostStoragePath: storage!.path,
-            fullInstanceName: instance!.name
-        };
-    }
-
-    private async QueryMyJDownloaderSettings(instanceId: number)
-    {
-        const instanceData = await this.QueryInstanceData(instanceId);
-        const hostId = instanceData.hostId;
-
-        const configPath = this.BuildConfigPath(instanceData.hostStoragePath, instanceData.fullInstanceName);
+        const configPath = this.BuildConfigPath(resourceReference);
         const exists = await this.remoteFileSystemManager.Exists(hostId, configPath);
         if(exists)
         {
@@ -210,7 +197,7 @@ export class JdownloaderManager
             email: "",
             password: "",
             autoconnectenabledv2: true,
-            devicename: instanceData.fullInstanceName
+            devicename: resourceReference.externalId
         };
     }
 }

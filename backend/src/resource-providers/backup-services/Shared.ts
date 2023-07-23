@@ -15,9 +15,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
+import path from "path";
 import { Command } from "../../services/SSHService";
 import { TargetFileSystemType } from "./BackupTargetMountService";
+
+export function BuildBackupPath(backupTargetPath: string, resourceId: number)
+{
+    return path.join(backupTargetPath, "opc-bkpvltcnt-" + resourceId);
+}
 
 export function CreateGPGEncryptionCommandOrPipe(input: Command, secretPath: string | undefined): Command
 {

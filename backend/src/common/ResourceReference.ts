@@ -33,6 +33,7 @@ export interface LightweightResourceReference
 {
     readonly id: number;
     readonly hostId: number;
+    readonly hostStoragePath: string;
 }
 
 export class ResourceReference implements LightweightResourceReference
@@ -65,11 +66,6 @@ export class ResourceReference implements LightweightResourceReference
     public get hostStoragePath()
     {
         return this._props.hostStoragePath;
-    }
-
-    public get name()
-    {
-        return this._props.name;
     }
 
     public get resourceProviderName()

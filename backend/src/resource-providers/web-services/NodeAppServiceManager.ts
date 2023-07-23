@@ -22,12 +22,12 @@ import { ResourcesController } from "../../data-access/ResourcesController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { DeploymentContext } from "../ResourceProvider";
+import { DeploymentContext, ResourceState } from "../ResourceProvider";
 import { NodeAppServiceProperties } from "./Properties";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { opcSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
-import { InstanceContext } from "../../common/InstanceContext";
 import { Dictionary } from "acts-util-core";
+import { LightweightResourceReference } from "../../common/ResourceReference";
 
 interface NodeEnvironmentVariableMapping
 {
@@ -44,100 +44,105 @@ export interface NodeAppConfig
 @Injectable
 export class NodeAppServiceManager
 {
-    constructor(private instancesManager: ResourcesManager, private modulesManager: ModulesManager, private instancesController: ResourcesController,
+    constructor(private resourcesManager: ResourcesManager, private modulesManager: ModulesManager, private instancesController: ResourcesController,
         private hostStoragesController: HostStoragesController, private remoteFileSystemManager: RemoteFileSystemManager,
         private systemServicesManager: SystemServicesManager)
     {
     }
 
     //Public methods
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string)
+    public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        await this.systemServicesManager.DeleteService(hostId, this.MapFullInstanceNameToSystemDName(fullInstanceName));
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.systemServicesManager.DeleteService(resourceReference.hostId, this.DeriveSystemUnitName(resourceReference));
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
-    public async ExecuteAction(hostId: number, fullInstanceName: string, action: "start" | "stop")
+    public async ExecuteAction(resourceReference: LightweightResourceReference, action: "start" | "stop")
     {
-        const serviceName = this.MapFullInstanceNameToSystemDName(fullInstanceName);
+        const serviceName = this.DeriveSystemUnitName(resourceReference);
         switch(action)
         {
             case "start":
-                await this.systemServicesManager.StartService(hostId, serviceName);
+                await this.systemServicesManager.StartService(resourceReference.hostId, serviceName);
                 break;
             case "stop":
-                await this.systemServicesManager.StopService(hostId, serviceName);
+                await this.systemServicesManager.StopService(resourceReference.hostId, serviceName);
                 break;
         }
     }
 
-    public async IsAppServiceRunning(hostId: number, fullInstanceName: string)
+    public async IsAppServiceRunning(resourceReference: LightweightResourceReference)
     {
-        return await this.systemServicesManager.IsServiceActive(hostId, this.MapFullInstanceNameToSystemDName(fullInstanceName));
+        return await this.systemServicesManager.IsServiceActive(resourceReference.hostId, this.DeriveSystemUnitName(resourceReference));
     }
 
     public async ProvideResource(instanceProperties: NodeAppServiceProperties, context: DeploymentContext)
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "node");
 
-        await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
-        await this.UpdateService(context.hostId, context.storagePath, context.resourceReference.externalId, {});
+        await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.UpdateService(context.resourceReference, {});
     }
 
-    public async QueryConfig(instanceContext: InstanceContext): Promise<NodeAppConfig>
+    public async QueryConfig(resourceReference: LightweightResourceReference): Promise<NodeAppConfig>
     {
-        const serviceName = this.MapFullInstanceNameToSystemDName(instanceContext.fullInstanceName);
-        const serviceProps = await this.systemServicesManager.ReadServiceUnit(instanceContext.hostId, serviceName);
+        const serviceName = this.DeriveSystemUnitName(resourceReference);
+        const serviceProps = await this.systemServicesManager.ReadServiceUnit(resourceReference.hostId, serviceName);
 
         return {
-            autoStart: await this.systemServicesManager.IsServiceEnabled(instanceContext.hostId, serviceName),
+            autoStart: await this.systemServicesManager.IsServiceEnabled(resourceReference.hostId, serviceName),
             env: serviceProps.environment.Entries().Map(kv => ({ varName: kv.key.toString(), value: kv.value! })).ToArray()
         };
     }
 
-    public async QueryStatus(hostId: number, fullInstanceName: string)
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
-        const serviceName = this.MapFullInstanceNameToSystemDName(fullInstanceName);
-        return await this.systemServicesManager.QueryStatus(hostId, serviceName);
+        const isRunning = await this.IsAppServiceRunning(resourceReference);
+        if(isRunning)
+            return "running";
+        return "stopped";
     }
 
-    public async UpdateConfig(instanceContext: InstanceContext, config: NodeAppConfig)
+    public async QueryStatus(resourceReference: LightweightResourceReference)
+    {
+        const serviceName = this.DeriveSystemUnitName(resourceReference);
+        return await this.systemServicesManager.QueryStatus(resourceReference.hostId, serviceName);
+    }
+
+    public async UpdateConfig(resourceReference: LightweightResourceReference, config: NodeAppConfig)
     {
         const env = config.env.Values().ToDictionary(e => e.varName, e => e.value);
-        await this.UpdateService(instanceContext.hostId, instanceContext.hostStoragePath, instanceContext.fullInstanceName, env);
+        await this.UpdateService(resourceReference, env);
 
-        const serviceName = this.MapFullInstanceNameToSystemDName(instanceContext.fullInstanceName);
+        const serviceName = this.DeriveSystemUnitName(resourceReference);
         if(config.autoStart)
-            await this.systemServicesManager.EnableService(instanceContext.hostId, serviceName);
+            await this.systemServicesManager.EnableService(resourceReference.hostId, serviceName);
         else
-            await this.systemServicesManager.DisableService(instanceContext.hostId, serviceName);
+            await this.systemServicesManager.DisableService(resourceReference.hostId, serviceName);
     }
 
-    public async UpdateContent(instanceId: number, buffer: Buffer)
+    public async UpdateContent(resourceReference: LightweightResourceReference, buffer: Buffer)
     {
-        const instance = await this.instancesController.QueryResource(instanceId);
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        const instancesDir = this.instancesManager.BuildInstanceStoragePath(storage!.path, instance!.name);
-
-        await this.remoteFileSystemManager.WriteFile(storage!.hostId, path.join(instancesDir, "index.js"), buffer);
+        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, path.join(resourceDir, "index.js"), buffer);
     }
 
     //Private methods
-    private MapFullInstanceNameToSystemDName(fullInstanceName: string)
+    private DeriveSystemUnitName(resourceReference: LightweightResourceReference)
     {
-        return this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        return "opc-rnas-" + resourceReference.id;
     }
 
-    private async UpdateService(hostId: number, storagePath: string, fullInstanceName: string, env: Dictionary<string>)
+    private async UpdateService(resourceReference: LightweightResourceReference, env: Dictionary<string>)
     {
-        const instancesDir = await this.instancesManager.BuildInstanceStoragePath(storagePath, fullInstanceName);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        await this.systemServicesManager.CreateOrUpdateService(hostId, {
-            command: "node " + path.join(instancesDir, "index.js"),
+        await this.systemServicesManager.CreateOrUpdateService(resourceReference.hostId, {
+            command: "node " + path.join(resourceDir, "index.js"),
             environment: env,
             groupName: opcSpecialGroups.host,
-            name: this.MapFullInstanceNameToSystemDName(fullInstanceName),
+            name: this.DeriveSystemUnitName(resourceReference),
             userName: opcSpecialUsers.host
         });
     }

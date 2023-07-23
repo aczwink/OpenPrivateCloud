@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,15 +22,16 @@ import { HostsController } from "../data-access/HostsController";
 import { ResourcesController } from "../data-access/ResourcesController";
 import { ModulesManager } from "./ModulesManager";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
-import { ResourceProviderManager } from "./ResourceProviderManager";
+import { ResourceHealthManager } from "./ResourceHealthManager";
+import { ErrorService } from "./ErrorService";
 
  
 @Injectable
 export class HostAvailabilityManager
 {
-    constructor(private modulesManager: ModulesManager, private hostsController: HostsController, private instancesController: ResourcesController,
-        private resourceProviderManager: ResourceProviderManager, private remoteConnectionsManager: RemoteConnectionsManager,
-        private healthController: HealthController)
+    constructor(private modulesManager: ModulesManager, private hostsController: HostsController, private instancesController: ResourcesController, private healthController: HealthController,
+        private remoteConnectionsManager: RemoteConnectionsManager, private errorService: ErrorService,
+        private resourceHealthManager: ResourceHealthManager)
     {
     }
 
@@ -52,19 +53,19 @@ export class HostAvailabilityManager
     //Private methods
     private async CheckAvailabilityOfHostAndItsInstances(hostId: number)
     {
-        const instanceIds = await this.instancesController.QueryInstanceIdsAssociatedWithHost(hostId);
+        const resourceIds = await this.instancesController.QueryInstanceIdsAssociatedWithHost(hostId);
 
         const available = await this.CheckHostAvailability(hostId);
         if(!available)
         {
-            for (const instanceId of instanceIds)
-                await this.healthController.UpdateInstanceAvailability(instanceId, HealthStatus.Down, "host is not available");
+            for (const resourceId of resourceIds)
+                await this.resourceHealthManager.UpdateResourceAvailability(resourceId, HealthStatus.Down, "host is not available");
             return;
         }
 
-        for (const instanceId of instanceIds)
+        for (const resourceId of resourceIds)
         {
-            await this.CheckInstanceAvailability(instanceId);
+            await this.resourceHealthManager.CheckResourceAvailability(resourceId);
         }
     }
 
@@ -77,25 +78,16 @@ export class HostAvailabilityManager
         }
         catch(e)
         {
-            await this.healthController.UpdateHostHealth(hostId, HealthStatus.Down, e);
+            await this.UpdateHostHealth(hostId, HealthStatus.Down, e);
             return false;
         }
-        await this.healthController.UpdateHostHealth(hostId, HealthStatus.Up);
+        await this.UpdateHostHealth(hostId, HealthStatus.Up);
         return true;
     }
 
-    private async CheckInstanceAvailability(instanceId: number)
+    private async UpdateHostHealth(hostId: number, status: HealthStatus, logData?: unknown)
     {
-        const instance = await this.instancesController.QueryResource(instanceId);
-        try
-        {
-            await this.resourceProviderManager.CheckInstanceAvailability(instance!.name);
-        }
-        catch(e)
-        {
-            await this.healthController.UpdateInstanceAvailability(instanceId, HealthStatus.Down, e);
-            return;
-        }
-        await this.healthController.UpdateInstanceAvailability(instanceId, HealthStatus.Up);
+        const log = this.errorService.ExtractDataAsMultipleLines(logData);
+        await this.healthController.UpdateHostHealth(hostId, status, log);
     }
 }

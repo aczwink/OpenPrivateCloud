@@ -17,11 +17,10 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
-import { InstanceContext } from "../../common/InstanceContext";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { MariadbProperties } from "./MariaDB/MariadbProperties";
 import { MariaDBManager } from "./MariaDB/MariaDBManager";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
 
   
 @Injectable
@@ -52,10 +51,10 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
     }
 
     //Public methods
-    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
     {
-        const warningCount = await this.mariaDBManager.ExecuteSelectQuery(instanceContext, "SELECT @@warning_count;");
-        const errorCount = await this.mariaDBManager.ExecuteSelectQuery(instanceContext, "SELECT @@error_count;");
+        const warningCount = await this.mariaDBManager.ExecuteSelectQuery(resourceReference, "SELECT @@warning_count;");
+        const errorCount = await this.mariaDBManager.ExecuteSelectQuery(resourceReference, "SELECT @@error_count;");
 
         if(parseInt(warningCount[0]["@@warning_count"]) != 0)
             throw new Error("Warnings are reported on the database");
@@ -63,15 +62,19 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
             throw new Error("Warnings are reported on the database");
     }
 
-    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
-        await this.mariaDBManager.CheckDatabaseIntegrity(instanceContext);
+        await this.mariaDBManager.CheckDatabaseIntegrity(resourceReference);
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
         await this.mariaDBManager.DeleteResource(resourceReference);
         return null;
+    }
+
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
+    {
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
@@ -81,5 +84,10 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
     public async ProvideResource(instanceProperties: MariadbProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         return await this.mariaDBManager.ProvideResource(instanceProperties, context);
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        return "running";
     }
 }

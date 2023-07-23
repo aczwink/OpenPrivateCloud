@@ -17,15 +17,15 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { ResourceDeletionError } from "../ResourceProvider";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
+import { ResourceDeletionError, ResourceState } from "../ResourceProvider";
 import { DockerContainerConfig, DockerContainerConfigPortMapping, DockerContainerInfo, DockerManager } from "./DockerManager";
-import { LightweightResourceReference } from "../../common/InstanceReference";
+import { LightweightResourceReference } from "../../common/ResourceReference";
 
 @Injectable
 export class DockerContainerManager
 {
-    constructor(private dockerManager: DockerManager, private instanceConfigController: InstanceConfigController)
+    constructor(private dockerManager: DockerManager, private instanceConfigController: ResourceConfigController)
     {
     }
 
@@ -73,6 +73,7 @@ export class DockerContainerManager
                 imageName: "",
                 portMap: [],
                 restartPolicy: "no",
+                volumes: []
             };
         }
 
@@ -104,6 +105,20 @@ export class DockerContainerManager
         return this.dockerManager.QueryContainerLogs(resourceReference.hostId, containerName);
     }
 
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    {
+        const state = await this.QueryContainerStatus(resourceReference);
+        switch(state)
+        {
+            case "exited":
+            case "not created yet":
+                return "stopped";
+            case "running":
+                return "running";
+        }
+        throw new Error(state);
+    }
+
     public async UpdateContainerConfig(resourceId: number, config: DockerContainerConfig)
     {
         await this.instanceConfigController.UpdateOrInsertConfig(resourceId, config);
@@ -121,6 +136,13 @@ export class DockerContainerManager
     }
 
     //Private methods
+    private ArrayEqualsAnyOrder<T>(a: T[], b: T[], key: keyof T)
+    {
+        const orderedA = a.Values().OrderBy(x => x[key] as any).ToArray();
+        const orderedB = b.Values().OrderBy(x => x[key] as any).ToArray();
+        return orderedA.Equals(orderedB);
+    }
+
     private DeriveContainerName(resourceReference: LightweightResourceReference)
     {
         return "opc-rdc-" + resourceReference.id;
@@ -129,15 +151,24 @@ export class DockerContainerManager
     private HasConfigChanged(containerData: DockerContainerInfo, config: DockerContainerConfig)
     {
         const currentPortMapping = this.ParsePortBindings(containerData);
-        const desiredPortMapping = config.portMap;
+        if(!this.ArrayEqualsAnyOrder(currentPortMapping, config.portMap, "hostPost"))
+            return true;
 
-        currentPortMapping.SortBy(x => x.hostPost);
-        if(!currentPortMapping.Equals(desiredPortMapping.Values().OrderBy(x => x.hostPost).ToArray()))
+        const currentEnv = this.ParseEnv(containerData);
+        if(!this.ArrayEqualsAnyOrder(currentEnv.ToArray(), config.env, "varName"))
             return true;
 
         return !(
             (containerData.Config.Image === config.imageName)
         );
+    }
+
+    private ParseEnv(containerData: DockerContainerInfo)
+    {
+        return containerData.Config.Env.Values()
+            .Map(x => x.split("="))
+            .Map(x => ({ varName: x[0], value: x[1] }))
+            .Filter(x => x.varName !== "PATH");
     }
 
     private ParsePortBindings(containerData: DockerContainerInfo): DockerContainerConfigPortMapping[]
@@ -149,11 +180,13 @@ export class DockerContainerManager
             {
                 const hostBinding = containerData.HostConfig.PortBindings[containerBinding]!;
 
-                const containerPort = parseInt(containerBinding.split("/")[0]);
+                const parts = containerBinding.split("/");
+                const containerPort = parseInt(parts[0]);
 
                 hostBinding.forEach(x => result.push({
                     containerPort,
-                    hostPost: parseInt(x.HostPort)
+                    hostPost: parseInt(x.HostPort),
+                    protocol: parts[1].toUpperCase() as any
                 }));
             }
         }

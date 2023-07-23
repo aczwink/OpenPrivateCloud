@@ -18,19 +18,18 @@
 import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { FileStorageProperties } from "./FileStorageProperties";
 import { FileStoragesManager } from "./FileStoragesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { InstanceContext } from "../../common/InstanceContext";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileStorageProperties>
 {
-    constructor(private instancesManager: ResourcesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager,
+    constructor(private resourcesManager: ResourcesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
@@ -53,11 +52,11 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     }
 
     //Public methods
-    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
     {
     }
 
-    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
     
@@ -67,9 +66,14 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
             smb: { enabled: false, transportEncryption: false }
         });
         await this.fileStoragesManager.DeleteAllSnapshots(resourceReference);
-        await this.instancesManager.RemoveInstanceStorageDirectory(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
 
         return null;
+    }
+
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
+    {
+        await this.fileStoragesManager.ExternalResourceIdChanged(resourceReference, oldExternalResourceId);
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
@@ -80,11 +84,11 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
-        const instancePath = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, instancePath, 0o775);
+        const resourcePath = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, resourcePath, 0o775);
 
-        const dataPath = this.fileStoragesManager.GetDataPath(context.storagePath, context.resourceReference.externalId);
-        const snapshotsPath = this.fileStoragesManager.GetSnapshotsPath(context.storagePath, context.resourceReference.externalId);
+        const dataPath = this.fileStoragesManager.GetDataPath(context.resourceReference);
+        const snapshotsPath = this.fileStoragesManager.GetSnapshotsPath(context.resourceReference);
 
         await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "create", dataPath], context.hostId);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, dataPath, 0o770);
@@ -93,5 +97,10 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
         await this.remoteFileSystemManager.ChangeMode(context.hostId, snapshotsPath, 0o750);
 
         return {};
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        return "running";
     }
 }

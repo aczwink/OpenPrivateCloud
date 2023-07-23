@@ -16,14 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, FormField, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, FormField, Get, Path, Post, Put } from "acts-util-apilib";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
-import { resourceProviders } from "openprivatecloud-common";
 import { c_nodeAppServiceResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { InstanceContext } from "../../common/InstanceContext";
 import { HostsController } from "../../data-access/HostsController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { NodeAppConfig, NodeAppServiceManager } from "./NodeAppServiceManager";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourceReference } from "../../common/ResourceReference";
 
 interface NodeAppServiceInfoDto
 {
@@ -41,86 +41,80 @@ interface NodeAppServiceStatus
     status: string;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_nodeAppServiceResourceTypeName}/{instanceName}`)
-class NodeAppServiceAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_nodeAppServiceResourceTypeName}/{resourceName}`)
+class NodeAppServiceAPIController extends ResourceAPIControllerBase
 {
-    constructor(private instancesManager: ResourcesManager, private nodeAppServiceManager: NodeAppServiceManager, private hostsController: HostsController)
+    constructor(resourcesManager: ResourcesManager, private nodeAppServiceManager: NodeAppServiceManager, private hostsController: HostsController)
     {
+        super(resourcesManager, c_webServicesResourceProviderName, c_nodeAppServiceResourceTypeName);
     }
     
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string
     )
     {
-        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(resourceProviders.webServices.name, resourceProviders.webServices.nodeAppServiceResourceType.name, instanceName);
-        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
-        if(instanceContext === undefined)
-            return NotFound("instance not found");
-
-        return instanceContext;
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Get("config")
     public async QueryConfig(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
     )
     {
-        return this.nodeAppServiceManager.QueryConfig(instanceContext);
+        return this.nodeAppServiceManager.QueryConfig(resourceReference);
     }
 
     @Put("config")
     public async UpdateConfig(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @Body config: NodeAppConfig
     )
     {
-        return this.nodeAppServiceManager.UpdateConfig(instanceContext, config);
+        return this.nodeAppServiceManager.UpdateConfig(resourceReference, config);
     }
 
     @Get("info")
     public async QueryInfo(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
     )
-    {
-        const host = await this.hostsController.RequestHostCredentials(instanceContext.hostId);
-            
+    {            
         const result: NodeAppServiceInfoDto = {
-            hostName: host!.hostName,
-            storagePath: instanceContext.hostStoragePath,
-            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(instanceContext.hostId, instanceContext.fullInstanceName),
+            hostName: resourceReference.hostName,
+            storagePath: resourceReference.hostStoragePath,
+            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(resourceReference),
         };
         return result;
     }
 
     @Get("status")
     public async QueryStatus(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
     )
     {
         const result: NodeAppServiceStatus = {
-            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(instanceContext.hostId, instanceContext.fullInstanceName),
-            status: await this.nodeAppServiceManager.QueryStatus(instanceContext.hostId, instanceContext.fullInstanceName)
+            isRunning: await this.nodeAppServiceManager.IsAppServiceRunning(resourceReference),
+            status: await this.nodeAppServiceManager.QueryStatus(resourceReference)
         };
         return result;
     }
 
     @Post("startStop")
     public async StartOrStopService(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @BodyProp action: "start" | "stop"
     )
     {
-        await this.nodeAppServiceManager.ExecuteAction(instanceContext.hostId, instanceContext.fullInstanceName, action);
+        await this.nodeAppServiceManager.ExecuteAction(resourceReference, action);
     }
 
     @Post()
     public async UpdateContent(
-        @Common instanceContext: InstanceContext,
+        @Common resourceReference: ResourceReference,
         @FormField file: UploadedFile
     )
     {
-        await this.nodeAppServiceManager.UpdateContent(instanceContext.instanceId, file.buffer);
+        await this.nodeAppServiceManager.UpdateContent(resourceReference, file.buffer);
     }
 }

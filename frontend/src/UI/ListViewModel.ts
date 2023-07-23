@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,10 +21,10 @@ import { APIService } from "../Services/APIService";
 import { ObjectBoundAction } from "./ObjectBoundActions";
 import { UnboundResourceAction } from "./UnboundActions";
 
-export interface ListViewModel<ObjectType, IdType>
+export interface ListViewModel<ObjectType, IdType, ObjectCreationType = ObjectType>
 {
     type: "list";
-    actions: UnboundResourceAction<ObjectType, IdType>[];
+    actions: UnboundResourceAction<ObjectCreationType, IdType>[];
     boundActions: ObjectBoundAction<ObjectType, IdType>[];
     displayName: string;
     requestObjects: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType[]>>;

@@ -19,9 +19,16 @@
 import { BaseResourceProperties } from "../ResourceProvider";
 import { OpenVPNGatewayPublicEndpointConfig } from "./OpenVPNGatewayManager";
 
+export interface DNS_ServerProperties extends BaseResourceProperties
+{
+    type: "dns-server";
+}
+
 export interface OpenVPNGatewayProperties extends BaseResourceProperties
 {
     type: "openvpn-gateway";
     publicEndpoint: OpenVPNGatewayPublicEndpointConfig;
     keySize: 2048 | 4096;
 }
+
+export type NetworkServicesProperties = DNS_ServerProperties | OpenVPNGatewayProperties;

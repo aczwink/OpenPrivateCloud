@@ -16,9 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, MatIcon, ProgressSpinner, Router, RouterButton, RouterState } from "acfrontend";
+import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterButton, RouterState } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common/resourceProviders";
-import { HealthStatus, ResourceOverviewDataDTO } from "../../../dist/api";
+import { ResourceOverviewDataDTO, ResourceState } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
  
   
@@ -45,7 +45,7 @@ export class ResourceListComponent extends Component
                     <tr>
                         <th>Resource name</th>
                         <th>Resource type</th>
-                        <th>Status</th>
+                        <th>State</th>
                         <th>Resource provider</th>
                     </tr>
                 </thead>
@@ -68,7 +68,7 @@ export class ResourceListComponent extends Component
         return <tr>
             <td>{this.RenderResourceIcon(resource.instanceType)} <Anchor route={"/resourceGroups/" + this.resourceGroupName + "/resources" + urlPart}>{resource.name}</Anchor></td>
             <td>{resource.instanceType}</td>
-            <td>{this.RenderStatus(resource.status)}</td>
+            <td>{this.RenderState(resource.state)}</td>
             <td>{resource.resourceProviderName}</td>
         </tr>;
     }
@@ -78,43 +78,49 @@ export class ResourceListComponent extends Component
         switch(resourceType)
         {
             case resourceProviders.backupServices.backupVaultResourceType.name:
-                return <MatIcon>backup</MatIcon>;
+                return <BootstrapIcon>safe</BootstrapIcon>;
             case resourceProviders.computeServices.dockerContainerResourceType.name:
                 return <BootstrapIcon>box-seam-fill</BootstrapIcon>;
             case resourceProviders.computeServices.virtualMachineResourceType.name:
-                return <MatIcon>dvr</MatIcon>;
+                return <BootstrapIcon>pc-display</BootstrapIcon>;
             case resourceProviders.databaseServices.mariadbResourceType.name:
-                return <MatIcon>storage</MatIcon>;
+                return <BootstrapIcon>database</BootstrapIcon>;
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return <BootstrapIcon>folder-fill</BootstrapIcon>;
             case resourceProviders.multimediaServices.avTranscoderResourceType.name:
                 return <BootstrapIcon>film</BootstrapIcon>;
+            case resourceProviders.networkServices.dnsServerResourceType.name:
+                return <BootstrapIcon>signpost-split</BootstrapIcon>;
             case resourceProviders.networkServices.openVPNGatewayResourceType.name:
-                return <MatIcon>vpn_lock</MatIcon>;
+                return <BootstrapIcon>shield-lock</BootstrapIcon>;
             case resourceProviders.webServices.jdownloaderResourceType.name:
                 return <BootstrapIcon>cloud-download</BootstrapIcon>;
             case resourceProviders.webServices.letsencryptCertResourceType.name:
-                return <MatIcon>verified</MatIcon>;
+                return <BootstrapIcon>patch-check-fill</BootstrapIcon>;
             case resourceProviders.webServices.nextcloudResourceType.name:
                 return <BootstrapIcon>cloud</BootstrapIcon>;
+            case resourceProviders.webServices.nodeAppServiceResourceType.name:
+                return <BootstrapIcon>app</BootstrapIcon>;
             case resourceProviders.webServices.staticWebsiteResourceType.name:
                 return <BootstrapIcon>file-richtext</BootstrapIcon>;
         }
         return null;
     }
 
-    private RenderStatus(status: HealthStatus)
+    private RenderState(state: ResourceState)
     {
-        switch(status)
+        switch(state)
         {
-            case HealthStatus.Corrupt:
+            case "corrupt":
                 return <div className="text-danger"><BootstrapIcon>x-circle-fill</BootstrapIcon></div>;
-            case HealthStatus.Down:
+            case "down":
                 return <div className="text-warning"><BootstrapIcon>exclamation-circle-fill</BootstrapIcon></div>;
-            case HealthStatus.Up:
+            case "running":
                 return <div className="text-success"><BootstrapIcon>check-circle-fill</BootstrapIcon></div>;
-            case HealthStatus.InDeployment:
+            case "in deployment":
                 return <div className="text-danger"><BootstrapIcon>hourglass-split</BootstrapIcon></div>;
+            case "stopped":
+                return <div className="text-danger"><BootstrapIcon>stop-fill</BootstrapIcon></div>;
         }
     }
 

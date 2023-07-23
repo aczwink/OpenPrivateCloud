@@ -20,17 +20,16 @@ import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { AVTranscoderProperties } from "./AVTranscoderProperties";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { AVTranscoderConfig, AVTranscoderQuality } from "./AVTranscoderConfig";
-import { InstanceContext } from "../../common/InstanceContext";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
 
 @Injectable
 export class MultimediaServicesResourceProvider implements ResourceProvider<AVTranscoderProperties>
 {
-    constructor(private modulesManager: ModulesManager, private instancesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private modulesManager: ModulesManager, private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
     
@@ -52,18 +51,22 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     }
 
     //Public methods
-    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
     {
     }
 
-    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        await this.instancesManager.RemoveInstanceStorageDirectory(resourceReference.hostId, resourceReference.hostStoragePath, resourceReference.externalId);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
         return null;
+    }
+
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
+    {
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
@@ -74,10 +77,9 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "ffmpeg");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
+        const instanceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
 
         const tmpDir = path.join(instanceDir, "tmp");
-
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, tmpDir);
 
         const config: AVTranscoderConfig = {
@@ -88,7 +90,7 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
                 videoCodec: "h264-baseline",
             },
             source: {
-                fullInstanceName: instanceProperties.fullInstanceName,
+                sourceFileStorageExternalId: instanceProperties.sourceFileStorageExternalId,
                 sourcePath: "/"
             },
             targetPath: "/"
@@ -96,5 +98,10 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
         return {
             config
         };
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        return "running";
     }
 }

@@ -21,22 +21,17 @@ import path from "path";
 import { ProcessTracker } from "../../services/ProcessTrackerManager";
 import { TargetFileSystemType } from "./BackupTargetMountService";
 import { BackupVaultFileStorageConfig, BackupVaultRetentionConfig } from "./models";
-import { ResourcesController } from "../../data-access/ResourcesController";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { TempFilesManager } from "../../services/TempFilesManager";
-import { CreateGPGEncryptionCommandOrPipe, ParseReplacedName, ReplaceSpecialCharacters } from "./Shared";
+import { BuildBackupPath, CreateGPGEncryptionCommandOrPipe, ParseReplacedName, ReplaceSpecialCharacters } from "./Shared";
 
 @Injectable
 export class FileStorageBackupProcessService
 {
-    constructor(private instancesController: ResourcesController, private hostStoragesController: HostStoragesController,
-        private fileStoragesManager: FileStoragesManager, private instancesManager: ResourcesManager,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private remoteCommandExecutor: RemoteCommandExecutor,
+    constructor(private fileStoragesManager: FileStoragesManager, private resourcesManager: ResourcesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteCommandExecutor: RemoteCommandExecutor,
         private tempFilesManager: TempFilesManager)
     {
     }
@@ -44,32 +39,24 @@ export class FileStorageBackupProcessService
     //Public methods
     public async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker)
     {
-        throw new Error("TODO: reimplement me");
-        /*const instance = await this.instancesController.QueryResourceByName(fileStorage.fullInstanceName);
-        if(instance === undefined)
+        const sourceRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(fileStorage.externalId);
+        if(sourceRef === undefined)
         {
-            processTracker.Add("ERROR! FileStorage not found:", fileStorage.fullInstanceName);
+            processTracker.Add("ERROR! FileStorage not found:", fileStorage.externalId);
             return;
         }
-        const storage = await this.hostStoragesController.RequestHostStorage(instance.storageId);
-        const storagePath = storage!.path;
 
         if(fileStorage.createSnapshotBeforeBackup)
         {
-            processTracker.Add("Creating snapshot for FileStorage", fileStorage.fullInstanceName);
-            await this.fileStoragesManager.CreateSnapshot({
-                fullInstanceName: fileStorage.fullInstanceName,
-                hostStoragePath: storagePath,
-                instanceId: instance.id,
-                hostId
-            });
+            processTracker.Add("Creating snapshot for FileStorage", fileStorage.externalId);
+            await this.fileStoragesManager.CreateSnapshot(sourceRef);
         }
 
-        processTracker.Add("Beginning to backup FileStorage", fileStorage.fullInstanceName);
+        processTracker.Add("Beginning to backup FileStorage", fileStorage.externalId);
 
-        const sourceSnapshots = (await this.fileStoragesManager.QuerySnapshotsOrdered(hostId, storagePath, fileStorage.fullInstanceName)).ToArray();
+        const sourceSnapshots = (await this.fileStoragesManager.QuerySnapshotsOrdered(sourceRef)).ToArray();
 
-        const targetDir = this.instancesManager.BuildInstanceStoragePath(backupTargetPath, fileStorage.fullInstanceName);
+        const targetDir = BuildBackupPath(backupTargetPath, sourceRef.id);
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetDir);
 
         const targetSnapshots = await this.LoadTargetSnapshots(hostId, targetDir);
@@ -79,9 +66,8 @@ export class FileStorageBackupProcessService
         {
             const snapshotName = snapshot.snapshotName;
             const idx = sourceSnapshots.indexOf(snapshot);
-            const prevSnapshotName = sourceSnapshots[idx - 1].snapshotName;
 
-            const sourceDir = path.join(this.fileStoragesManager.GetSnapshotsPath(storagePath, fileStorage.fullInstanceName), snapshotName);
+            const sourceDir = path.join(this.fileStoragesManager.GetSnapshotsPath(sourceRef), snapshotName);
 
             if(idx === 0)
             {
@@ -91,20 +77,28 @@ export class FileStorageBackupProcessService
             }
             else
             {
+                const prevSnapshotName = sourceSnapshots[idx - 1].snapshotName;
                 processTracker.Add("Backing up snapshot", snapshotName, "with predecessor", prevSnapshotName);
 
-                const prevSourceDir = path.join(this.fileStoragesManager.GetSnapshotsPath(storagePath, fileStorage.fullInstanceName), prevSnapshotName);
+                const prevSourceDir = path.join(this.fileStoragesManager.GetSnapshotsPath(sourceRef), prevSnapshotName);
 
                 await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, encryptionPassphrase, processTracker, prevSourceDir);
             }
 
             processTracker.Add("Finished copying snapshot", snapshotName);
-        }*/
+        }
     }
 
     public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, retention: BackupVaultRetentionConfig, processTracker: ProcessTracker)
     {
-        const targetDir = this.instancesManager.BuildInstanceStoragePath(backupTargetPath, fileStorage.fullInstanceName);
+        const sourceRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(fileStorage.externalId);
+        if(sourceRef === undefined)
+        {
+            processTracker.Add("ERROR! FileStorage not found:", fileStorage.externalId);
+            return;
+        }
+
+        const targetDir = BuildBackupPath(backupTargetPath, sourceRef.id);
         const targetSnapshots = await this.LoadTargetSnapshots(hostId, targetDir);
 
         const msToDay = 1000 * 60 * 60 * 24;

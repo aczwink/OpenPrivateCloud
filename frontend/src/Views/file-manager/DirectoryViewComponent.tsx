@@ -24,7 +24,7 @@ import { APIService } from "../../Services/APIService";
 import { RenderReadOnlyValue } from "../../UI/ValuePresentation";
 
 @Injectable
-export class DirectoryViewComponent extends Component<{ resourceGroupName: string; instanceName: string }>
+export class DirectoryViewComponent extends Component<{ resourceGroupName: string; resourceName: string }>
 {
     constructor(private apiService: APIService, private apiSchemaService: APISchemaService)
     {
@@ -65,7 +65,7 @@ export class DirectoryViewComponent extends Component<{ resourceGroupName: strin
 
     private async QueryEntries(path: string)
     {
-        const result = await this.apiService.resourceProviders._any_.fileservices.filestorage._any_.contents.get(this.input.resourceGroupName, this.input.instanceName, { dirPath: path });
+        const result = await this.apiService.resourceProviders._any_.fileservices.filestorage._any_.contents.get(this.input.resourceGroupName, this.input.resourceName, { dirPath: path });
         if(result.statusCode === 200)
         {
             this.dirPath = path;

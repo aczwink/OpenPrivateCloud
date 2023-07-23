@@ -20,7 +20,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { ProcessTracker } from "../../services/ProcessTrackerManager";
 import { TargetFileSystemType } from "./BackupTargetMountService";
-import { ReplaceSpecialCharacters, CreateGPGEncryptionCommandOrPipe, ParseReplacedName } from "./Shared";
+import { ReplaceSpecialCharacters, CreateGPGEncryptionCommandOrPipe, ParseReplacedName, BuildBackupPath } from "./Shared";
 import { BackupVaultDatabaseConfig, BackupVaultRetentionConfig } from "./models";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
@@ -30,19 +30,25 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 @Injectable
 export class DatabaseBackupProcessService
 {
-    constructor(private instancesManager: ResourcesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private tempFilesManager: TempFilesManager, private remoteCommandExecutor: RemoteCommandExecutor)
+    constructor(private resourcesManager: ResourcesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private tempFilesManager: TempFilesManager, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
     
     //Public methods
     public async BackupDatabase(hostId: number, database: BackupVaultDatabaseConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker)
     {
-        const targetInstancePath = this.instancesManager.BuildInstanceStoragePath(backupTargetPath, database.fullInstanceName);
-        await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetInstancePath);
+        const sourceRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(database.externalId);
+        if(sourceRef === undefined)
+        {
+            processTracker.Add("ERROR! Database not found:", database.externalId, database.databaseName);
+            return;
+        }
+
+        const targetResourcePath = BuildBackupPath(backupTargetPath, sourceRef.id);
+        await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetResourcePath);
 
         const dbFolderName = this.DeriveDbFolderName(database.databaseName, encryptionPassphrase);
-        const targetPath = path.join(targetInstancePath, dbFolderName);
+        const targetPath = path.join(targetResourcePath, dbFolderName);
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetPath);
 
         const snapshotFileName = new Date().toISOString() + ".sql.gz" + (encryptionPassphrase === undefined ? "" : ".gpg");
@@ -72,9 +78,17 @@ export class DatabaseBackupProcessService
 
     public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId: number, database: BackupVaultDatabaseConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, retention: BackupVaultRetentionConfig, encryptionPassphrase: string | undefined, processTracker: ProcessTracker)
     {
-        const targetInstancePath = this.instancesManager.BuildInstanceStoragePath(backupTargetPath, database.fullInstanceName);
+        const sourceRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(database.externalId);
+        if(sourceRef === undefined)
+        {
+            processTracker.Add("ERROR! Database not found:", database.externalId, database.databaseName);
+            return;
+        }
+
+        const targetResourcePath = BuildBackupPath(backupTargetPath, sourceRef.id);
+
         const dbFolderName = this.DeriveDbFolderName(database.databaseName, encryptionPassphrase);
-        const targetPath = path.join(targetInstancePath, dbFolderName);
+        const targetPath = path.join(targetResourcePath, dbFolderName);
 
         const msToDay = 1000 * 60 * 60 * 24;
         const currentDay = Date.now() / msToDay;

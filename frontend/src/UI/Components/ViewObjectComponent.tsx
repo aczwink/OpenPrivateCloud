@@ -28,7 +28,7 @@ interface ObjectInput<ObjectType>
 {
     actions: IdBoundResourceAction<any, any, any>[];
     baseRoute: string;
-    heading: (obj: any) => string;
+    heading: (ids: any, obj: any) => string;
     requestObject: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType>>;
     schema: OpenAPI.ObjectSchema;
 }
@@ -81,7 +81,7 @@ export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)
             this.data = result.value;
-        this.heading = this.input.heading(this.data);
+        this.heading = this.input.heading(this.routerState.routeParams, this.data);
     }
 
     private RenderOneOf(value: any, oneOfSchema: OpenAPI.OneOfSchema, tables: SingleRenderValue[]): RenderValue
@@ -133,6 +133,9 @@ export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<Objec
                     for (const key of keys)
                     {
                         const prop = value[key];
+                        if(prop === undefined)
+                            continue;
+
                         const renderValue = this.RenderValue(prop, schema.properties[key]!, tables, key);
                         children.push(renderValue);
                     }

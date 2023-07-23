@@ -22,7 +22,7 @@ import { ResourcesManager } from "../../services/ResourcesManager";
 import { DockerContainerManager } from "./DockerContainerManager";
 import { DockerContainerConfig } from "./DockerManager";
 import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
 
 
 interface DockerContainerInfo

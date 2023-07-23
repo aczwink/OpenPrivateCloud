@@ -21,7 +21,8 @@ import { APIService } from "../../Services/APIService";
 
 interface HostInstanceSelection
 {
-    type: string;
+    resourceProviderName: string;
+    resourceTypeName: string;
     hostName: string;
     value: string | null;
     valueChanged: (newValue: string | null) => void;
@@ -43,7 +44,7 @@ export class HostResourceSelectionComponent extends Component<HostInstanceSelect
 
         return <AutoCompleteSelectBox<string>
             onChanged={newValue => this.input.valueChanged(newValue.key)}
-            onLoadSuggestions={this.LoadInstances.bind(this)}
+            onLoadSuggestions={this.LoadResources.bind(this)}
             selection={{ key: this.state, displayValue: this.state }} />;
     }
 
@@ -61,8 +62,9 @@ export class HostResourceSelectionComponent extends Component<HostInstanceSelect
 
             const response = await this.apiService.resources.search.get({
                 hostName: this.input.hostName,
-                instanceNameFilter: this.input.value,
-                type: this.input.type
+                resourceProviderName: this.input.resourceProviderName,
+                resourceTypeName: this.input.resourceTypeName,
+                resourceNameFilter: this.input.value,
             });
             if(response.statusCode === 200)
                 this.state = this.input.value;
@@ -71,24 +73,19 @@ export class HostResourceSelectionComponent extends Component<HostInstanceSelect
         }
     }
 
-    private async LoadInstances(searchText: string)
+    private async LoadResources(searchText: string)
     {
         searchText = searchText.toLowerCase();
 
         const response = await this.apiService.resources.search.get({
-            hostName: this.input.hostName,
-            instanceNameFilter: searchText,
-            type: this.input.type
+            hostName: this.input.hostName,            
+            resourceProviderName: this.input.resourceProviderName,
+            resourceTypeName: this.input.resourceTypeName,
+            resourceNameFilter: searchText
         });
-        alert("TODO");
-        throw new Error("TODO");
-        /*return response.data.map(x => ({
-            key: x.fullName,
-            displayValue: x.fullName,
-        }));*/
         return response.data.map(x => ({
-            key: "asd",
-            displayValue: "asd",
+            key: x,
+            displayValue: x,
         }));
     }
 

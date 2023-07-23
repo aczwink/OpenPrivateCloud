@@ -16,10 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { InstanceContext } from "../common/InstanceContext";
-import { ResourceReference } from "../common/InstanceReference";
+import { ResourceReference } from "../common/ResourceReference";
 import { TimeSchedule } from "../common/TimeSchedule";
-import { ResourceGroup } from "../data-access/ResourceGroupsController";
 
 export interface BaseResourceProperties
 {
@@ -59,14 +57,18 @@ export interface DeploymentResult
     config?: any;
 }
 
+export type ResourceState = "corrupt" | "down" | "in deployment" | "running" | "stopped";
+
 export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
 {
     readonly name: string;
     readonly resourceTypeDefinitions: ResourceTypeDefinition[];
 
-    CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>;
-    CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>;
+    CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>;
+    CheckResourceHealth(resourceReference: ResourceReference): Promise<void>;
     DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>;
+    ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>;
     InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
+    QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>;
 }

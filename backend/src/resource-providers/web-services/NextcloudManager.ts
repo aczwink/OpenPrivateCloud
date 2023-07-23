@@ -30,32 +30,34 @@ import { VirtualHost } from "./VirtualHost";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { NextcloudProperties } from "./Properties";
 import { LetsEncryptManager } from "./LetsEncryptManager";
+import { LightweightResourceReference } from "../../common/ResourceReference";
  
 @Injectable
 export class NextcloudManager
 {
-    constructor(private instancesManager: ResourcesManager, private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager,
+    constructor(private resourcesManager: ResourcesManager, private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager,
         private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager,
         private usersController: UsersController, private remoteCommandExecutor: RemoteCommandExecutor, private letsEncryptManager: LetsEncryptManager)
     {
     }
 
     //Public methods
-    public async DeleteResource(hostId: number, hostStoragePath: string, fullInstanceName: string)
+    public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const hostId = resourceReference.hostId;
+        const siteName = this.BuildUniqueResourceName(resourceReference);
 
         await this.apacheManager.DisableSite(hostId, siteName);
         await this.systemServicesManager.RestartService(hostId, "apache2");
         await this.apacheManager.DeleteSite(hostId, siteName);
 
-        const dbName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const dbName = this.BuildUniqueResourceName(resourceReference);
         const dbUser = dbName;
         const client = MySQLClient.CreateStandardHostClient(hostId);
         await client.DropDatabase(dbName);
         await client.DropUser(dbUser, "localhost");
 
-        await this.instancesManager.RemoveInstanceStorageDirectory(hostId, hostStoragePath, fullInstanceName);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
     public async ProvideResource(instanceProperties: NextcloudProperties, context: DeploymentContext)
@@ -63,27 +65,38 @@ export class NextcloudManager
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "apache");
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "nextcloud-dependencies");
 
-        const instanceDir = await this.instancesManager.CreateInstanceStorageDirectory(context.hostId, context.storagePath, context.resourceReference.externalId);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, instanceDir, 0o775);
+        const resourceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, resourceDir, 0o775);
 
-        await this.DownloadNextcloudApp(context.hostId, instanceDir);
+        await this.DownloadNextcloudApp(context.hostId, resourceDir);
 
-        const dbName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(context.resourceReference.externalId);
+        const dbName = this.BuildUniqueResourceName(context.resourceReference);
         const dbUser = dbName;
         const dbPw = crypto.randomBytes(16).toString("hex");
 
         await this.SetupDatabase(context.hostId, dbName, dbUser, dbPw);
-        await this.SetupNextcloud(context.hostId, instanceDir, dbName, dbUser, dbPw, context.userId);        
+        await this.SetupNextcloud(context.hostId, resourceDir, dbName, dbUser, dbPw, context.userId);        
 
-        await this.CreateApacheSite(context.hostId, instanceDir, context.resourceReference.externalId, context.userId, instanceProperties.certFullInstanceName);
+        await this.CreateApacheSite(context.resourceReference, resourceDir, context.userId, instanceProperties.certResourceExternalId);
     }
 
     //Private methods
-    private async CreateApacheSite(hostId: number, instanceDir: string, fullInstanceName: string, userId: number, certFullInstanceName: string)
+    private BuildUniqueResourceName(resourceReference: LightweightResourceReference)
     {
-        const appDir = path.join(instanceDir, "nextcloud");
+        return "opc-rnc-" + resourceReference.id;
+    }
+
+    private async CreateApacheSite(resourceReference: LightweightResourceReference, resourceDir: string, userId: number, certResourceExternalId: string)
+    {
+        const appDir = path.join(resourceDir, "nextcloud");
         const user = await this.usersController.QueryUser(userId);
-        const cert = await this.letsEncryptManager.GetCert(hostId, certFullInstanceName);
+
+        const certRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(certResourceExternalId);
+        if(certRef === undefined)
+            throw new Error("cert resource not found");
+        const cert = await this.letsEncryptManager.GetCert(certRef);
+        if(cert === undefined)
+            throw new Error("cert not found");
 
         const vh = VirtualHost.Default("*:443", user!.emailAddress);
         vh.properties.documentRoot = appDir;
@@ -105,7 +118,8 @@ export class NextcloudManager
             ],
         }];
 
-        const siteName = this.instancesManager.DeriveInstanceFileNameFromUniqueInstanceName(fullInstanceName);
+        const hostId = resourceReference.hostId;
+        const siteName = this.BuildUniqueResourceName(resourceReference);
         await this.apacheManager.EnableModule(hostId, "ssl");
         await this.apacheManager.CreateSite(hostId, siteName, vh);
         await this.apacheManager.EnableSite(hostId, siteName);

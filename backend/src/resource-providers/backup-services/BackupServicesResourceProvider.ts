@@ -17,13 +17,12 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { BackupVaultProperties } from "./BackupVaultProperties";
 import { resourceProviders } from "openprivatecloud-common";
 import { ModulesManager } from "../../services/ModulesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
-import { InstanceContext } from "../../common/InstanceContext";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
 
 @Injectable
 export class BackupServicesResourceProvider implements ResourceProvider<BackupVaultProperties>
@@ -50,18 +49,22 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     }
 
     //Public methods
-    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
     {
-        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(instanceContext.fullInstanceName);
+        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
     }
 
-    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
         return null;
+    }
+
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
+    {
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
@@ -74,5 +77,10 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
         
         //this is a virtual resource
         return {};
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        return "running";
     }
 }

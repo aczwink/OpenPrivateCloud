@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,8 @@ export class ErrorService
     {
         if(e === undefined)
             return [];
+        if(typeof e === "number")
+            return [e.toString()];
         if(typeof e === "string")
             return [e];
         if(e instanceof Error)

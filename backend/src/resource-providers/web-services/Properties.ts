@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -33,11 +33,11 @@ export interface NextcloudProperties extends BaseResourceProperties
 {
     type: "nextcloud";
 
-    /**
+     /**
      * @title Certificate
      * @format instance-same-host[web-services/letsencrypt-cert]
      */
-     certFullInstanceName: string;
+    certResourceExternalId: string;
 }
 
 export interface NodeAppServiceProperties extends BaseResourceProperties

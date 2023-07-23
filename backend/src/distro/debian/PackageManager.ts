@@ -50,7 +50,7 @@ class DebianPackageManager implements DistroPackageManager
 
     public async Uninstall(hostId: number, moduleName: ModuleName)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "purge", ...this.MapModuleToPackageList(moduleName)], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "DEBIAN_FRONTEND=noninteractive", "apt", "-y", "purge", ...this.MapModuleToPackageList(moduleName)], hostId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "autoremove"], hostId);
     }
 
@@ -131,7 +131,7 @@ class DebianPackageManager implements DistroPackageManager
             case "letsencrypt":
                 return ["certbot"];
             case "libvirt":
-                return ["libosinfo-bin", "libvirt-daemon-system", "qemu-kvm"];
+                return ["libosinfo-bin", "libvirt-daemon-system", "qemu-kvm", "virtinst"];
             case "mariadb":
                 return ["mariadb-server"];
             case "nextcloud-dependencies":
@@ -164,7 +164,7 @@ class DebianPackageManager implements DistroPackageManager
             input += "multiselect " + value.join(", ");
             
         await this.remoteCommandExecutor.ExecuteCommand({
-            source: ["echo", '"' + input + '"'],
+            source: ["echo", input],
             target: ["debconf-set-selections"],
             type: "pipe",
             sudo: true,

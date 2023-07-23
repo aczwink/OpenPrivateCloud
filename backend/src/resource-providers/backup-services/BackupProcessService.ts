@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { InstanceLogsController } from "../../data-access/InstanceLogsController";
+import { ResourceLogsController } from "../../data-access/ResourceLogsController";
 import { ResourcesController } from "../../data-access/ResourcesController";
 import { ProcessTracker, ProcessTrackerManager } from "../../services/ProcessTrackerManager";
 import { BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig } from "./models";
@@ -30,7 +30,7 @@ import { DatabaseBackupProcessService } from "./DatabaseBackupProcessService";
 export class BackupProcessService
 {
     constructor(private processTrackerManager: ProcessTrackerManager, private instancesController: ResourcesController,
-        private hostStoragesController: HostStoragesController, private instanceLogsController: InstanceLogsController,
+        private hostStoragesController: HostStoragesController, private instanceLogsController: ResourceLogsController,
         private backupTargetMountService: BackupTargetMountService,
         private fileStorageBackupProcessService: FileStorageBackupProcessService,
         private databaseBackupProcessService: DatabaseBackupProcessService)

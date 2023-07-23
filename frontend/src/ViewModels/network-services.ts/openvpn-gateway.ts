@@ -22,6 +22,7 @@ import { OpenVPNGatewayClient, OpenVPNGatewayConnectedClientEntry, OpenVPNGatewa
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -141,7 +142,8 @@ export const openVPNGatewayViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     child: configViewModel,
                 },
             ]
-        }
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
     ],
     formTitle: ids => ids.resourceName,
     type: "multiPage"

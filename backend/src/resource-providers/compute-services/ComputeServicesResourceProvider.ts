@@ -16,14 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { VirtualMachineManager } from "./VirtualMachineManager";
-import { InstanceContext } from "../../common/InstanceContext";
 import { DockerContainerManager } from "./DockerContainerManager";
 import { ComputeServicesProperties } from "./Properties";
 import { DockerManager } from "./DockerManager";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
  
 @Injectable
 export class ComputeServicesResourceProvider implements ResourceProvider<ComputeServicesProperties>
@@ -56,11 +55,11 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
     }
 
     //Public methods
-    public async CheckInstanceAvailability(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
     {
     }
 
-    public async CheckInstanceHealth(instanceContext: InstanceContext): Promise<void>
+    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
     
@@ -75,6 +74,10 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
         }
 
         return null;
+    }
+
+    public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
+    {
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
@@ -94,5 +97,17 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
         }
 
         return {};
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.computeServices.dockerContainerResourceType.name:
+                return await this.dockerContainerManager.QueryResourceState(resourceReference);
+            case resourceProviders.computeServices.virtualMachineResourceType.name:
+                return await this.virtualMachineManager.QueryResourceState(resourceReference);
+        }
+        return "corrupt";
     }
 }

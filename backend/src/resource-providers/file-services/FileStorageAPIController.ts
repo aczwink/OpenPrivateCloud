@@ -16,19 +16,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, Body, Forbidden, Get, Header, NotFound, Path, Put, Query, Post, BadRequest } from "acts-util-apilib";
+import { APIController, Common, Body, Forbidden, Get, Header, Path, Put, Query, Post, BadRequest, NotFound } from "acts-util-apilib";
 import path from "path";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { ResourcesController } from "../../data-access/ResourcesController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { HostsController } from "../../data-access/HostsController";
 import { SessionsManager } from "../../services/SessionsManager";
 import { FileStorageConfig, FileStoragesManager } from "./FileStoragesManager";
-import { InstanceContext } from "../../common/InstanceContext";
-import { ResourceReference } from "../../common/InstanceReference";
+import { ResourceReference } from "../../common/ResourceReference";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { PermissionsManager } from "../../services/PermissionsManager";
+import { permissions } from "openprivatecloud-common";
 
 interface DeploymentDataDto
 {
@@ -53,91 +52,103 @@ interface SnapshotDto
     date: Date;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{instanceName}`)
-class FileStorageAPIController
+interface ResourceReferenceWithSession
 {
-    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private instancesController: ResourcesController,
-        private instancesManager: ResourcesManager, private hostStoragesController: HostStoragesController,
-        private hostUsersManager: HostUsersManager, private hostsController: HostsController,
+    resourceReference: ResourceReference;
+    userId: number;
+}
+
+@APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{resourceName}`)
+class FileStorageAPIController extends ResourceAPIControllerBase
+{
+    constructor(private remoteFileSystemManager: RemoteFileSystemManager, resourcesManager: ResourcesManager, private hostUsersManager: HostUsersManager, private permissionsManager: PermissionsManager,
         private sessionsManager: SessionsManager, private fileStoragesManager: FileStoragesManager)
     {
-    }
-
-    //Public methods
-    @Post("snapshots")
-    public async AddSnapshot(
-        @Common resourceReference: ResourceReference
-    )
-    {
-        await this.fileStoragesManager.CreateSnapshot(resourceReference);
+        super(resourcesManager, c_fileServicesResourceProviderName, c_fileStorageResourceTypeName);
     }
 
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string,
+        @Header Authorization: string
     )
     {
-        const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, instanceName);
-        const instanceContext = await this.instancesManager.TODO_LEGACYCreateInstanceContext(fullInstanceName);
-        if(instanceContext === undefined)
-            return NotFound("instance not found");
+        const ref = await this.FetchResourceReference(resourceGroupName, resourceName);
+        if(!(ref instanceof ResourceReference))
+            return NotFound("resource not found");
 
-        return instanceContext;
+        const res: ResourceReferenceWithSession = {
+            resourceReference: ref,
+            userId: this.sessionsManager.GetUserIdFromAuthHeader(Authorization)
+        }
+        return res;
+    }
+
+    //Public methods
+    @Post("snapshots")
+    public async AddSnapshot(
+        @Common context: ResourceReferenceWithSession
+    )
+    {
+        await this.fileStoragesManager.CreateSnapshot(context.resourceReference);
     }
 
     @Get("contents")
     public async ListDirectoryContents(
-        @Common data: InstanceContext,
+        @Common context: ResourceReferenceWithSession,
         @Query dirPath: string
     )
     {
-        const remotePath = path.join(this.instancesManager.BuildInstanceStoragePath(data.hostStoragePath, data.fullInstanceName), "data", dirPath);
-        if(remotePath.length < data.hostStoragePath.length)
+        const hasPermission = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!hasPermission)
             return Forbidden("access denied");
 
-        const entries = await this.remoteFileSystemManager.ListDirectoryContents(data.hostId, remotePath);
-        const mappedEntries = await entries.Values().Map(this.MapEntry.bind(this, data.hostId, remotePath)).PromiseAll();
+        const dataPath = this.fileStoragesManager.GetDataPath(context.resourceReference);
+        const remotePath = path.join(dataPath, dirPath);
+        if(remotePath.length < context.resourceReference.hostStoragePath.length)
+            return Forbidden("access denied");
+
+        const entries = await this.remoteFileSystemManager.ListDirectoryContents(context.resourceReference.hostId, remotePath);
+        const mappedEntries = await entries.Values().Map(this.MapEntry.bind(this, context.resourceReference.hostId, remotePath)).PromiseAll();
         return mappedEntries;
     }
 
     @Get("deploymentdata")
     public async QueryDeploymentData(
-        @Common data: InstanceContext
+        @Common context: ResourceReferenceWithSession
     )
     {
-        const host = await this.hostsController.RequestHostCredentials(data.hostId);
-
         const result: DeploymentDataDto = {
-            hostName: host!.hostName,
-            storagePath: data.hostStoragePath
+            hostName: context.resourceReference.hostName,
+            storagePath: context.resourceReference.hostStoragePath
         };
         return result;
     }
 
     @Get("smbconnect")
     public async QuerySMBConnectionInfo(
-        @Common data: InstanceContext,
+        @Common context: ResourceReferenceWithSession,
         @Header Authorization: string
     )
     {
-        return await this.fileStoragesManager.GetSMBConnectionInfo(data, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
+        return await this.fileStoragesManager.GetSMBConnectionInfo(context.resourceReference, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
     }
 
     @Get("config")
     public async QueryConfig(
-        @Common data: InstanceContext
+        @Common context: ResourceReferenceWithSession
     )
     {
-        return await this.fileStoragesManager.ReadConfig(data.instanceId);
+        return await this.fileStoragesManager.ReadConfig(context.resourceReference.id);
     }
 
     @Get("snapshots")
     public async QuerySnapshots(
-        @Common data: InstanceContext
+        @Common context: ResourceReferenceWithSession
     )
     {
-        const snaps = await this.fileStoragesManager.QuerySnapshotsOrdered(data.hostId, data.hostStoragePath, data.fullInstanceName);
+        const snaps = await this.fileStoragesManager.QuerySnapshotsOrdered(context.resourceReference);
         return snaps.Map(x => {
             const res: SnapshotDto = { date: x.creationDate };
             return res;
@@ -146,11 +157,11 @@ class FileStorageAPIController
 
     @Put("config")
     public async UpdateConfig(
-        @Common resourceReference: ResourceReference,
+        @Common context: ResourceReferenceWithSession,
         @Body config: FileStorageConfig
     )
     {
-        const result = await this.fileStoragesManager.UpdateConfig(resourceReference, config);
+        const result = await this.fileStoragesManager.UpdateConfig(context.resourceReference, config);
         if(result === "ErrorNoOneHasAccess")
             return BadRequest("no user has been giving read access to the share");
     }

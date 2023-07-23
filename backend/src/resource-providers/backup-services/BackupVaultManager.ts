@@ -17,8 +17,7 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { InstanceConfigController } from "../../data-access/InstanceConfigController";
-import { ResourcesController } from "../../data-access/ResourcesController";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { TaskSchedulingManager } from "../../services/TaskSchedulingManager";
 import { BackupProcessService } from "./BackupProcessService";
 import { BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
@@ -38,30 +37,24 @@ interface BackupVaultConfig
 @Injectable
 export class BackupVaultManager
 {
-    constructor(private instanceConfigController: InstanceConfigController, private backupProcessService: BackupProcessService,
-        private instancesController: ResourcesController, private taskSchedulingManager: TaskSchedulingManager)
+    constructor(private instanceConfigController: ResourceConfigController, private backupProcessService: BackupProcessService, private taskSchedulingManager: TaskSchedulingManager)
     {
     }
 
     //Public methods
-    public async EnsureBackupTimerIsRunningIfConfigured(fullInstanceName: string)
+    public async EnsureBackupTimerIsRunningIfConfigured(resourceId: number)
     {
-        throw new Error("TODO: reimplement me");
-        /*
-        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
-        const instanceId = instance!.id;
-
-        const config = await this.ReadConfig(instanceId);
+        const config = await this.ReadConfig(resourceId);
         if(config.trigger.type === "automatic")
         {
             const lastScheduleTime = config.state.lastScheduleTime ?? new Date(0);
-            this.taskSchedulingManager.ScheduleForInstance(fullInstanceName, lastScheduleTime, config.trigger.schedule, this.OnAutomaticBackupTrigger.bind(this, instanceId, fullInstanceName));
-        }*/
+            this.taskSchedulingManager.ScheduleForInstance(resourceId, lastScheduleTime, config.trigger.schedule, this.OnAutomaticBackupTrigger.bind(this, resourceId));
+        }
     }
 
-    public async ReadConfig(instanceId: number): Promise<BackupVaultConfig>
+    public async ReadConfig(resourceId: number): Promise<BackupVaultConfig>
     {
-        const config = await this.instanceConfigController.QueryConfig<BackupVaultConfig>(instanceId);
+        const config = await this.instanceConfigController.QueryConfig<BackupVaultConfig>(resourceId);
 
         if(config === undefined)
         {
@@ -116,14 +109,14 @@ export class BackupVaultManager
     }
 
     //Event handlers
-    private async OnAutomaticBackupTrigger(instanceId: number, fullInstanceName: string)
+    private async OnAutomaticBackupTrigger(resourceId: number)
     {
-        await this.StartBackupProcess(instanceId);
+        await this.StartBackupProcess(resourceId);
 
-        const config = await this.ReadConfig(instanceId);
+        const config = await this.ReadConfig(resourceId);
         config.state.lastScheduleTime = new Date();
-        await this.WriteConfig(instanceId, config);
+        await this.WriteConfig(resourceId, config);
         
-        this.EnsureBackupTimerIsRunningIfConfigured(fullInstanceName);
+        this.EnsureBackupTimerIsRunningIfConfigured(resourceId);
     }
 }

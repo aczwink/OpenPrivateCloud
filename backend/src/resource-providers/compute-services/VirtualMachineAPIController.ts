@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,13 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, BodyProp, Common, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, BodyProp, Common, Get, Path, Post } from "acts-util-apilib";
 import { c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { HostsController } from "../../data-access/HostsController";
-import { HostStorage, HostStoragesController } from "../../data-access/HostStoragesController";
-import { ResourcesController } from "../../data-access/ResourcesController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { VirtualMachineManager } from "./VirtualMachineManager";
+import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourceReference } from "../../common/ResourceReference";
 
 
 interface VMInfo
@@ -32,53 +31,42 @@ interface VMInfo
     state: string;
 }
  
-@APIController(`resourceProviders/{resourceGroupName}/${c_computeServicesResourceProviderName}/${c_virtualMachineResourceTypeName}/{instanceName}`)
-class VirtualMachineAPIController
+@APIController(`resourceProviders/{resourceGroupName}/${c_computeServicesResourceProviderName}/${c_virtualMachineResourceTypeName}/{resourceName}`)
+class VirtualMachineAPIController extends ResourceAPIControllerBase
 {
-    constructor(private instancesController: ResourcesController, private instancesManager: ResourcesManager,
-        private hostStoragesController: HostStoragesController, private hostsController: HostsController, private virtualMachineManager: VirtualMachineManager)
+    constructor(instancesManager: ResourcesManager, private virtualMachineManager: VirtualMachineManager)
     {
+        super(instancesManager, c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName);
     }
 
     @Common()
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
-        @Path instanceName: string
+        @Path resourceName: string
     )
     {
-        throw new Error("TODO: reimplement me");
-        /*const fullInstanceName = this.instancesManager.TODO_DEPRECATED_CreateUniqueInstanceName(c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, instanceName);
-        const instance = await this.instancesController.QueryResourceByName(fullInstanceName);
-        if(instance === undefined)
-            return NotFound("instance not found");
-
-        const storage = await this.hostStoragesController.RequestHostStorage(instance!.storageId);
-
-        return storage!;*/
+        return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
     @Post()
     public async ExecuteVMAction(
-        @Common hostStorage: HostStorage,
-        @Path instanceName: string,
+        @Common resourceReference: ResourceReference,
         @BodyProp action: "destroy" | "start" | "shutdown"
     )
     {
-        await this.virtualMachineManager.ExecuteAction(hostStorage.hostId, instanceName, action);
+        await this.virtualMachineManager.ExecuteAction(resourceReference, action);
     }
 
     @Get("info")
     public async QueryVMInfo(
-        @Common hostStorage: HostStorage,
-        @Path instanceName: string
+        @Common resourceReference: ResourceReference
     )
-    {
-        const host = await this.hostsController.RequestHostCredentials(hostStorage.hostId);
-            
+    {            
+        const state = await this.virtualMachineManager.QueryVMState(resourceReference);
         const result: VMInfo = {
-            hostName: host!.hostName,
-            state: await this.virtualMachineManager.QueryVMState(hostStorage.hostId, instanceName),
-            storagePath: hostStorage.path
+            hostName: resourceReference.hostName,
+            state: state!,
+            storagePath: resourceReference.hostStoragePath
         };
         return result;
     }

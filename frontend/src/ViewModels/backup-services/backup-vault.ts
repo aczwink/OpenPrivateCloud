@@ -17,10 +17,11 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultTargetConfig, BackupVaultTrigger, InstanceLog, InstanceLogOverviewData } from "../../../dist/api";
+import { BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultTargetConfig, BackupVaultTrigger, InstanceLog, ResourceLogOverviewData } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -76,7 +77,7 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, R
     boundActions: [
         {
             type: "delete",
-            deleteResource: (service, ids, config) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, { fullInstanceSourceName: config.fullInstanceName }),
+            deleteResource: (service, ids, config) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, { sourceResourceId: config.externalId }),
         }
     ],
     displayName: "File storage to backup",
@@ -116,7 +117,7 @@ const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, Resourc
     boundActions: [
         {
             type: "delete",
-            deleteResource: (service, ids, config) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, { fullInstanceSourceName: config.fullInstanceName }),
+            deleteResource: (service, ids, config) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, { sourceResourceId: config.externalId }),
         }
     ],
     displayName: "Databases to backup",
@@ -175,23 +176,20 @@ const logViewModel: ObjectViewModel<InstanceLog, ResourceAndGroupId & { logId: n
     schemaName: "InstanceLog",
 };
 
-const logsViewModel: CollectionViewModel<InstanceLogOverviewData, ResourceAndGroupId> = {
+const logsViewModel: CollectionViewModel<ResourceLogOverviewData, ResourceAndGroupId> = {
     type: "collection",
     actions: [],
     child: logViewModel,
     displayName: "Logs",
     extractId: x => x.logId,
     idKey: "logId",
-    requestObjects: (service, ids) => service.resources.logs.get({ fullInstanceName: BuildResourceId(ids.resourceGroupName, ids.resourceName) }),
-    schemaName: "InstanceLogOverviewData",
+    requestObjects: (service, ids) => service.resources.logs.get({ resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) }),
+    schemaName: "ResourceLogOverviewData",
 };
  
 export const backupVaultViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.resourceGroups._any_.resources.delete(ids.resourceGroupName, { resourceId: BuildResourceId(ids.resourceGroupName, ids.resourceName) })
-        }
+        ...BuildCommonResourceActions(BuildResourceId),
     ],
     entries: [
         {
@@ -202,6 +200,17 @@ export const backupVaultViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     displayName: "Overview",
                     child: overviewViewModel,
                 },
+                {
+                    key: "logs",
+                    displayName: "Logs",
+                    child: logsViewModel,
+                }
+            ]
+        },
+        BuildResourceGeneralPageGroupEntry(BuildResourceId),
+        {
+            displayName: "Configuration",
+            entries: [
                 {
                     key: "target",
                     displayName: "Target config",
@@ -227,11 +236,6 @@ export const backupVaultViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     displayName: "Retention config",
                     child: retentionConfigViewModel
                 },
-                {
-                    key: "logs",
-                    displayName: "Logs",
-                    child: logsViewModel,
-                }
             ]
         }
     ],

@@ -52,9 +52,9 @@ export class UploadNodeAppServieContentComponent extends Component
     {
         this.loading = true;
         const resourceGroupName = this.routerState.routeParams.resourceGroupName!;
-        const instanceName = this.routerState.routeParams.instanceName!;
-        await this.apiService.resourceProviders._any_.webservices.nodeappservice._any_.post(resourceGroupName, instanceName, { file: this.file! });
+        const resourceName = this.routerState.routeParams.resourceName!;
+        await this.apiService.resourceProviders._any_.webservices.nodeappservice._any_.post(resourceGroupName, resourceName, { file: this.file! });
 
-        this.router.RouteTo("/instances/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nodeAppServiceResourceType.name + "/" + instanceName);
+        this.router.RouteTo("/resourceGroups/" + resourceGroupName + "/resources/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nodeAppServiceResourceType.name + "/" + resourceName);
     }
 }

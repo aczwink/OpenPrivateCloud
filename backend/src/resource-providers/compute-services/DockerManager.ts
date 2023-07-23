@@ -15,12 +15,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { GlobalInjector, Injectable } from "acts-util-node";
+import { Injectable } from "acts-util-node";
 import { ShellFrontend } from "../../common/ShellFrontend";
 import { ShellWrapper } from "../../common/ShellWrapper";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { LetsEncryptManager } from "../web-services/LetsEncryptManager";
 import { Dictionary } from "acts-util-core";
 
 interface EnvironmentVariableMapping
@@ -33,6 +32,14 @@ export interface DockerContainerConfigPortMapping
 {
     hostPost: number;
     containerPort: number;
+    protocol: "TCP" | "UDP";
+}
+
+interface DockerContainerConfigVolume
+{
+    hostPath: string;
+    containerPath: string;
+    readOnly: boolean;
 }
 
 export interface DockerContainerConfig
@@ -41,12 +48,13 @@ export interface DockerContainerConfig
      * @title Certificate
      * @format instance-same-host[web-services/letsencrypt-cert]
      */
-    certFullInstanceName?: string;
+    //certResourceExternalId?: string;
 
     env: EnvironmentVariableMapping[];
     imageName: string;
     portMap: DockerContainerConfigPortMapping[];
     restartPolicy: "always" | "no";
+    volumes: DockerContainerConfigVolume[];
 }
 
 interface DockerContainerInfoPortBinding
@@ -62,11 +70,12 @@ export interface DockerContainerInfo
     };
 
     Config: {
+        Env: string[];
         Image: string;
     };
 
     State: {
-        Status: string;
+        Status: "created" | "exited" | "restarting" | "running";
         Running: boolean;
     };
 }
@@ -83,24 +92,27 @@ export class DockerManager
     {
         await this.EnsureDockerIsInstalled(hostId);
 
-        const readOnlyVolumes = [];
-        if(config.certFullInstanceName)
+        /*const readOnlyVolumes = [];
+        if(config.certResourceExternalId)
         {
+            const rmgr = GlobalInjector.Resolve(ResourcesManager);
+            const certResourceRef = await rmgr.CreateResourceReferenceFromExternalId(config.certResourceExternalId);
             const lem = GlobalInjector.Resolve(LetsEncryptManager);
-            const cert = await lem.GetCert(hostId, config.certFullInstanceName);
+            const cert = await lem.GetCert(certResourceRef!);
 
-            readOnlyVolumes.push("-v", cert.certificatePath + ":/certs/public.crt:ro");
-            readOnlyVolumes.push("-v", cert.privateKeyPath + ":/certs/private.key:ro");
-        }
+            readOnlyVolumes.push("-v", cert!.certificatePath + ":/certs/public.crt:ro");
+            readOnlyVolumes.push("-v", cert!.privateKeyPath + ":/certs/private.key:ro");
+        }*/
 
         const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
-        const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort].Values()).Flatten().ToArray();
+        const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort + "/" + x.protocol.toLowerCase()].Values()).Flatten().ToArray();
+        const volArgs = config.volumes.Values().Map(x => ["-v", x.hostPath + ":" + x.containerPath + (x.readOnly ? ":ro" : "")].Values()).Flatten().ToArray();
 
         const cmdArgs = [
             "--name", containerName,
             ...envArgs,
             ...portArgs,
-            ...readOnlyVolumes,
+            ...volArgs,
             "--restart", config.restartPolicy,
             config.imageName
         ];
@@ -152,7 +164,7 @@ export class DockerManager
     {
         const hostShell = await this.remoteCommandExecutor.SpawnRawShell(hostId);
         const hostShellFrontend = new ShellFrontend(hostShell);
-        await hostShellFrontend.ExecuteCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", "PS1=$\\ ", containerName, shellType]);
+        await hostShellFrontend.ExecuteCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", 'PS1="$ "', containerName, shellType]);
 
         const containerShell: ShellWrapper = {
             Close: async () => {

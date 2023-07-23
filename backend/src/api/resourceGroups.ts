@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Body, BodyProp, Common, Conflict, Delete, Get, Header, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Conflict, Delete, Get, Header, NotFound, Patch, Path, Post } from "acts-util-apilib";
 import { ResourceGroup, ResourceGroupsController } from "../data-access/ResourceGroupsController";
 import { SessionsManager } from "../services/SessionsManager";
 import { PermissionsController } from "../data-access/PermissionsController";
@@ -25,8 +25,12 @@ import { AnyResourceProperties } from "../resource-providers/ResourceProperties"
 import { HostsController } from "../data-access/HostsController";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { ResourcesController } from "../data-access/ResourcesController";
-import { ResourceReference } from "../common/InstanceReference";
+import { ResourceReference } from "../common/ResourceReference";
 import { ResourcesManager } from "../services/ResourcesManager";
+import { ResourceDeploymentService } from "../services/ResourceDeploymentService";
+import { ResourceGroupsManager } from "../services/ResourceGroupsManager";
+import { HealthStatus } from "../data-access/HealthController";
+import { ResourceState } from "../resource-providers/ResourceProvider";
 
 interface ResourceGroupDTO
 {
@@ -45,7 +49,7 @@ interface ResourceOverviewDataDTO
     name: string;
     resourceProviderName: string;
     instanceType: string;
-    status: number;
+    state: ResourceState;
 }
 
 function ToDTO(input: ResourceGroup | undefined): ResourceGroupDTO | undefined
@@ -97,7 +101,7 @@ class _api_
 @APIController("resourceGroups/{resourceGroupName}")
 class _api4_
 {
-    constructor(private resourceGroupsController: ResourceGroupsController, private roleAssignmentsController: RoleAssignmentsController)
+    constructor(private resourceGroupsController: ResourceGroupsController, private roleAssignmentsController: RoleAssignmentsController, private resourceGroupsManager: ResourceGroupsManager)
     {
     }
 
@@ -116,6 +120,19 @@ class _api4_
         await this.resourceGroupsController.DeleteGroup(group.id);
     }
 
+    @Patch()
+    public async ChangeGroupName(
+        @Path resourceGroupName: string,
+        @BodyProp newResourceGroupName: string
+    )
+    {
+        const group = await this.resourceGroupsController.QueryGroupByName(resourceGroupName);
+        if(group === undefined)
+            return NotFound("resource group not found");
+
+        await this.resourceGroupsManager.ChangeGroupName(group.id, newResourceGroupName);
+    }
+
     @Get()
     public async QueryGroup(
         @Path resourceGroupName: string
@@ -129,7 +146,7 @@ class _api4_
 class _api3_
 {
     constructor(private resourceGroupsController: ResourceGroupsController, private hostsController: HostsController, private resourceProviderManager: ResourceProviderManager, private sessionsManager: SessionsManager,
-        private permissionsController: PermissionsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager)
+        private permissionsController: PermissionsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private resourceDeploymentService: ResourceDeploymentService)
     {
     }
 
@@ -148,6 +165,38 @@ class _api3_
             userId: this.sessionsManager.GetUserIdFromAuthHeader(Authorization)
         }
         return res;
+    }
+
+    @Patch("group")
+    public async ChangeResourceGroup(
+        @Common common: ResourceGroupWithSession,
+        @BodyProp resourceId: string,
+        @BodyProp newResourceGroupName: string
+    )
+    {
+        const ref = await this.resourcesManager.CreateResourceReferenceFromExternalId(resourceId);
+        if(ref === undefined)
+            return NotFound("resource not found");
+
+        const newGroup = await this.resourceGroupsController.QueryGroupByName(newResourceGroupName);
+        if(newGroup === undefined)
+            return NotFound("new resource group not found");
+
+        await this.resourcesManager.ChangeResourceGroup(ref, newGroup.id);
+    }
+
+    @Patch("name")
+    public async ChangeResourceName(
+        @Common common: ResourceGroupWithSession,
+        @BodyProp resourceId: string,
+        @BodyProp newResourceName: string
+    )
+    {
+        const ref = await this.resourcesManager.CreateResourceReferenceFromExternalId(resourceId);
+        if(ref === undefined)
+            return NotFound("resource not found");
+
+        await this.resourcesManager.ChangeResourceName(ref, newResourceName);
     }
 
     @Delete()
@@ -181,7 +230,7 @@ class _api3_
         if(hostId === undefined)
             return NotFound("host not found");
 
-        await this.resourceProviderManager.StartInstanceDeployment(properties, common.resourceGroup, hostId, common.userId);
+        await this.resourceDeploymentService.StartInstanceDeployment(properties, common.resourceGroup, hostId, common.userId);
     }
 
     @Get()
@@ -193,29 +242,37 @@ class _api3_
 
         const instances = await resourceIds.Map(async resourceId => {
             const row = await this.resourcesController.QueryOverviewInstanceData(resourceId);
-
-            const ref = new ResourceReference({
-                resourceGroupName: common.resourceGroup.name,
-                id: resourceId,
-                name: row!.name,
-                resourceType: row!.instanceType,
-                resourceProviderName: row!.resourceProviderName,
-                //not important for generating external id
-                hostId: 0,
-                hostName: "",
-                hostStoragePath: "",
-            });
+            const ref = await this.resourcesManager.CreateResourceReference(resourceId);
 
             const res: ResourceOverviewDataDTO = {
-                id: ref.externalId,
+                id: ref!.externalId,
                 instanceType: row!.instanceType,
                 name: row!.name,
                 resourceProviderName: row!.resourceProviderName,
-                status: row!.status,
+                state: await this.GetResourceState(ref!, row!.status)
             };
             return res;
         }).PromiseAll();
         return instances.Values().ToArray();
+    }
+
+    //Private methods
+    private async GetResourceState(resourceReference: ResourceReference, healthStatus: HealthStatus): Promise<ResourceState>
+    {
+        switch(healthStatus)
+        {
+            case HealthStatus.Corrupt:
+                return "corrupt";
+            case HealthStatus.Down:
+                return "down";
+            case HealthStatus.InDeployment:
+                return "in deployment";
+            case HealthStatus.Up:
+            {
+                const rp = this.resourceProviderManager.FindResourceProviderByResource(resourceReference);
+                return await rp.QueryResourceState(resourceReference);
+            }
+        }
     }
 }
 
