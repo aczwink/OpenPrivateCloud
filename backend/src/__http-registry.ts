@@ -18,7 +18,7 @@
 
 import "./api/ClusterConfigAPIController";
 import "./api/health";
-import "./api/HostsAPIController";
+import "./api/hosts";
 import "./api/HostStorageDevicesAPIController";
 import "./api/HostStoragesAPIController";
 import "./api/resourceGroups";
@@ -37,9 +37,13 @@ import "./resource-providers/compute-services/DockerContainerAPIController";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/database-services/MariaDB/MariaDBAPIController";
 import "./resource-providers/file-services/FileStorageAPIController";
+import "./resource-providers/integration-services/api/ad-dc";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
 import "./resource-providers/network-services/DNS_ServerAPI_Controller";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";
+import "./resource-providers/network-services/VNetAPI_Controller";
+import "./resource-providers/security-services/apis/key-vault";
+import "./resource-providers/web-services/apis/API_Gateway";
 import "./resource-providers/web-services/JdownloaderAPIController";
 import "./resource-providers/web-services/LetsEncryptAPIController";
 import "./resource-providers/web-services/NodeAppServiceAPIController";

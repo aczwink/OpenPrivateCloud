@@ -17,16 +17,17 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { OpenVPNGatewayManager } from "./OpenVPNGatewayManager";
 import { ResourceReference } from "../../common/ResourceReference";
 import { NetworkServicesProperties } from "./properties";
 import { DNS_ServerManager } from "./DNS_ServerManager";
+import { VNetManager } from "./VNetManager";
  
 @Injectable
 export class NetworkServicesResourceProvider implements ResourceProvider<NetworkServicesProperties>
 {
-    constructor(private openVPNGatwayManager: OpenVPNGatewayManager, private dnsServerManager: DNS_ServerManager)
+    constructor(private openVPNGatwayManager: OpenVPNGatewayManager, private dnsServerManager: DNS_ServerManager, private vnetManager: VNetManager)
     {
     }
 
@@ -48,15 +49,16 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
                 schemaName: "OpenVPNGatewayProperties"
+            },
+            {
+                fileSystemType: "btrfs",
+                healthCheckSchedule: null,
+                schemaName: "VirtualNetworkProperties"
             }
         ];
     }
 
     //Public methods
-    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
-    {
-    }
-
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
@@ -70,6 +72,9 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
                 break;
             case resourceProviders.networkServices.openVPNGatewayResourceType.name:
                 await this.openVPNGatwayManager.DeleteResource(resourceReference);
+                break;
+            case resourceProviders.networkServices.virtualNetworkResourceType.name:
+                await this.vnetManager.DeleteResource(resourceReference);
                 break;
         }
 
@@ -96,10 +101,13 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
                 return {
                     config
                 };
+            case "virtual-network":
+                await this.vnetManager.ProvideResource(instanceProperties, context);
+                return {};
         }
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         switch(resourceReference.resourceTypeName)
         {
@@ -107,6 +115,8 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
                 return await this.dnsServerManager.QueryResourceState(resourceReference);
             case resourceProviders.networkServices.openVPNGatewayResourceType.name:
                 return "running";
+            case resourceProviders.networkServices.virtualNetworkResourceType.name:
+                return await this.vnetManager.QueryResourceState(resourceReference);
         }
         return "corrupt";
     }

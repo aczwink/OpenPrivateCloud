@@ -90,7 +90,7 @@ export class SideNavComponent extends Component<SideNavComponentInput>
         }
 
         return <ul className="nav nav-pills flex-column">
-            {...cat.objectTypes.map(x => <NavItem route={this.baseRoute + "/" + x.key}>{this.RenderIcon(x)}{x.displayName}</NavItem>)}
+            {...cat.objectTypes.map(x => <NavItem route={this.baseRoute + "/" + x.key}><span className="pe-1">{this.RenderIcon(x)}</span>{x.displayName}</NavItem>)}
         </ul>;
     }
 

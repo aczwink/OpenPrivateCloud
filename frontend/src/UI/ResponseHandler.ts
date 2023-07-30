@@ -61,3 +61,20 @@ export function ShowErrorMessageOnErrorFromResponse(response: ResponseData<numbe
 {
     ExtractDataFromResponseOrShowErrorMessageOnError(response);
 }
+
+export async function UnwrapResponse<ErrorCodes, ResultType, UnwrappedType>(promise: Promise<ResponseData<200, ErrorCodes, ResultType>>, unwrapper: (x: ResultType) => UnwrappedType): Promise<ResponseData<200, ErrorCodes, UnwrappedType>>
+{
+    const response = await promise;
+    if(response.statusCode === 200)
+    {
+        return {
+            data: unwrapper((response as any).data),
+            rawBody: response.rawBody,
+            statusCode: response.statusCode as any
+        };
+    }
+    return {
+        rawBody: response.rawBody,
+        statusCode: response.statusCode
+    };
+}

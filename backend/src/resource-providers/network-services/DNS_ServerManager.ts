@@ -18,67 +18,27 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { DNS_ServerProperties } from "./properties";
-import { DeploymentContext, ResourceState } from "../ResourceProvider";
-import { DockerContainerConfig, DockerManager } from "../compute-services/DockerManager";
+import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { EqualsAny } from "acts-util-core";
-
-interface DNS_A_Record
-{
-    type: "A";
-    name: string;
-    target: string;
-}
-
-interface DNS_NS_Record
-{
-    type: "NS";
-    name: string;
-}
-
-interface DNS_SOA_Record
-{
-    type: "SOA";
-    serialNumber: number;
-    /**
-     * in seconds
-     */
-    refreshTime: number;
-    /**
-     * in seconds
-     */
-    retryTime: number;
-    /**
-     * in seconds
-     */
-    expiryTime: number;
-    /**
-     * in seconds
-     */
-    minTTL: number;
-}
-
-export type DNS_Record = DNS_A_Record | DNS_NS_Record | DNS_SOA_Record;
-
-interface DNS_Zone
-{
-    name: string;
-    records: DNS_Record[];
-}
+import { BindContainerManager } from "./BindContainerManager";
+import { DNS_Record, DNS_ServerSettings, DNS_Zone } from "./models_dns";
+import { dnsmasqManager } from "./dnsmasqManager";
 
 interface DNS_ServerConfig
 {
-    forwarders: string[];
+    serverSettings: DNS_ServerSettings;
     zones: DNS_Zone[];
 }
 
 @Injectable
 export class DNS_ServerManager
 {
-    constructor(private dockerManager: DockerManager, private resourceConfigController: ResourceConfigController, private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private resourceConfigController: ResourceConfigController, private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager,
+        private bindContainerManager: BindContainerManager, private dnsmasqManager: dnsmasqManager)
     {
     }
     
@@ -110,7 +70,7 @@ export class DNS_ServerManager
         });
         await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
 
-        this.UpdateBindState(resourceReference);
+        this.UpdateServerState(resourceReference);
     }
 
     public async AddZoneRecord(resourceReference: LightweightResourceReference, zoneName: string, record: DNS_Record)
@@ -123,14 +83,23 @@ export class DNS_ServerManager
         zone.records.push(record);
 
         await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
-        this.UpdateBindState(resourceReference);
+        this.UpdateServerState(resourceReference);
 
         return true;
     }
 
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        await this.DestroyContainer(resourceReference);
+        const config = await this.ReadConfig(resourceReference.id);
+        switch(config.serverSettings.backend)
+        {
+            case "bind9":
+                await this.bindContainerManager.DestroyContainer(resourceReference);
+                break;
+            case "dnsmasq":
+                await this.dnsmasqManager.UnlinkConfig(resourceReference);
+                break;
+        }
 
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
@@ -142,13 +111,10 @@ export class DNS_ServerManager
         const idx = config.zones.findIndex(x => x.name === zoneName);
         config.zones.Remove(idx);
 
-        await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
-
-        const fileName = zoneName + ".zone";
         const paths = this.BuildPaths(resourceReference);
-        await this.remoteFileSystemManager.UnlinkFile(resourceReference.hostId, path.join(paths.configDir, fileName));
+        this.bindContainerManager.ZoneWasRemoved(resourceReference.hostId, zoneName, paths.bindConfigDir);
 
-        this.UpdateBindState(resourceReference);
+        await this.UpdateConfig(resourceReference, config);
     }
 
     public async DeleteZoneRecord(resourceReference: LightweightResourceReference, zoneName: string, record: DNS_Record)
@@ -161,8 +127,7 @@ export class DNS_ServerManager
         const idx = zone.records.findIndex(x => EqualsAny(x, record));
         zone.records.Remove(idx);
 
-        await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
-        this.UpdateBindState(resourceReference);
+        await this.UpdateConfig(resourceReference, config);
 
         return true;
     }
@@ -176,39 +141,40 @@ export class DNS_ServerManager
 
         zone.records[recordIndex] = record;
 
-        await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
-        this.UpdateBindState(resourceReference);
+        await this.UpdateConfig(resourceReference, config);
 
         return true;
     }
 
     public async ProvideResource(instanceProperties: DNS_ServerProperties, context: DeploymentContext)
     {
-        await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        const resourceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, resourceDir, 0o775); //dnsmasq needs the hosts file to be world-readable
         const paths = this.BuildPaths(context.resourceReference);
 
-        await this.remoteFileSystemManager.CreateDirectory(context.hostId, paths.configDir);
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, paths.bindConfigDir);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, paths.bindConfigDir, 0o770);
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, paths.dnsmasqConfigDir);
 
-        this.UpdateBindState(context.resourceReference);
+        this.UpdateServerState(context.resourceReference);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
-        const containerName = this.DeriveContainerName(resourceReference);
-        const containerInfo = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
-        if(containerInfo === undefined)
-            return "in deployment";
-
-        switch(containerInfo.State.Status)
+        const config = await this.ReadConfig(resourceReference.id);
+        switch(config.serverSettings.backend)
         {
-            case "created":
-            case "restarting":
-                return "in deployment";
-            case "exited":
-                return "down";
-            case "running":
-                return "running";
+            case "bind9":
+                return this.bindContainerManager.QueryResourceState(resourceReference);
+            case "dnsmasq":
+                return this.dnsmasqManager.QueryResourceState(resourceReference);
         }
+    }
+
+    public async QueryServerSettings(resourceId: number)
+    {
+        const config = await this.ReadConfig(resourceId);
+        return config.serverSettings;
     }
 
     public async QueryZone(resourceReference: LightweightResourceReference, zoneName: string)
@@ -224,82 +190,36 @@ export class DNS_ServerManager
         return config.zones;
     }
 
+    public async UpdateServerSettings(resourceReference: LightweightResourceReference, serverSettings: DNS_ServerSettings)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+
+        if(config.serverSettings.backend !== serverSettings.backend)
+        {
+            switch(config.serverSettings.backend)
+            {
+                case "bind9":
+                    await this.bindContainerManager.DestroyContainer(resourceReference);
+                    break;
+                case "dnsmasq":
+                    await this.dnsmasqManager.UnlinkConfig(resourceReference);
+                    break;
+            }
+        }
+
+        config.serverSettings = serverSettings;        
+        this.UpdateConfig(resourceReference, config);
+    }
+
     //Private methods
     private BuildPaths(resourceReference: LightweightResourceReference)
     {
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
         return {
-            configDir: path.join(resourceDir, "config")
+            bindConfigDir: path.join(resourceDir, "bind9config"),
+            dnsmasqConfigDir: path.join(resourceDir, "dnsmasqconfig")
         };
-    }
-
-    private DeriveContainerName(resourceReference: LightweightResourceReference)
-    {
-        return "opc-rdnssrv-" + resourceReference.id;
-    }
-
-    private async DestroyContainer(resourceReference: LightweightResourceReference)
-    {
-        const containerName = this.DeriveContainerName(resourceReference);
-        const containerInfo = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
-        if(containerInfo === undefined)
-            return;
-
-        if(containerInfo.State.Running)
-            await this.dockerManager.StopContainer(resourceReference.hostId, containerName);
-
-        await this.dockerManager.DeleteContainer(resourceReference.hostId, containerName);
-    }
-
-    private GenerateBindConfigFile(config: DNS_ServerConfig)
-    {
-        const forwarderIPs = config.forwarders.Values().Map(x => x + ";").Join("\n");
-        const zones = config.zones.map(x => `
-zone "${x.name}" IN {
-    type master;
-    file "/etc/bind/${x.name}.zone";
-};
-        `).join("\n");
-
-        const namedConf = `
-options {
-    directory "/var/cache/bind";
-
-    forwarders {
-        ${forwarderIPs}
-    };
-};
-${zones}
-        `;
-
-        return namedConf;
-    }
-
-    private GenerateRecordParts(record: DNS_Record)
-    {
-        switch(record.type)
-        {
-            case "A":
-                return [record.name, "IN", "A", record.target];
-            case "NS":
-                return ["", "IN", "NS", record.name];
-            case "SOA":
-            {
-                const value = [record.serialNumber, record.refreshTime, record.retryTime, record.expiryTime, record.minTTL];
-                return ["@", "IN", "SOA", "ns1", "hostmaster", "( " + value.join(" ") + " )"];
-            }
-        }
-    }
-
-    private GenerateZoneFile(zone: DNS_Zone)
-    {
-        const records = zone.records.Values().Map(this.GenerateRecordParts.bind(this)).Map(x => x.join("\t")).Join("\n");
-        return `
-$TTL 1h
-$ORIGIN ${zone.name}.
-${records}
-        `;
     }
 
     private async ReadConfig(resourceId: number): Promise<DNS_ServerConfig>
@@ -308,67 +228,36 @@ ${records}
         if(config === undefined)
         {
             return {
-                forwarders: ["1.1.1.1", "1.0.0.1"], //cloudflares dns servers
+                serverSettings: {
+                    backend: "dnsmasq",
+                    forwarders: ["1.1.1.1", "1.0.0.1"], //cloudflares dns servers
+                },
                 zones: []
             };
         }
         return config;
     }
 
-    private async RestartContainer(resourceReference: LightweightResourceReference)
+    private async UpdateConfig(resourceReference: LightweightResourceReference, config: DNS_ServerConfig)
     {
-        await this.DestroyContainer(resourceReference);
-
-        const paths = this.BuildPaths(resourceReference);
-
-        const config: DockerContainerConfig = {
-            env: [
-            ],
-            imageName: "ubuntu/bind9:latest",
-            portMap: [
-                {
-                    containerPort: 53,
-                    hostPost: 53,
-                    protocol: "TCP"
-                },
-                {
-                    containerPort: 53,
-                    hostPost: 53,
-                    protocol: "UDP"
-                },
-            ],
-            restartPolicy: "always",
-            volumes: [
-                {
-                    containerPath: "/etc/bind",
-                    hostPath: paths.configDir,
-                    readOnly: true
-                }
-            ]
-        };
-        const containerName = this.DeriveContainerName(resourceReference);
-        await this.dockerManager.CreateContainerInstanceAndStart(resourceReference.hostId, containerName, config);
+        await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
+        this.UpdateServerState(resourceReference);
     }
 
-    private async UpdateBindState(resourceReference: LightweightResourceReference)
-    {
-        await this.WriteBindConfigFile(resourceReference);
-        await this.RestartContainer(resourceReference);
-    }
-
-    private async WriteBindConfigFile(resourceReference: LightweightResourceReference)
+    private async UpdateServerState(resourceReference: LightweightResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
         const paths = this.BuildPaths(resourceReference);
 
-        for (const zone of config.zones)
+        switch(config.serverSettings.backend)
         {
-            const zoneData = this.GenerateZoneFile(zone);
-            const fileName = zone.name + ".zone";
-            await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, path.join(paths.configDir, fileName), zoneData.trim());
+            case "bind9":
+                await this.bindContainerManager.WriteBindConfigFile(resourceReference.hostId, config.serverSettings, config.zones, paths.bindConfigDir);
+                await this.bindContainerManager.RestartContainer(resourceReference, paths.bindConfigDir);
+                break;
+            case "dnsmasq":
+                await this.dnsmasqManager.WriteConfigFile(resourceReference, config.serverSettings, config.zones, paths.dnsmasqConfigDir);
+                break;
         }
-        const namedConf = this.GenerateBindConfigFile(config);
-
-        await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, path.join(paths.configDir, "named.conf"), namedConf.trim());
     }
 }

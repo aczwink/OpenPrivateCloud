@@ -16,10 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { VirtualMachineManager } from "./VirtualMachineManager";
-import { DockerContainerManager } from "./DockerContainerManager";
+import { ContainerAppServiceManager } from "./ContainerAppServiceManager";
 import { ComputeServicesProperties } from "./Properties";
 import { DockerManager } from "./DockerManager";
 import { ResourceReference } from "../../common/ResourceReference";
@@ -28,7 +28,7 @@ import { ResourceReference } from "../../common/ResourceReference";
 export class ComputeServicesResourceProvider implements ResourceProvider<ComputeServicesProperties>
 {
     constructor(private virtualMachineManager: VirtualMachineManager,
-        private dockerContainerManager: DockerContainerManager, private dockerManager: DockerManager)
+        private dockerContainerManager: ContainerAppServiceManager, private dockerManager: DockerManager)
     {
     }
 
@@ -55,10 +55,6 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
     }
 
     //Public methods
-    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
-    {
-    }
-
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
@@ -99,7 +95,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
         return {};
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         switch(resourceReference.resourceTypeName)
         {

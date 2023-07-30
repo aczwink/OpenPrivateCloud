@@ -26,7 +26,7 @@ import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystem
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { SharedFolderPermissionsManager } from "../file-services/SharedFolderPermissionsManager";
 import { SingleSMBSharePerInstanceProvider } from "../file-services/SingleSMBSharePerInstanceProvider";
-import { DeploymentContext, ResourceState } from "../ResourceProvider";
+import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { JdownloaderProperties } from "./Properties";
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 
@@ -123,7 +123,7 @@ export class JdownloaderManager
         };
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
         const isActive = await this.IsActive(resourceReference);
         if(isActive)

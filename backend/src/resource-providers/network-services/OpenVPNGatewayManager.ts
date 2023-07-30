@@ -29,14 +29,15 @@ import { ConfigModel } from "../../common/config/ConfigModel";
 import { ConfigWriter } from "../../common/config/ConfigWriter";
 import path from "path";
 import { Dictionary } from "acts-util-core";
-import { HostNATService } from "../../services/HostNATService";
 import { CIDRRange } from "../../common/CIDRRange";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { DeploymentContext } from "../ResourceProvider";
 import { ModulesManager } from "../../services/ModulesManager";
 import { SysCtlConfService } from "./SysCtlConfService";
-import { EasyRSAManager } from "./EasyRSAManager";
+import { _legacy_EasyRSAManager } from "./EasyRSAManager";
 import { OpenVPNGatewayProperties } from "./properties";
+import { FirewallZoneData, FirewallZoneDataProvider } from "../../services/HostFirewallZonesManager";
+import { EasyRSAManager } from "../security-services/EasyRSAManager";
 
 export interface OpenVPNGatewayConnectedClientEntry
 {
@@ -74,13 +75,18 @@ const openVPNConfigDialect: ConfigDialect = {
 }
 
 @Injectable
-export class OpenVPNGatewayManager
+export class OpenVPNGatewayManager implements FirewallZoneDataProvider
 {
     constructor(private resourcesManager: ResourcesManager, private instanceConfigController: ResourceConfigController, private modulesManager: ModulesManager, private sysCtlConfService: SysCtlConfService,
-        private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager, private easyRSAManager: EasyRSAManager,
-        private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private hostNATService: HostNATService)
+        private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager, private _legacy_easyRSAManager: _legacy_EasyRSAManager,
+        private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private easyRSAManager: EasyRSAManager,)
     {
+    }
+
+    //Properties
+    public get matchingZonePrefix(): string
+    {
+        return "vpn-";
     }
     
     //Public methods
@@ -140,17 +146,39 @@ ${taData}
 `;
     }
 
+    public MatchNetworkInterfaceName(nicName: string): string | null
+    {
+        if(nicName.startsWith("opc-ovpn"))
+            return this.matchingZonePrefix + nicName.substring(8);
+        return null;
+    }
+
+    public async ProvideData(hostId: number, zoneName: string): Promise<FirewallZoneData>
+    {
+        const resourceId = parseInt(zoneName.substring(this.matchingZonePrefix.length));
+        const ref = await this.resourcesManager.CreateResourceReference(resourceId);
+        const config = await this.ReadServerConfig(ref!.hostId, ref!.id);
+
+        return {
+            addressSpace: new CIDRRange(config.virtualServerAddressRange),
+            inboundRules: [],
+            outboundRules: []
+        };
+    }
+
     public async ProvideResource(instanceProperties: OpenVPNGatewayProperties, context: DeploymentContext)
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "openvpn");
         await this.sysCtlConfService.SetIPForwardingState(context.hostId, true);
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(context.resourceReference);
 
-        await this.easyRSAManager.CreateCADir(context.hostId, resourceDir);
-        await this.easyRSAManager.CreateCA(context.hostId, resourceDir, instanceProperties.name, instanceProperties.keySize);
-        await this.easyRSAManager.CreateServer(context.hostId, resourceDir, instanceProperties.publicEndpoint.domainName, instanceProperties.keySize);
+        await this.easyRSAManager.CreateCA(context.hostId, resourceDir, {
+            commonName: instanceProperties.name,
+            keySize: instanceProperties.keySize
+        });
+        await this.easyRSAManager.CreateServerKeyPair(context.hostId, resourceDir, instanceProperties.publicEndpoint.domainName, instanceProperties.keySize);
 
-        const paths = this.easyRSAManager.GetCertPaths(resourceDir, instanceProperties.publicEndpoint.domainName);
+        const paths = this._legacy_easyRSAManager.GetCertPaths(resourceDir, instanceProperties.publicEndpoint.domainName);
         await this.CreateServerConfig(context.hostId, resourceDir, context.resourceReference.id, this.CreateDefaultConfig(), paths);
         await this.AutoStartServer(context.hostId, context.resourceReference.id);
 
@@ -160,6 +188,7 @@ ${taData}
             },
             publicEndpoint: instanceProperties.publicEndpoint,
         };
+        return config;
     }
 
     public async ReadInstanceConfig(instanceId: number): Promise<OpenVPNGatewayInternalConfig>
@@ -252,18 +281,6 @@ ${taData}
 
     public async UpdateServerConfig(hostId: number, resourceId: number, config: OpenVPNServerConfig)
     {
-        const oldConfig = await this.ReadServerConfig(hostId, resourceId);
-        if(oldConfig.virtualServerAddressRange !== config.virtualServerAddressRange)
-        {
-            const serviceName = this.DeriveSystemDServiceName(resourceId);
-            const isRunning = await this.systemServicesManager.IsServiceActive(hostId, serviceName);
-            if(isRunning)
-            {
-                await this.hostNATService.RemoveSourceNATRule(hostId, oldConfig.virtualServerAddressRange);
-                await this.hostNATService.AddSourceNATRule(hostId, config.virtualServerAddressRange);
-            }
-        }
-
         const range = new CIDRRange(config.virtualServerAddressRange);
 
         const parsed = await this.ParseConfig(hostId, resourceId);
@@ -297,7 +314,6 @@ ${taData}
     private async AutoStartServer(hostId: number, resourceId: number)
     {
         const config = await this.ReadServerConfig(hostId, resourceId);
-        await this.hostNATService.AddSourceNATRule(hostId, config.virtualServerAddressRange);
 
         const serviceName = this.DeriveSystemDServiceName(resourceId);
 
@@ -327,9 +343,11 @@ ${taData}
     {
         await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", serverDir + "/ta.key"], hostId);
 
+        const nicName = "opc-ovpn" + resourceId;
         const range = new CIDRRange(data.virtualServerAddressRange);
         const config = `
-dev tun
+dev ${nicName}
+dev-type tun
 topology subnet
 keepalive 10 120
 user nobody
@@ -343,7 +361,7 @@ tls-auth ${serverDir}/ta.key 0
 status ${serverDir}/openvpn-status.log
 log ${serverDir}/openvpn.log
 
-server ${range.netAddress} ${range.GenerateSubnetMask()}
+server ${range.netAddress.ToString()} ${range.GenerateSubnetMask()}
 port ${data.port}
 proto ${data.protocol}
 cipher ${data.cipher}
@@ -419,8 +437,5 @@ crl-verify ${certKeyFiles.crlPath}
     {
         const serviceName = this.DeriveSystemDServiceName(resourceId);
         await this.systemServicesManager.StopService(hostId, serviceName);
-
-        const config = await this.ReadServerConfig(hostId, resourceId);
-        await this.hostNATService.RemoveSourceNATRule(hostId, config.virtualServerAddressRange);
     }
 }

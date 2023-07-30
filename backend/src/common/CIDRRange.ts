@@ -16,16 +16,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { IPv4 } from "./IPv4";
+
 export class CIDRRange
 {
     constructor(stringRepresentation: string)
     {
         const parts = stringRepresentation.split("/");
-        this._netAddress = parts[0];
+        this._netAddress = new IPv4(parts[0]);
         this._length = parseInt(parts[1]);
     }
 
     //Properties
+    public get brodcastAddress()
+    {
+        const num = this._netAddress.intValue;
+        const mask = (1 << (32 - this._length)) - 1;
+
+        return new IPv4(num | mask);
+    }
+
     public get length()
     {
         return this._length;
@@ -60,7 +70,7 @@ export class CIDRRange
 
     public ToString()
     {
-        return this._netAddress + "/" + this._length;
+        return this._netAddress.ToString() + "/" + this._length;
     }
 
     //Functions
@@ -84,6 +94,6 @@ export class CIDRRange
     }
 
     //Private state
-    private _netAddress: string;
+    private _netAddress: IPv4;
     private _length: number;
 }

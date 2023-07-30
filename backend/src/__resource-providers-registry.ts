@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,8 @@ import { NetworkServicesResourceProvider } from "./resource-providers/network-se
 import { DatabaseServicesResourceProvider } from "./resource-providers/database-services/DatabaseServicesResourceProvider";
 import { WebServicesResourceProvider } from "./resource-providers/web-services/WebServicesResourceProvider";
 import { MultimediaServicesResourceProvider } from "./resource-providers/multimedia-services/MultimediaServicesResourceProvider";
+import { SecurityServicesResourceProvider } from "./resource-providers/security-services/SecurityServicesResourceProvider";
+import { IntegrationServicesResourceProvider } from "./resource-providers/integration-services/IntegrationServicesResourceProvider";
 
 function RegisterResourceProviders()
 {
@@ -33,8 +35,10 @@ function RegisterResourceProviders()
         ComputeServicesResourceProvider,
         DatabaseServicesResourceProvider,
         FileServicesResourceProvider,
+        IntegrationServicesResourceProvider,
         MultimediaServicesResourceProvider,
         NetworkServicesResourceProvider,
+        SecurityServicesResourceProvider,
         WebServicesResourceProvider
     ];
 

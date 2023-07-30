@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { MariadbProperties } from "./MariaDB/MariadbProperties";
 import { MariaDBManager } from "./MariaDB/MariaDBManager";
 import { ResourceReference } from "../../common/ResourceReference";
@@ -51,17 +51,6 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
     }
 
     //Public methods
-    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
-    {
-        const warningCount = await this.mariaDBManager.ExecuteSelectQuery(resourceReference, "SELECT @@warning_count;");
-        const errorCount = await this.mariaDBManager.ExecuteSelectQuery(resourceReference, "SELECT @@error_count;");
-
-        if(parseInt(warningCount[0]["@@warning_count"]) != 0)
-            throw new Error("Warnings are reported on the database");
-        if(parseInt(errorCount[0]["@@error_count"]) != 0)
-            throw new Error("Warnings are reported on the database");
-    }
-
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
         await this.mariaDBManager.CheckDatabaseIntegrity(resourceReference);
@@ -86,8 +75,16 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
         return await this.mariaDBManager.ProvideResource(instanceProperties, context);
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
+        const warningCount = await this.mariaDBManager.ExecuteSelectQuery(resourceReference, "SELECT @@warning_count;");
+        const errorCount = await this.mariaDBManager.ExecuteSelectQuery(resourceReference, "SELECT @@error_count;");
+
+        if(parseInt(warningCount[0]["@@warning_count"]) != 0)
+            throw new Error("Warnings are reported on the database");
+        if(parseInt(errorCount[0]["@@error_count"]) != 0)
+            throw new Error("Warnings are reported on the database");
+            
         return "running";
     }
 }

@@ -18,14 +18,34 @@
 
 import { Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
-import { ResourceDeletionError, ResourceState } from "../ResourceProvider";
-import { DockerContainerConfig, DockerContainerConfigPortMapping, DockerContainerInfo, DockerManager } from "./DockerManager";
+import { ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
+import { DockerContainerConfig, DockerContainerInfo, DockerEnvironmentVariableMapping, DockerManager } from "./DockerManager";
 import { LightweightResourceReference } from "../../common/ResourceReference";
+import { ResourcesManager } from "../../services/ResourcesManager";
+import { VNetManager } from "../network-services/VNetManager";
+
+export interface ContainerAppServiceConfig
+{
+    /**
+     * @title Certificate
+     * @format instance-same-host[web-services/letsencrypt-cert]
+     */
+    //certResourceExternalId?: string;
+
+    env: DockerEnvironmentVariableMapping[];
+    imageName: string;
+
+    /**
+     * @title Virtual network
+     * @format instance-same-host[network-services/virtual-network]
+     */
+    vnetResourceExternalId: string;
+}
 
 @Injectable
-export class DockerContainerManager
+export class ContainerAppServiceManager
 {
-    constructor(private dockerManager: DockerManager, private instanceConfigController: ResourceConfigController)
+    constructor(private dockerManager: DockerManager, private instanceConfigController: ResourceConfigController, private vnetManager: VNetManager, private resourcesManager: ResourcesManager)
     {
     }
 
@@ -63,17 +83,23 @@ export class DockerContainerManager
         }
     }
 
-    public async QueryContainerConfig(resourceId: number): Promise<DockerContainerConfig>
+    public async InspectContainer(resourceReference: LightweightResourceReference)
     {
-        const config = await this.instanceConfigController.QueryConfig<DockerContainerConfig>(resourceId);
+        const containerName = this.DeriveContainerName(resourceReference);
+        const containerData = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
+
+        return containerData;
+    }
+
+    public async QueryContainerConfig(resourceId: number): Promise<ContainerAppServiceConfig>
+    {
+        const config = await this.instanceConfigController.QueryConfig<ContainerAppServiceConfig>(resourceId);
         if(config === undefined)
         {
             return {
                 env: [],
                 imageName: "",
-                portMap: [],
-                restartPolicy: "no",
-                volumes: []
+                vnetResourceExternalId: ""
             };
         }
 
@@ -82,8 +108,7 @@ export class DockerContainerManager
 
     public async QueryContainerStatus(resourceReference: LightweightResourceReference)
     {
-        const containerName = this.DeriveContainerName(resourceReference);
-        const containerData = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
+        const containerData = await this.InspectContainer(resourceReference);
         if(containerData === undefined)
             return "not created yet";
 
@@ -105,11 +130,12 @@ export class DockerContainerManager
         return this.dockerManager.QueryContainerLogs(resourceReference.hostId, containerName);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
         const state = await this.QueryContainerStatus(resourceReference);
         switch(state)
         {
+            case "created":
             case "exited":
             case "not created yet":
                 return "stopped";
@@ -119,7 +145,7 @@ export class DockerContainerManager
         throw new Error(state);
     }
 
-    public async UpdateContainerConfig(resourceId: number, config: DockerContainerConfig)
+    public async UpdateContainerConfig(resourceId: number, config: ContainerAppServiceConfig)
     {
         await this.instanceConfigController.UpdateOrInsertConfig(resourceId, config);
     }
@@ -148,12 +174,8 @@ export class DockerContainerManager
         return "opc-rdc-" + resourceReference.id;
     }
 
-    private HasConfigChanged(containerData: DockerContainerInfo, config: DockerContainerConfig)
+    private HasConfigChanged(containerData: DockerContainerInfo, config: ContainerAppServiceConfig)
     {
-        const currentPortMapping = this.ParsePortBindings(containerData);
-        if(!this.ArrayEqualsAnyOrder(currentPortMapping, config.portMap, "hostPost"))
-            return true;
-
         const currentEnv = this.ParseEnv(containerData);
         if(!this.ArrayEqualsAnyOrder(currentEnv.ToArray(), config.env, "varName"))
             return true;
@@ -171,28 +193,6 @@ export class DockerContainerManager
             .Filter(x => x.varName !== "PATH");
     }
 
-    private ParsePortBindings(containerData: DockerContainerInfo): DockerContainerConfigPortMapping[]
-    {
-        const result: DockerContainerConfigPortMapping[] = [];
-        for (const containerBinding in containerData.HostConfig.PortBindings)
-        {
-            if (Object.prototype.hasOwnProperty.call(containerData.HostConfig.PortBindings, containerBinding))
-            {
-                const hostBinding = containerData.HostConfig.PortBindings[containerBinding]!;
-
-                const parts = containerBinding.split("/");
-                const containerPort = parseInt(parts[0]);
-
-                hostBinding.forEach(x => result.push({
-                    containerPort,
-                    hostPost: parseInt(x.HostPort),
-                    protocol: parts[1].toUpperCase() as any
-                }));
-            }
-        }
-        return result;
-    }
-
     private async StartContainer(resourceReference: LightweightResourceReference)
     {
         const config = await this.QueryContainerConfig(resourceReference.id);
@@ -202,13 +202,43 @@ export class DockerContainerManager
         if(containerData?.State.Running)
             throw new Error("Container is already running");
 
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.vnetResourceExternalId);
+        if(vnetRef === undefined)
+            throw new Error("VNET does not exist!");
+        const dockerNetName = await this.vnetManager.EnsureDockerNetworkExists(vnetRef);
+
+        const dockerConfig: DockerContainerConfig = {
+            additionalHosts: [],
+            capabilities: [],
+            dnsSearchDomains: [],
+            dnsServers: [],
+            env: config.env,
+            imageName: config.imageName,
+            networkName: dockerNetName,
+            portMap: [],
+            restartPolicy: "always",
+            volumes: [],
+        };
+
+        /*const readOnlyVolumes = [];
+        if(config.certResourceExternalId)
+        {
+            const rmgr = GlobalInjector.Resolve(ResourcesManager);
+            const certResourceRef = await rmgr.CreateResourceReferenceFromExternalId(config.certResourceExternalId);
+            const lem = GlobalInjector.Resolve(LetsEncryptManager);
+            const cert = await lem.GetCert(certResourceRef!);
+
+            readOnlyVolumes.push("-v", cert!.certificatePath + ":/certs/public.crt:ro");
+            readOnlyVolumes.push("-v", cert!.privateKeyPath + ":/certs/private.key:ro");
+        }*/
+
         if((containerData !== undefined) && this.HasConfigChanged(containerData, config))
         {
             await this.dockerManager.DeleteContainer(resourceReference.hostId, containerName);
-            await this.dockerManager.CreateContainerInstance(resourceReference.hostId, containerName, config);
+            await this.dockerManager.CreateContainerInstance(resourceReference.hostId, containerName, dockerConfig);
         }
         else if(containerData === undefined)
-            await this.dockerManager.CreateContainerInstance(resourceReference.hostId, containerName, config);
+            await this.dockerManager.CreateContainerInstance(resourceReference.hostId, containerName, dockerConfig);
         
         await this.dockerManager.StartExistingContainer(resourceReference.hostId, containerName);
     }

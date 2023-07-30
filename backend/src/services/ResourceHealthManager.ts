@@ -27,6 +27,7 @@ import { ResourceGroupsController } from "../data-access/ResourceGroupsControlle
 import { ErrorService } from "./ErrorService";
 import { ResourcesManager } from "./ResourcesManager";
 import { ResourceReference } from "../common/ResourceReference";
+import { ResourceState, ResourceStateResult } from "../resource-providers/ResourceProvider";
   
 @Injectable
 export class ResourceHealthManager
@@ -45,14 +46,15 @@ export class ResourceHealthManager
         
         try
         {
-            await resourceProvider.CheckResourceAvailability(ref!);
+            const result = await resourceProvider.QueryResourceState(ref!);
+            const extracted = this.ExtractResourceStateResult(result);
+            await this.UpdateResourceAvailability(resourceId, extracted.status, extracted.msg);
         }
         catch(e)
         {
             await this.UpdateResourceAvailability(resourceId, HealthStatus.Down, e);
             return;
         }
-        await this.UpdateResourceAvailability(resourceId, HealthStatus.Up);
     }
 
     public async ScheduleResourceCheck(resourceId: number)
@@ -114,6 +116,28 @@ export class ResourceHealthManager
 
         await this.UpdateResourceHealth(ref.id, HealthStatus.Up);
         return true;
+    }
+
+    private ExtractResourceStateResult(result: ResourceStateResult)
+    {
+        function GetHealthStatus(state: ResourceState)
+        {
+            switch(state)
+            {
+                case "corrupt":
+                    return HealthStatus.Corrupt;
+                case "down":
+                    return HealthStatus.Down;
+                case "in deployment":
+                    return HealthStatus.InDeployment;
+            }
+            return HealthStatus.Up;
+        }
+
+        if(typeof result === "string")
+            return { status: GetHealthStatus(result), msg: "" };
+        else
+            return { status: GetHealthStatus(result.state), msg: result.context };
     }
 
     private async FindGroupAssociatedWithInstance(resourceReference: ResourceReference)

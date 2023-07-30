@@ -20,7 +20,7 @@ import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { AVTranscoderProperties } from "./AVTranscoderProperties";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { AVTranscoderConfig, AVTranscoderQuality } from "./AVTranscoderConfig";
@@ -51,10 +51,6 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     }
 
     //Public methods
-    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
-    {
-    }
-
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
@@ -100,7 +96,7 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
         };
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         return "running";
     }

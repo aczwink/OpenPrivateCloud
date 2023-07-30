@@ -16,9 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { resourceProviders } from "openprivatecloud-common";
-import { CollectionViewModel, MultiPageViewModel } from "../../UI/ViewModel";
+import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { DNS_Record, DNS_ZoneDTO } from "../../../dist/api";
+import { DNS_Record, DNS_ServerSettings, DNS_ZoneDTO } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
@@ -93,6 +93,21 @@ const zonesViewModel: CollectionViewModel<DNS_ZoneDTO, ResourceAndGroupId> = {
     schemaName: "DNS_ZoneDTO",
 };
 
+const serverSettingsViewModel: ObjectViewModel<DNS_ServerSettings, ResourceAndGroupId> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "DNS_ServerSettings",
+            requestObject: (service, ids) => service.resourceProviders._any_.networkservices.dnsserver._any_.serverSettings.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, settings) => service.resourceProviders._any_.networkservices.dnsserver._any_.serverSettings.put(ids.resourceGroupName, ids.resourceName, settings),
+        }
+    ],
+    formTitle: _ => "Server settings",
+    requestObject: (service, ids) => service.resourceProviders._any_.networkservices.dnsserver._any_.serverSettings.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "DNS_ServerSettings"
+};
+
 export const dnsServerViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         ...BuildCommonResourceActions(BuildResourceId)
@@ -105,6 +120,11 @@ export const dnsServerViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "zones",
                     displayName: "Zones",
                     child: zonesViewModel
+                },
+                {
+                    key: "serverSettings",
+                    displayName: "Server settings",
+                    child: serverSettingsViewModel
                 }
             ]
         },

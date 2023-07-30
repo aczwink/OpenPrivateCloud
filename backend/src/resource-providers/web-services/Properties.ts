@@ -18,6 +18,17 @@
 
 import { BaseResourceProperties } from "../ResourceProvider";
 
+export interface API_GatewayProperties extends BaseResourceProperties
+{
+    type: "api-gateway";
+
+    /**
+     * @title Virtual network
+     * @format instance-same-host[network-services/virtual-network]
+     */
+    vnetResourceExternalId: string;
+}
+
 export interface JdownloaderProperties extends BaseResourceProperties
 {
     type: "jdownloader";
@@ -52,7 +63,8 @@ export interface StaticWebsiteProperties extends BaseResourceProperties
     port: number;
 }
 
-export type WebServicesResourceProperties = JdownloaderProperties
+export type WebServicesResourceProperties = API_GatewayProperties
+    | JdownloaderProperties
     | LetsEncryptProperties
     | NextcloudProperties
     | NodeAppServiceProperties

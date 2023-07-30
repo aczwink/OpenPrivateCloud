@@ -22,11 +22,8 @@ import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { Dictionary } from "acts-util-core";
 
-interface EnvironmentVariableMapping
-{
-    varName: string;
-    value: string;
-}
+
+type DockerCapability = "SYS_ADMIN";
 
 export interface DockerContainerConfigPortMapping
 {
@@ -42,16 +39,28 @@ interface DockerContainerConfigVolume
     readOnly: boolean;
 }
 
+export interface DockerEnvironmentVariableMapping
+{
+    varName: string;
+    value: string;
+}
+
+interface DockerHostEntry
+{
+    domainName: string;
+    ipAddress: string;
+}
+
 export interface DockerContainerConfig
 {
-    /**
-     * @title Certificate
-     * @format instance-same-host[web-services/letsencrypt-cert]
-     */
-    //certResourceExternalId?: string;
-
-    env: EnvironmentVariableMapping[];
+    additionalHosts: DockerHostEntry[];
+    capabilities: DockerCapability[];
+    dnsSearchDomains: string[];
+    dnsServers: string[];
+    env: DockerEnvironmentVariableMapping[];
+    hostName?: string;
     imageName: string;
+    networkName: string;
     portMap: DockerContainerConfigPortMapping[];
     restartPolicy: "always" | "no";
     volumes: DockerContainerConfigVolume[];
@@ -63,6 +72,11 @@ interface DockerContainerInfoPortBinding
     HostPort: string;
 }
 
+interface DockerContainerNetwork
+{
+    IPAddress: string;
+}
+
 export interface DockerContainerInfo
 {
     HostConfig: {
@@ -72,6 +86,10 @@ export interface DockerContainerInfo
     Config: {
         Env: string[];
         Image: string;
+    };
+
+    NetworkSettings: {
+        Networks: Dictionary<DockerContainerNetwork>;
     };
 
     State: {
@@ -92,27 +110,26 @@ export class DockerManager
     {
         await this.EnsureDockerIsInstalled(hostId);
 
-        /*const readOnlyVolumes = [];
-        if(config.certResourceExternalId)
-        {
-            const rmgr = GlobalInjector.Resolve(ResourcesManager);
-            const certResourceRef = await rmgr.CreateResourceReferenceFromExternalId(config.certResourceExternalId);
-            const lem = GlobalInjector.Resolve(LetsEncryptManager);
-            const cert = await lem.GetCert(certResourceRef!);
-
-            readOnlyVolumes.push("-v", cert!.certificatePath + ":/certs/public.crt:ro");
-            readOnlyVolumes.push("-v", cert!.privateKeyPath + ":/certs/private.key:ro");
-        }*/
-
+        const addHostsArgs = config.additionalHosts.map(x => "--add-host=" + x.domainName + ":" + x.ipAddress);
+        const capsArgs = config.capabilities.map(x => "--cap-add=" + x);
+        const dnsSearchDomainArgs = config.dnsSearchDomains.map(x => "--dns-search=" + x);
+        const dnsServerArgs = config.dnsServers.map(x => "--dns=" + x);
         const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
+        const hostNameArgs = (config.hostName === undefined) ? [] : ["-h", config.hostName];
         const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort + "/" + x.protocol.toLowerCase()].Values()).Flatten().ToArray();
         const volArgs = config.volumes.Values().Map(x => ["-v", x.hostPath + ":" + x.containerPath + (x.readOnly ? ":ro" : "")].Values()).Flatten().ToArray();
 
         const cmdArgs = [
             "--name", containerName,
+            ...addHostsArgs,
+            ...capsArgs,
+            ...dnsSearchDomainArgs,
+            ...dnsServerArgs,
             ...envArgs,
+            ...hostNameArgs,
             ...portArgs,
             ...volArgs,
+            "--net", config.networkName,
             "--restart", config.restartPolicy,
             config.imageName
         ];
@@ -162,6 +179,10 @@ export class DockerManager
 
     public async SpawnShell(hostId: number, containerName: string, shellType: "sh" = "sh")
     {
+        const data = await this.InspectContainer(hostId, containerName);
+        if(data === undefined)
+            throw new Error("Container is not there. Can't spawn shell."); //TODO: because of the bad shell implementation, we need to track this beforehand :S
+
         const hostShell = await this.remoteCommandExecutor.SpawnRawShell(hostId);
         const hostShellFrontend = new ShellFrontend(hostShell);
         await hostShellFrontend.ExecuteCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", 'PS1="$ "', containerName, shellType]);

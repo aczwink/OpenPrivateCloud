@@ -86,7 +86,7 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
 
         return <fragment>
             <h5>{schema.title ?? fallback}</h5>
-            <p>{schema.description ?? ""}</p>
+            <div className="form-text">{schema.description ?? ""}</div>
             {value.map( (x, idx) => this.RenderValue(x, schema.items, newValue => {
                 value[idx] = newValue;
                 valueChanged(value);

@@ -17,7 +17,7 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { BackupVaultProperties } from "./BackupVaultProperties";
 import { resourceProviders } from "openprivatecloud-common";
 import { ModulesManager } from "../../services/ModulesManager";
@@ -49,11 +49,6 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     }
 
     //Public methods
-    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
-    {
-        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
-    }
-
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
@@ -79,8 +74,9 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
         return {};
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
+        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
         return "running";
     }
 }

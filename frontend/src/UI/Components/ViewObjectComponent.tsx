@@ -118,7 +118,10 @@ export class ViewObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         {
             case "array":
                 return <tr>
-                    <td>{RenderTitle(schema, fallback)}</td>
+                    <td>
+                        {RenderTitle(schema, fallback)}
+                        {schema.description === undefined ? null : <fragment><br /><small className="text-muted">{schema.description}</small></fragment>}
+                    </td>
                     <td>
                         <table>
                             {...value.map( (x: any) => this.RenderValue(x, schema.items, tables, ""))}

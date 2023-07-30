@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { NextcloudManager } from "./NextcloudManager";
 import { LetsEncryptManager } from "./LetsEncryptManager";
 import { JdownloaderManager } from "./JdownloaderManager";
@@ -25,11 +25,12 @@ import { StaticWebsitesManager } from "./StaticWebsitesManager";
 import { NodeAppServiceManager } from "./NodeAppServiceManager";
 import { WebServicesResourceProperties } from "./Properties";
 import { ResourceReference } from "../../common/ResourceReference";
+import { API_GatewayManager } from "./API_GatewayManager";
 
 @Injectable
 export class WebServicesResourceProvider implements ResourceProvider<WebServicesResourceProperties>
 { 
-    constructor(private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager,
+    constructor(private nextcloudManager: NextcloudManager, private letsEncryptManager: LetsEncryptManager, private apiGatewayManager: API_GatewayManager,
         private jdownloaderManager: JdownloaderManager, private staticWebsitesManager: StaticWebsitesManager, private nodeAppServiceManager: NodeAppServiceManager)
     {
     }
@@ -70,15 +71,16 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
                 schemaName: "StaticWebsiteProperties"
+            },
+            {
+                healthCheckSchedule: null,
+                fileSystemType: "btrfs",
+                schemaName: "API_GatewayProperties"
             }
         ];
     }
 
     //Public methods
-    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
-    {
-    }
-
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
         switch(resourceReference.resourceTypeName)
@@ -93,6 +95,9 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     {
         switch(resourceReference.resourceTypeName)
         {
+            case resourceProviders.webServices.apiGatewayResourceType.name:
+                await this.apiGatewayManager.DeleteResource(resourceReference);
+                break;
             case resourceProviders.webServices.jdownloaderResourceType.name:
                 await this.jdownloaderManager.DeleteResource(resourceReference);
                 break;
@@ -130,6 +135,9 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     {
         switch(instanceProperties.type)
         {
+            case "api-gateway":
+                await this.apiGatewayManager.ProvideResource(instanceProperties, context);
+                break;
             case "jdownloader":
                 await this.jdownloaderManager.ProvideResource(instanceProperties, context);
                 break;
@@ -150,10 +158,12 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
         return {};
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         switch(resourceReference.resourceTypeName)
         {
+            case resourceProviders.webServices.apiGatewayResourceType.name:
+                return await this.apiGatewayManager.QueryResourceState(resourceReference);
             case resourceProviders.webServices.jdownloaderResourceType.name:
                 return await this.jdownloaderManager.QueryResourceState(resourceReference);
             case resourceProviders.webServices.letsencryptCertResourceType.name:

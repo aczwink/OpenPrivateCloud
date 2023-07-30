@@ -21,16 +21,23 @@ import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
 import { SystemServicesManager } from "./SystemServicesManager";
 
+interface RuleConditionConnectionTrackOperand
+{
+    type: "ct";
+    key: "state";
+}
+
 interface RuleConditionMetaOperand
 {
     type: "meta";
-    key: "l4proto" | "oifname";
+    key: "iifname" | "l4proto" | "oifname";
 }
 
 interface RuleConditionPayloadOperand
 {
     type: "payload";
-    field: "saddr";
+    field: "daddr" | "dport" | "saddr" | "type";
+    protocol?: "ether" | "ip" | "tcp" | "udp";
 }
 
 interface RuleConditionPrefixOperand
@@ -46,11 +53,17 @@ interface RuleConditionValueOperand
     value: string;
 }
 
-export type NetfilteRuleConditionOperand = RuleConditionMetaOperand | RuleConditionPayloadOperand | RuleConditionPrefixOperand | RuleConditionValueOperand;
-
-interface RuleCondition
+interface RuleConditionValueListOperand
 {
-    op: "==" | "!=";
+    type: "values";
+    values: string[];
+}
+
+export type NetfilteRuleConditionOperand = RuleConditionConnectionTrackOperand | RuleConditionMetaOperand | RuleConditionPayloadOperand | RuleConditionPrefixOperand | RuleConditionValueOperand | RuleConditionValueListOperand;
+
+export interface NetfilterRuleCondition
+{
+    op: "==" | "!=" | "in";
     left: NetfilteRuleConditionOperand;
     right: NetfilteRuleConditionOperand;
 }
@@ -72,46 +85,52 @@ interface RulePolicyJump
     target: string;
 }
 
-type RulePolicy = RulePolicyAction | RulePolicyJump;
+interface RulePolicyMangle
+{
+    type: "mangle";
+    key: {
+        meta: {
+            key: "nftrace";
+        };
+    };
+    value: 1;
+}
+
+interface RulePolicyRejection
+{
+    type: "reject";
+    expr: "port-unreachable";
+}
+
+type RulePolicy = RulePolicyAction | RulePolicyJump | RulePolicyMangle | RulePolicyRejection;
 
 export interface NetfilterRuleCreationData
 {
-    conditions: RuleCondition[];
+    conditions: NetfilterRuleCondition[];
     policy?: RulePolicy;
 }
 
 export interface NetfilterRule extends NetfilterRuleCreationData
 {
-    conditions: RuleCondition[];
     counter: RuleCounter;
     handle: number;
-    policy?: RulePolicy;
 }
 
-interface ChainCreationProperties
-{
-    name: string;
-    type: "nat";
-    hook: "postrouting";
-    priority: "srcnat";
-    policy: "accept";
-}
-
-interface Chain<RuleType>
+export interface NetfilterChain<RuleType>
 {
     name: string;
     rules: RuleType[];
-    type?: "nat";
-    hook?: "postrouting";
-    prio?: number;
-    policy?: "accept";
+    type?: "filter" | "nat";
+    hook?: "forward" | "input" | "output" | "postrouting";
+    prio?: number | "filter" | "srcnat";
+    policy?: "accept" | "drop";
 }
 
 interface Table<RuleType>
 {
     name: string;
-    family: string;
-    chains: Chain<RuleType>[];
+    family: "bridge" | "ip" | "ip6";
+    chains: NetfilterChain<RuleType>[];
 }
 
 @Injectable
@@ -122,26 +141,6 @@ export class HostNetfilterService
     }
 
     //Public methods
-    public async AddChain(hostId: number, familyName: string, tableName: string, chainProps: ChainCreationProperties)
-    {
-        const configArgs = ["{", "type", chainProps.type, "hook", chainProps.hook, "priority", chainProps.priority + ";", "policy", chainProps.policy + ";", "}"];
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "add", "chain", familyName, tableName, chainProps.name, configArgs.join(" ")], hostId);
-    }
-
-    public async AddNATRule(hostId: number, familyName: string, tableName: string, chainName: string, rule: NetfilterRuleCreationData)
-    {
-        const conditionArgs = rule.conditions.Values().Map(x => this.ConditionToArgs(x).Values()).Flatten().ToArray();
-        const policyArgs = this.PolicyToArgs(rule.policy);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "add", "rule", familyName, tableName, chainName, ...conditionArgs, "counter", ...policyArgs], hostId);
-
-        await this.PersistRuleSet(hostId);
-    }
-
-    public async AddTable(hostId: number, family: string, tableName: string)
-    {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "add", "table", family, tableName], hostId);
-    }
-
     public async DeleteNATRule(hostId: number, familyName: string, tableName: string, chainName: string, handle: number)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "delete", "rule", familyName, tableName, chainName, "handle", handle.toString()], hostId);
@@ -155,16 +154,41 @@ export class HostNetfilterService
         return result;
     }
 
-    //Private methods
-    private ConditionToArgs(condition: RuleCondition): string[]
+    public async WriteRuleSet(hostId: number, tables: Table<NetfilterRuleCreationData>[])
     {
-        const result = this.OperandToArgs(condition.left);
-        if(condition.op !== "==")
-            result.push(condition.op);
-        return result.concat(this.OperandToArgs(condition.right));
+        const writtenTables = tables.map(this.TableToNFTSourceCode.bind(this));
+
+        const textContent = "#!/usr/sbin/nft -f\n\nflush ruleset\n\n" + writtenTables.join("\n\n");
+        await this.remoteRootFileSystemManager.WriteTextFile(hostId, "/etc/nftables.conf", textContent);
+
+        const enabled = await this.systemServicesManager.IsServiceEnabled(hostId, "nftables");
+        if(!enabled)
+            await this.systemServicesManager.EnableService(hostId, "nftables");
+        await this.systemServicesManager.RestartService(hostId, "nftables");
     }
 
-    private ConvertMatch(match: any): RuleCondition
+    //Private methods
+    private ChainToNFTSourceCode(chain: NetfilterChain<NetfilterRuleCreationData>)
+    {
+        const policyPart = (chain.policy === undefined) ? "" : " policy " + chain.policy + ";";
+        const type = (chain.type === undefined) ? "" : (`type ${chain.type} hook ${chain.hook} priority ${chain.prio};` + policyPart);
+        const typeIfExists = (type === "") ? "" : ("\t\t" + type + "\n");
+
+        const rules = chain.rules.Values().Map(x => "\t\t" + this.RuleToNFTSourceCode(x)).Join("\n");
+
+        return "\tchain " + chain.name + " {\n" + typeIfExists + rules + "\n\t}";
+    }
+
+    private ConditionToNFTSourceCode(condition: NetfilterRuleCondition)
+    {
+        const left = this.OperandToNFTSourceCode(condition.left);
+        const right = this.OperandToNFTSourceCode(condition.right);
+        const op = (condition.op === "!=") ? condition.op : undefined;
+
+        return [left, op, right].filter(x => x !== undefined).join(" ");
+    }
+
+    private ConvertMatch(match: any): NetfilterRuleCondition
     {
         return {
             op: match.op,
@@ -211,7 +235,7 @@ export class HostNetfilterService
     private ConvertRule(rule: any): NetfilterRule
     {
         let counter: RuleCounter = { bytes: 0, packets: 0 };
-        const conditions: RuleCondition[] = [];
+        const conditions: NetfilterRuleCondition[] = [];
         let policy: RulePolicy | undefined;
 
         for (const entry of rule.expr)
@@ -255,18 +279,22 @@ export class HostNetfilterService
         return result.stdOut;
     }
 
-    private OperandToArgs(op: NetfilteRuleConditionOperand): string[]
+    private OperandToNFTSourceCode(operand: NetfilteRuleConditionOperand)
     {
-        switch(op.type)
+        switch(operand.type)
         {
+            case "ct":
+                return ["ct", operand.key].join(" ");
             case "meta":
-                return [op.key];
+                return ["meta", operand.key].join(" ");
             case "payload":
-                return ["ip", op.field];
+                return [operand.protocol, operand.field].filter(x => x !== undefined).join(" ");
             case "prefix":
-                return [op.addr + "/" + op.len];
+                return [operand.addr + "/" + operand.len];
             case "value":
-                return [op.value];
+                return operand.value;
+            case "values":
+                return operand.values.join(",");
         }
     }
 
@@ -284,13 +312,15 @@ export class HostNetfilterService
             await this.systemServicesManager.EnableService(hostId, "nftables");
     }
 
-    private PolicyToArgs(policy: RulePolicy | undefined): string[]
+    private PolicyToNFTSourceCode(policy: RulePolicy)
     {
-        if(policy === undefined)
-            return [];
-        else if(policy.type === "jump")
-            throw new Error("Method not implemented.");
-        return [policy.type];
+        if(policy.type === "jump")
+            return "jump " + policy.target;
+        if(policy.type === "reject")
+            return "reject with icmp type " + policy.expr;
+        if(policy.type === "mangle")
+            return "meta " + policy.key.meta.key + " set " + policy.value;
+        return policy.type;
     }
 
     private async ReadNFTables(hostId: number)
@@ -330,5 +360,21 @@ export class HostNetfilterService
         }
 
         return tables;
+    }
+
+    private RuleToNFTSourceCode(rule: NetfilterRuleCreationData)
+    {
+        const conds = rule.conditions.Values().Map(this.ConditionToNFTSourceCode.bind(this)).Join(" ");
+        const policy = (rule.policy === undefined) ? "" : this.PolicyToNFTSourceCode(rule.policy);
+
+        if(conds.length === 0)
+            return policy;
+        return conds + " " + policy;
+    }
+
+    private TableToNFTSourceCode(table: Table<NetfilterRuleCreationData>)
+    {
+        const chains = table.chains.Values().Map(this.ChainToNFTSourceCode.bind(this)).Join("\n");
+        return `table ${table.family} ${table.name} {` + "\n" + chains + "\n}";
     }
 }

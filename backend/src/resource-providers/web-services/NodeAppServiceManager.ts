@@ -22,7 +22,7 @@ import { ResourcesController } from "../../data-access/ResourcesController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { DeploymentContext, ResourceState } from "../ResourceProvider";
+import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { NodeAppServiceProperties } from "./Properties";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { opcSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
@@ -95,7 +95,7 @@ export class NodeAppServiceManager
         };
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
         const isRunning = await this.IsAppServiceRunning(resourceReference);
         if(isRunning)

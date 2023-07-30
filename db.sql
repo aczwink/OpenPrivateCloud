@@ -62,6 +62,22 @@ CREATE TABLE `hosts` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `hosts_configuration`
+--
+
+DROP TABLE IF EXISTS `hosts_configuration`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `hosts_configuration` (
+  `hostId` int(10) unsigned NOT NULL,
+  `configKey` varchar(100) NOT NULL,
+  `config` text NOT NULL,
+  PRIMARY KEY (`hostId`,`configKey`),
+  CONSTRAINT `hosts_configuration_hostId` FOREIGN KEY (`hostId`) REFERENCES `hosts` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `hosts_health`
 --
 
@@ -310,4 +326,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-07-16 21:44:40
+-- Dump completed on 2023-07-30 23:38:48

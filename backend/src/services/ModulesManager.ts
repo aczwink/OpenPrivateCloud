@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -127,15 +127,26 @@ export class ModulesManager
                         config = {};
                     }
 
+                    config["bridge"] = "none";
                     config["data-root"] = dockerDataPath;
+                    config["iptables"] = false;
                     await remoteRootFileSystemManager.WriteTextFile(hostId, dockerDaemonConfigFile, JSON.stringify(config));
 
-                    const oldDataPath = "/var/lib/docker/";
-                    await remoteCommandExecutor.ExecuteCommand(["sudo", "rsync", "-axS", oldDataPath, dockerDataPath], hostId);
-
-                    await remoteRootFileSystemManager.RemoveDirectoryRecursive(hostId, oldDataPath);
-
                     await systemServicesManager.StartService(hostId, "docker");
+
+                    //the standard docker bridge driver does not allow using custom bridges (at least not more than one i.e. "bridge" in the daemon.json). This plugin effectively allows us exactly that
+                    await remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "plugin", "install", "--grant-all-permissions", "ghcr.io/devplayer0/docker-net-dhcp:release-linux-amd64"], hostId);
+                }
+                break;
+            case "libvirt":
+                {
+                    const remoteCommandExecutor = GlobalInjector.Resolve(RemoteCommandExecutor);
+                    const systemServicesManager = GlobalInjector.Resolve(SystemServicesManager);
+
+                    await remoteCommandExecutor.ExecuteCommand(["virsh", "net-destroy", "default"], hostId);
+                    await remoteCommandExecutor.ExecuteCommand(["virsh", "net-undefine", "default"], hostId);
+
+                    await systemServicesManager.RestartService(hostId, "nftables"); //reload firewall rules
                 }
                 break;
             case "samba":

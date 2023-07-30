@@ -23,6 +23,9 @@ import { HostPerformanceMeasurementService } from "../services/HostPerformanceMe
 import { HostsManager } from "../services/HostsManager";
 import { HostUpdateManager } from "../services/HostUpdateManager";
 import { RemoteCommandExecutor } from "../services/RemoteCommandExecutor";
+import { HostNetworkInterfaceCardsManager } from "../services/HostNetworkInterfaceCardsManager";
+import { FirewallRule, HostFirewallZonesManager } from "../services/HostFirewallZonesManager";
+import { HostFirewallSettingsManager } from "../services/HostFirewallSettingsManager";
 
 interface UnattendedUpgradeConfigDto
 {
@@ -35,6 +38,12 @@ interface UpdateInfoDto
     distributionName: string;
     unattendedUpgradeConfig: UnattendedUpgradeConfigDto;
     updatablePackagesCount: number;
+}
+
+interface NetworkInterfaceDTO
+{
+    name: string;
+    zone: string;
 }
 
 @APIController("hosts")
@@ -62,7 +71,8 @@ class HostsAPIController
 @APIController("hosts/{hostName}")
 class HostAPIController
 {
-    constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor, private hostPerformanceMeasurementService: HostPerformanceMeasurementService)
+    constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor, private hostPerformanceMeasurementService: HostPerformanceMeasurementService,
+        private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private hostFirewallZonesManager: HostFirewallZonesManager)
     {
     }
 
@@ -96,6 +106,26 @@ class HostAPIController
             return NotFound("host does not exist");
 
         return await this.hostPerformanceMeasurementService.QueryLogs(hostId);
+    }
+
+    @Get("networkInterfaces")
+    public async QueryNetworkInterfaces(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+
+        const interfaces = await this.hostNetworkInterfaceCardsManager.QueryAllNetworkInterfaces(hostId);
+        return Promise.all(interfaces.map(async x => {
+            const zone = await this.hostFirewallZonesManager.DetermineAssignedZoneForNetworkInterface(hostId, x);
+            const res: NetworkInterfaceDTO = {
+                name: x,
+                zone,
+            };
+            return res;
+        }));
     }
 
     @Get("performance")
@@ -138,6 +168,82 @@ class HostAPIController
     private IssueShutdown(hostId: number, additionalArgs: string[])
     {
         setTimeout(() => this.remoteCommandExecutor.ExecuteCommand(["sudo", "shutdown"].concat(additionalArgs).concat(["0"]), hostId), 5000);
+    }
+}
+
+@APIController("hosts/{hostName}/firewall")
+class _api_
+{
+    constructor(private hostsController: HostsController, private hostFirewallSettingsManager: HostFirewallSettingsManager)
+    {
+    }
+
+    @Common()
+    public async QueryHostId(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+        return hostId;
+    }
+
+    @Get("{direction}")
+    public async QueryRuleSet(
+        @Common hostId: number,
+        @Path direction: "Inbound" | "Outbound",
+    )
+    {
+        const ruleSet = await this.hostFirewallSettingsManager.QueryHostFirewallRules(hostId, direction);
+
+        //implicit rules
+        if(direction === "Inbound")
+        {
+            ruleSet.push({
+                priority: 65535,
+                destinationPortRanges: "Any",
+                protocol: "Any",
+                source: "Any",
+                destination: "Any",
+                action: "Deny",
+                comment: "Deny all inbound traffic"
+            });
+        }
+        else
+        {
+            ruleSet.push({
+                priority: 65535,
+                destinationPortRanges: "Any",
+                protocol: "Any",
+                source: "Any",
+                destination: "Any",
+                action: "Allow",
+                comment: "Allow all outbound traffic"
+            });
+        }
+
+        return ruleSet;
+    }
+
+    @Delete("{direction}")
+    public async DeleteRule(
+        @Common hostId: number,
+        @Path direction: "Inbound" | "Outbound",
+        @BodyProp priority: number
+    )
+    {
+        await this.hostFirewallSettingsManager.DeleteRule(hostId, direction, priority);
+    }
+
+    @Put("{direction}")
+    public async SetRule(
+        @Common hostId: number,
+        @Path direction: "Inbound" | "Outbound",
+        @Body rule: FirewallRule
+    )
+    {
+        await this.hostFirewallSettingsManager.SetRule(hostId, direction, rule);
     }
 }
 

@@ -18,7 +18,7 @@
 import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { FileStorageProperties } from "./FileStorageProperties";
 import { FileStoragesManager } from "./FileStoragesManager";
@@ -52,10 +52,6 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     }
 
     //Public methods
-    public async CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>
-    {
-    }
-
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
     }
@@ -99,7 +95,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
         return {};
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         return "running";
     }

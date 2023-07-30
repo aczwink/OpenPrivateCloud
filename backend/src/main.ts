@@ -26,11 +26,21 @@ import { DBConnectionsManager } from "./data-access/DBConnectionsManager";
 import { APISchemaService } from "./services/APISchemaService";
 import { HostAvailabilityManager } from "./services/HostAvailabilityManager";
 import { ResourceHealthManager } from "./services/ResourceHealthManager";
+import { HostFirewallZonesManager } from "./services/HostFirewallZonesManager";
+import { HostFirewallSettingsManager } from "./services/HostFirewallSettingsManager";
+import { VNetManager } from "./resource-providers/network-services/VNetManager";
+import { OpenVPNGatewayManager } from "./resource-providers/network-services/OpenVPNGatewayManager";
+import { ProcessTrackerManager } from "./services/ProcessTrackerManager";
 
 const port = 8078;
 
 async function EnableHealthManagement()
 {
+    const fwZonesMgr = GlobalInjector.Resolve(HostFirewallZonesManager);
+    fwZonesMgr.RegisterDataProvider(GlobalInjector.Resolve(HostFirewallSettingsManager));
+    fwZonesMgr.RegisterDataProvider(GlobalInjector.Resolve(VNetManager));
+    fwZonesMgr.RegisterDataProvider(GlobalInjector.Resolve(OpenVPNGatewayManager));
+
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
     GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
 }
@@ -74,5 +84,23 @@ async function SetupServer()
         server.close();
     });
 }
+
+function DumpCommands()
+{
+    const ptm = GlobalInjector.Resolve(ProcessTrackerManager);
+    for (const process of ptm.processes)
+    {
+        console.log(process);
+    }
+}
+
+process.on("uncaughtException", (error, origin) => {
+    DumpCommands();
+    console.log("Unhandled exception: ", error, origin);
+});
+process.on("unhandledRejection", (reason, promise) => {
+    DumpCommands();
+    console.log("Unhandled rejection: ", reason, promise);
+});
 
 SetupServer();

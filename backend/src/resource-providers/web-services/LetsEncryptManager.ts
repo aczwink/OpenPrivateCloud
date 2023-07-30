@@ -20,7 +20,7 @@ import { UsersController } from "../../data-access/UsersController";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
-import { DeploymentContext, ResourceState } from "../ResourceProvider";
+import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { ApacheManager } from "./ApacheManager";
 import { CertBotListParser } from "./CertBotListParser";
 import { LetsEncryptProperties } from "./Properties";
@@ -88,7 +88,7 @@ export class LetsEncryptManager
         }
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
         const cert = await this.GetCert(resourceReference);
         if(cert === undefined)

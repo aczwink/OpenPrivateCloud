@@ -48,6 +48,11 @@ export class RemoteRootFileSystemManager
         return exitCode === 0;
     }
 
+    public async CreateSymbolicLink(hostId: number, remotePath: string, linkTargetPath: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ln", "-s", linkTargetPath, remotePath], hostId)
+    }
+
     public async ListDirectoryContents(hostId: number, remotePath: string)
     {
         const pythonCode = "import os, json; print(json.dumps(os.listdir('" + remotePath + "')))";

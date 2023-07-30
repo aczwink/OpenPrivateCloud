@@ -83,7 +83,9 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
 
     private Order(v1: any, v2: any)
     {
-        return v1.toString().localeCompare();
+        if(typeof v1 === "number")
+            return v1 - v2;
+        return v1.toString().localeCompare(v2);
     }
 
     private async QueryData()
@@ -98,7 +100,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
 
     private RenderColumnsNames()
     {
-        return this.input.elementSchema.properties.OwnKeys().Map(x => <th>{RenderTitle(this.input.elementSchema.properties[x]!, x.toString())}</th>).ToArray();
+        return this.input.elementSchema.properties.OwnKeys().Map(x => <th onclick={this.OnColumnHeaderClick.bind(this, x)}>{RenderTitle(this.input.elementSchema.properties[x]!, x.toString())}</th>).ToArray();
     }
 
     private RenderIdBoundAction(object: any, action: IdBoundResourceAction<any, any, any>)
@@ -186,6 +188,12 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
     }
 
     //Event handlers
+    private OnColumnHeaderClick(columnKey: string | number)
+    {
+        this.Sort(columnKey, true);
+        this.Update();
+    }
+    
     private async OnDelete(action: DeleteAction<any, any>, object: any)
     {
         if(confirm("Are you sure that you want to delete this?"))

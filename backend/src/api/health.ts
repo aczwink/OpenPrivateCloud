@@ -21,6 +21,7 @@ import { HealthController, HealthStats, HealthStatus } from "../data-access/Heal
 import { ResourcesManager } from "../services/ResourcesManager";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { TimeSchedule } from "../common/TimeSchedule";
+import { ResourceState } from "../resource-providers/ResourceProvider";
 
 interface ClusterHealthStats
 {
@@ -41,7 +42,9 @@ interface ResourceCheckDTO
 
 interface ResourceHealthDTO
 {
-    status: HealthStatus;
+    healthStatus: HealthStatus;
+    state: ResourceState;
+    hostName: string;
     
     /**
      * @format multi-line
@@ -79,10 +82,14 @@ class HealthAPIController
 
         const hd = await this.healthController.QueryResourceHealthData(ref.id);
         const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref.id);
+        const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref);
+        const stateResult = await resourceProvider.QueryResourceState(ref);
 
         const res: ResourceHealthDTO = {
             availabilityLog: hd!.availabilityLog,
-            status: hd!.status,
+            healthStatus: hd!.status,
+            hostName: ref.hostName,
+            state: (typeof stateResult === "string") ? stateResult : stateResult.state
         };
         if(schedule !== null)
         {

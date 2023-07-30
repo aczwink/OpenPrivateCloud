@@ -16,8 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, JournalEntry, PartitionDto, StorageDeviceDto } from "../../dist/api";
+import { FirewallRule, Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, JournalEntry, NetworkInterfaceDTO, PartitionDto, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
+import { ExtractDataFromResponseOrShowErrorMessageOnError, UnwrapResponse } from "../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
 import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
@@ -47,6 +48,7 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
     schemaName: "Host",
 };
 
+//Monitoring
 const logsViewModel: ListViewModel<JournalEntry, HostId> = {
     type: "list",
     actions: [],
@@ -54,38 +56,6 @@ const logsViewModel: ListViewModel<JournalEntry, HostId> = {
     displayName: "Logs",
     requestObjects: (service, ids) => service.hosts._any_.logs.get(ids.hostName),
     schemaName: "JournalEntry"
-};
-
-const storageViewModel: ObjectViewModel<HostStorageWithInfo, { hostName: string, storageId: number }> = {
-    type: "object",
-    actions: [
-        {
-            type: "delete",
-            deleteResource: (service, ids) => service.hostStorages._any_.delete(ids.storageId),
-        }
-    ],
-    formTitle: (_, x) => x.path,
-    requestObject: (service, ids) => service.hostStorages._any_.get(ids.storageId),
-    schemaName: "HostStorageWithInfo",
-};
-
-type HostId = { hostName: string };
-
-const storagesViewModel: CollectionViewModel<HostStorage, HostId, HostStorageCreationProperties> = {
-    type: "collection",
-    actions: [
-        {
-            type: "create",
-            createResource: (service, ids, props) => service.hosts._any_.storages.post(ids.hostName, { props }),
-            schemaName: "HostStorageCreationProperties"
-        }
-    ],
-    child: storageViewModel,
-    displayName: "Host-storage",
-    extractId: x => x.id,
-    idKey: "storageId",
-    requestObjects: (service, ids) => service.hosts._any_.storages.get(ids.hostName),
-    schemaName: "HostStorage",
 };
 
 type StorageDeviceId = Host & { storageDevicePath: string };
@@ -133,6 +103,15 @@ const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId> = {
     type: "multiPage"
 };
 
+const nicsViewModel: ListViewModel<NetworkInterfaceDTO, HostId> = {
+    type: "list",
+    actions: [],
+    boundActions: [],
+    displayName: "Network interfaces",
+    requestObjects: (service, ids) => service.hosts._any_.networkInterfaces.get(ids.hostName),
+    schemaName: "NetworkInterfaceDTO"
+};
+
 const storageDevicesViewModel: CollectionViewModel<StorageDeviceDto, HostId> = {
     type: "collection",
     actions: [],
@@ -142,6 +121,79 @@ const storageDevicesViewModel: CollectionViewModel<StorageDeviceDto, HostId> = {
     idKey: "storageDevicePath",
     requestObjects: (service, ids) => service.hosts._any_.storageDevices.get(ids.hostName),
     schemaName: "StorageDeviceDto",
+};
+
+//Configuration
+type HostId = { hostName: string };
+
+function BuildFirewallViewModel(direction: "Inbound" | "Outbound")
+{
+    const firewallViewModel: ListViewModel<FirewallRule, HostId> = {
+        type: "list",
+        actions: [
+            {
+                type: "create",
+                createResource: (service, ids, rule) => service.hosts._any_.firewall._any_.put(ids.hostName, direction, rule),
+            }
+        ],
+        boundActions: [
+            {
+                type: "edit",
+                schemaName: "FirewallRule",
+                updateResource: async (service, ids, idx, rule) => {
+                    const response = await service.hosts._any_.firewall._any_.get(ids.hostName, direction);
+                    const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                    if(result.ok)
+                    {
+                        const ruleToDelete = result.value[idx];
+                        await service.hosts._any_.firewall._any_.delete(ids.hostName, direction, { priority: ruleToDelete.priority });
+                        return service.hosts._any_.firewall._any_.put(ids.hostName, direction, rule);
+                    }
+
+                    return response;
+                },
+            },
+            {
+                type: "delete",
+                deleteResource: (service, ids, rule) => service.hosts._any_.firewall._any_.delete(ids.hostName, direction, { priority: rule.priority }),
+            }
+        ],
+        displayName: direction + " firewall rules - External Zone",
+        requestObjects: (service, ids) => service.hosts._any_.firewall._any_.get(ids.hostName, direction),
+        schemaName: "FirewallRule"
+    };
+
+    return firewallViewModel;
+}
+
+const storageViewModel: ObjectViewModel<HostStorageWithInfo, { hostName: string, storageId: number }> = {
+    type: "object",
+    actions: [
+        {
+            type: "delete",
+            deleteResource: (service, ids) => service.hostStorages._any_.delete(ids.storageId),
+        }
+    ],
+    formTitle: (_, x) => x.path,
+    requestObject: (service, ids) => service.hostStorages._any_.get(ids.storageId),
+    schemaName: "HostStorageWithInfo",
+};
+
+const storagesViewModel: CollectionViewModel<HostStorage, HostId, HostStorageCreationProperties> = {
+    type: "collection",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, props) => service.hosts._any_.storages.post(ids.hostName, { props }),
+            schemaName: "HostStorageCreationProperties"
+        }
+    ],
+    child: storageViewModel,
+    displayName: "Host-storage",
+    extractId: x => x.id,
+    idKey: "storageId",
+    requestObjects: (service, ids) => service.hosts._any_.storages.get(ids.hostName),
+    schemaName: "HostStorage",
 };
 
 const hostViewModel: MultiPageViewModel<HostId> = {
@@ -162,6 +214,23 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     displayName: "Overview",
                     key: "overview"
                 },
+                {
+                    key: "update",
+                    displayName: "Update",
+                    child: {
+                        type: "component",
+                        component: HostUpdateComponent
+                    },
+                    icon: {
+                        type: "material",
+                        name: "update"
+                    }
+                },
+            ]
+        },
+        {
+            displayName: "Monitoring",
+            entries: [
                 {
                     child: {
                         type: "component",
@@ -192,15 +261,40 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     key: "logs",
                 },
                 {
-                    key: "update",
-                    displayName: "Update",
-                    child: {
-                        type: "component",
-                        component: HostUpdateComponent
-                    },
+                    child: nicsViewModel,
+                    displayName: "Network interfaces",
+                    key: "nics"
+                },
+                {
+                    child: storageDevicesViewModel,
+                    displayName: "Storage devices",
+                    key: "storage-devices",
                     icon: {
                         type: "material",
-                        name: "update"
+                        name: "storage"
+                    }
+                },
+            ]
+        },
+        {
+            displayName: "Configuration",
+            entries: [
+                {
+                    child: BuildFirewallViewModel("Inbound"),
+                    displayName: "Inbound Firewall rules",
+                    key: "inboundfw",
+                    icon: {
+                        type: "bootstrap",
+                        name: "bricks"
+                    }
+                },
+                {
+                    child: BuildFirewallViewModel("Outbound"),
+                    displayName: "Outbound Firewall rules",
+                    key: "outboundfw",
+                    icon: {
+                        type: "bootstrap",
+                        name: "bricks"
                     }
                 },
                 {
@@ -210,15 +304,6 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     icon: {
                         type: "material",
                         name: "album"
-                    }
-                },
-                {
-                    child: storageDevicesViewModel,
-                    displayName: "Storage devices",
-                    key: "storage-devices",
-                    icon: {
-                        type: "material",
-                        name: "storage"
                     }
                 },
             ]

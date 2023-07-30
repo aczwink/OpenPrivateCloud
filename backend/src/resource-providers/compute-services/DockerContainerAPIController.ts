@@ -19,7 +19,7 @@
 import { APIController, Body, BodyProp, Common, Get, Path, Post, Put } from "acts-util-apilib";
 import { c_computeServicesResourceProviderName, c_dockerContainerResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { ResourcesManager } from "../../services/ResourcesManager";
-import { DockerContainerManager } from "./DockerContainerManager";
+import { ContainerAppServiceConfig, ContainerAppServiceManager } from "./ContainerAppServiceManager";
 import { DockerContainerConfig } from "./DockerManager";
 import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
 import { ResourceReference } from "../../common/ResourceReference";
@@ -29,6 +29,7 @@ interface DockerContainerInfo
 {
     hostName: string;
     state: string;
+    ipAddresses: string[];
 }
 
 interface DockerContainerLogDto
@@ -47,7 +48,7 @@ interface DockerContainerLogDto
 @APIController(`resourceProviders/{resourceGroupName}/${c_computeServicesResourceProviderName}/${c_dockerContainerResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
-    constructor(instancesManager: ResourcesManager, private dockerContainerManager: DockerContainerManager)
+    constructor(instancesManager: ResourcesManager, private dockerContainerManager: ContainerAppServiceManager)
     {
         super(instancesManager, c_computeServicesResourceProviderName, c_dockerContainerResourceTypeName);
     }
@@ -81,7 +82,7 @@ class _api_ extends ResourceAPIControllerBase
     @Put("config")
     public async UpdateContainerConfig(
         @Common resourceReference: ResourceReference,
-        @Body config: DockerContainerConfig
+        @Body config: ContainerAppServiceConfig
     )
     {
         return this.dockerContainerManager.UpdateContainerConfig(resourceReference.id, config);
@@ -92,9 +93,11 @@ class _api_ extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference
     )
     {            
+        const data = await this.dockerContainerManager.InspectContainer(resourceReference);
         const result: DockerContainerInfo = {
             hostName: resourceReference.hostName,
             state: await this.dockerContainerManager.QueryContainerStatus(resourceReference),
+            ipAddresses: (data === undefined) ? [] : data.NetworkSettings.Networks.Values().NotUndefined().Map(x => x.IPAddress).ToArray()
         };
         return result;
     }

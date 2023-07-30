@@ -87,12 +87,20 @@ export class ResourceListComponent extends Component
                 return <BootstrapIcon>database</BootstrapIcon>;
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return <BootstrapIcon>folder-fill</BootstrapIcon>;
+            case resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name:
+                return <BootstrapIcon>houses</BootstrapIcon>;
             case resourceProviders.multimediaServices.avTranscoderResourceType.name:
                 return <BootstrapIcon>film</BootstrapIcon>;
             case resourceProviders.networkServices.dnsServerResourceType.name:
                 return <BootstrapIcon>signpost-split</BootstrapIcon>;
             case resourceProviders.networkServices.openVPNGatewayResourceType.name:
                 return <BootstrapIcon>shield-lock</BootstrapIcon>;
+            case resourceProviders.networkServices.virtualNetworkResourceType.name:
+                return <BootstrapIcon>ethernet</BootstrapIcon>;
+            case resourceProviders.securityServices.keyVaultResourceTypeName.name:
+                return <BootstrapIcon>key</BootstrapIcon>;
+            case resourceProviders.webServices.apiGatewayResourceType.name:
+                return <BootstrapIcon>sign-turn-right</BootstrapIcon>;
             case resourceProviders.webServices.jdownloaderResourceType.name:
                 return <BootstrapIcon>cloud-download</BootstrapIcon>;
             case resourceProviders.webServices.letsencryptCertResourceType.name:

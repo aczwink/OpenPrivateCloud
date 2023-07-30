@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -47,13 +47,20 @@ export class DeleteObjectComponent extends Component<DeleteObjectComponentInput>
             <br />
             <div className="btn-group">
                 <button type="button" className="btn btn-danger" onclick={this.OnDelete.bind(this)}>Delete</button>
-                <RouterButton className="btn btn-secondary" route={this.input.postDeleteUrl}>Cancel</RouterButton>
+                <RouterButton className="btn btn-secondary" route={this.postDeleteURL}>Cancel</RouterButton>
             </div>
         </fragment>;
     }
 
     //Private variables
     private loading: boolean;
+
+    //Private properties
+    private get postDeleteURL()
+    {
+        const replaced = RouterState.ReplaceRouteParams(this.input.postDeleteUrl, this.routerState.routeParams);
+        return replaced.join("/");
+    }
 
     //Event handlers
     private async OnDelete()
@@ -62,7 +69,6 @@ export class DeleteObjectComponent extends Component<DeleteObjectComponentInput>
         const response = await this.input.deleteResource(this.routerState.routeParams);
         ShowErrorMessageOnErrorFromResponse(response);
 
-        const replaced = RouterState.ReplaceRouteParams(this.input.postDeleteUrl, this.routerState.routeParams);
-        this.router.RouteTo(replaced.join("/"));
+        this.router.RouteTo(this.postDeleteURL);
     }
 }

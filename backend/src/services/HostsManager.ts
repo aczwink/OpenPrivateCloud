@@ -24,11 +24,12 @@ import { HostsController } from "../data-access/HostsController";
 import { ModulesManager } from "./ModulesManager";
 import { SSHCommandExecutor } from "./SSHCommandExecutor";
 import { opcSpecialUsers } from "../common/UserAndGroupDefinitions";
+import { HostFirewallSettingsManager } from "./HostFirewallSettingsManager";
 
 @Injectable
 export class HostsManager
 {
-    constructor(private localCommandExecutor: LocalCommandExecutor, private modulesManager: ModulesManager,
+    constructor(private localCommandExecutor: LocalCommandExecutor, private modulesManager: ModulesManager, private hostFirewallSettingsManager: HostFirewallSettingsManager,
         private sshService: SSHService, private hostsController: HostsController, private sshCommandExecutor: SSHCommandExecutor)
     {
     }
@@ -45,6 +46,26 @@ export class HostsManager
 
         const hostId = await this.hostsController.AddHost(hostName, newPassword);
         await this.modulesManager.EnsureModuleIsInstalled(hostId, "core");
+
+        //enable firewall and make sure ssh is reachable
+        await this.hostFirewallSettingsManager.SetRule(hostId, "Inbound", {
+            priority: 100,
+            destinationPortRanges: "22",
+            protocol: "TCP",
+            source: "Any",
+            destination: "Any",
+            action: "Allow",
+            comment: "SSH. Required for host management. Do not touch!"
+        });
+        await this.hostFirewallSettingsManager.SetRule(hostId, "Inbound", {
+            priority: 101,
+            destinationPortRanges: "Any",
+            protocol: "ICMP",
+            source: "Any",
+            destination: "Any",
+            action: "Allow",
+            comment: "Ping. Recommended for diagnosis"
+        });
 
         //await this.GenerateKeyPair(hostName);
         //await this.CopyPublicKeyToHost(hostName, hostName);

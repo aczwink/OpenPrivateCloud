@@ -58,17 +58,18 @@ export interface DeploymentResult
 }
 
 export type ResourceState = "corrupt" | "down" | "in deployment" | "running" | "stopped";
+type ResourceStateWithContext = { state: ResourceState; context: string; };
+export type ResourceStateResult = ResourceState | ResourceStateWithContext;
 
 export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
 {
     readonly name: string;
     readonly resourceTypeDefinitions: ResourceTypeDefinition[];
 
-    CheckResourceAvailability(resourceReference: ResourceReference): Promise<void>;
     CheckResourceHealth(resourceReference: ResourceReference): Promise<void>;
     DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>;
     ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>;
     InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
-    QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>;
+    QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>;
 }

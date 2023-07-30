@@ -270,7 +270,8 @@ class _api3_
             case HealthStatus.Up:
             {
                 const rp = this.resourceProviderManager.FindResourceProviderByResource(resourceReference);
-                return await rp.QueryResourceState(resourceReference);
+                const result = await rp.QueryResourceState(resourceReference);
+                return (typeof result === "string") ? result : result.state;
             }
         }
     }

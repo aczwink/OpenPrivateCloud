@@ -96,7 +96,12 @@ export class MariaDBContainerManager implements MariaDBInterface
 
     public async ProvideResource(instanceProperties: MariadbProperties, context: DeploymentContext)
     {
+        throw new Error("TODO: MISSING vnetResourceExternalId");
         const config: DockerContainerConfig = {
+            additionalHosts: [],
+            capabilities: [],
+            dnsSearchDomains: [],
+            dnsServers: [],
             env: [
                 {
                     varName: "MARIADB_ROOT_PASSWORD",
@@ -104,9 +109,10 @@ export class MariaDBContainerManager implements MariaDBInterface
                 }
             ],
             imageName: "mariadb",
+            networkName: "TODO",
             portMap: [],
             restartPolicy: "always",
-            volumes: []
+            volumes: [],
         };
         const containerName = this.DeriveContainerName(context.resourceReference);
         await this.dockerManager.CreateContainerInstanceAndStart(context.hostId, containerName, config);

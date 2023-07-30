@@ -31,4 +31,14 @@ export interface OpenVPNGatewayProperties extends BaseResourceProperties
     keySize: 2048 | 4096;
 }
 
-export type NetworkServicesProperties = DNS_ServerProperties | OpenVPNGatewayProperties;
+export interface VirtualNetworkProperties extends BaseResourceProperties
+{
+    type: "virtual-network";
+    /**
+     * CIDR-range
+     */
+    addressSpace: string;
+    enableDHCPv4: boolean;
+}
+
+export type NetworkServicesProperties = DNS_ServerProperties | OpenVPNGatewayProperties | VirtualNetworkProperties;

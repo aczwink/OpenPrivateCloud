@@ -21,7 +21,8 @@ import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
 import { APIController, Body, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ResourceReference } from "../../common/ResourceReference";
-import { DNS_Record, DNS_ServerManager } from "./DNS_ServerManager";
+import { DNS_ServerManager } from "./DNS_ServerManager";
+import { DNS_ServerSettings, DNS_Record } from "./models_dns";
 
 interface DNS_ZoneDTO
 {
@@ -43,6 +44,23 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         return this.FetchResourceReference(resourceGroupName, resourceName);
+    }
+
+    @Get("serverSettings")
+    public QueryServerSettings(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        return this.dnsServerManager.QueryServerSettings(resourceReference.id);
+    }
+
+    @Put("serverSettings")
+    public UpdateServerSettings(
+        @Common resourceReference: ResourceReference,
+        @Body serverSettings: DNS_ServerSettings
+    )
+    {
+        return this.dnsServerManager.UpdateServerSettings(resourceReference, serverSettings);
     }
 
     @Post("zones")

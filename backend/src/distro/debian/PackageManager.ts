@@ -121,7 +121,9 @@ class DebianPackageManager implements DistroPackageManager
             case "apache":
                 return ["apache2"];
             case "core":
-                return ["acl", "btrfs-progs", "smartmontools", "unattended-upgrades", "unzip"];
+                return ["acl", "btrfs-progs", "nftables", "smartmontools", "unattended-upgrades", "unzip"];
+            case "dnsmasq":
+                return ["dnsmasq"];
             case "docker":
                 return ["docker.io"];
             case "ffmpeg":

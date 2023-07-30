@@ -19,7 +19,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { DeploymentContext, ResourceDeletionError, ResourceState } from "../ResourceProvider";
+import { DeploymentContext, ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
 import { OSImageDownloader } from "./OSImageDownloader";
 import { OSQueryService } from "./OSQueryService";
 import { VirtualMachineProperties } from "./Properties";
@@ -74,7 +74,7 @@ export class VirtualMachineManager
         await this.remoteCommandExecutor.ExecuteCommand(command, resourceReference.hostId);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
         const state = await this.QueryVMState(resourceReference);
         if(state === undefined)
