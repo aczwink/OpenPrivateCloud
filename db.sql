@@ -241,6 +241,23 @@ CREATE TABLE `instances_roleAssignments` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `resources_dependencies`
+--
+
+DROP TABLE IF EXISTS `resources_dependencies`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `resources_dependencies` (
+  `resourceId` int(10) unsigned NOT NULL,
+  `dependantResourceId` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`resourceId`,`dependantResourceId`),
+  KEY `resources_dependencies_dependantResourceId` (`dependantResourceId`),
+  CONSTRAINT `resources_dependencies_dependantResourceId` FOREIGN KEY (`dependantResourceId`) REFERENCES `instances` (`id`),
+  CONSTRAINT `resources_dependencies_resourceId` FOREIGN KEY (`resourceId`) REFERENCES `instances` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `roles`
 --
 
@@ -326,4 +343,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-07-30 23:38:48
+-- Dump completed on 2023-08-07  1:33:39
