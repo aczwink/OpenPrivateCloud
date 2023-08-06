@@ -205,32 +205,22 @@ export class ContainerAppServiceManager
         const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.vnetResourceExternalId);
         if(vnetRef === undefined)
             throw new Error("VNET does not exist!");
-        const dockerNetName = await this.vnetManager.EnsureDockerNetworkExists(vnetRef);
+        const dockerNetwork = await this.vnetManager.EnsureDockerNetworkExists(vnetRef);
 
         const dockerConfig: DockerContainerConfig = {
             additionalHosts: [],
             capabilities: [],
             dnsSearchDomains: [],
-            dnsServers: [],
+            dnsServers: [dockerNetwork.primaryDNS_Server],
             env: config.env,
+            macAddress: this.dockerManager.CreateMAC_Address(resourceReference.id),
             imageName: config.imageName,
-            networkName: dockerNetName,
+            networkName: dockerNetwork.name,
             portMap: [],
+            removeOnExit: false,
             restartPolicy: "always",
             volumes: [],
         };
-
-        /*const readOnlyVolumes = [];
-        if(config.certResourceExternalId)
-        {
-            const rmgr = GlobalInjector.Resolve(ResourcesManager);
-            const certResourceRef = await rmgr.CreateResourceReferenceFromExternalId(config.certResourceExternalId);
-            const lem = GlobalInjector.Resolve(LetsEncryptManager);
-            const cert = await lem.GetCert(certResourceRef!);
-
-            readOnlyVolumes.push("-v", cert!.certificatePath + ":/certs/public.crt:ro");
-            readOnlyVolumes.push("-v", cert!.privateKeyPath + ":/certs/private.key:ro");
-        }*/
 
         if((containerData !== undefined) && this.HasConfigChanged(containerData, config))
         {

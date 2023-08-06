@@ -91,7 +91,8 @@ export class NextcloudManager
         const appDir = path.join(resourceDir, "nextcloud");
         const user = await this.usersController.QueryUser(userId);
 
-        const certRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(certResourceExternalId);
+        throw new Error("use kv cert and not certbot");
+        /*const certRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(certResourceExternalId);
         if(certRef === undefined)
             throw new Error("cert resource not found");
         const cert = await this.letsEncryptManager.GetCert(certRef);
@@ -124,7 +125,7 @@ export class NextcloudManager
         await this.apacheManager.CreateSite(hostId, siteName, vh);
         await this.apacheManager.EnableSite(hostId, siteName);
 
-        await this.systemServicesManager.RestartService(hostId, "apache2");
+        await this.systemServicesManager.RestartService(hostId, "apache2");*/
     }
 
     private async DownloadNextcloudApp(hostId: number, instanceDir: string)

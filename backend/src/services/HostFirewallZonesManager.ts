@@ -18,7 +18,6 @@
 
 import { Injectable } from "acts-util-node";
 import { HostNetworkInterfaceCardsManager } from "./HostNetworkInterfaceCardsManager";
-import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { Observer, Subject } from "acts-util-core";
 import { CIDRRange } from "../common/CIDRRange";
 
@@ -62,6 +61,7 @@ interface FirewallZoneCollection
         interfaceNames: string[];
         inboundRules: FirewallRule[];
         outboundRules: FirewallRule[];
+        portForwardingRules: PortForwardingRule[];
     };
 
     trusted: {
@@ -69,11 +69,20 @@ interface FirewallZoneCollection
     };
 }
 
+export interface PortForwardingRule
+{
+    protocol: "TCP" | "UDP";
+    port: number;
+    targetAddress: string;
+    targetPort: number;
+}
+
 export interface FirewallZoneData
 {
     addressSpace: CIDRRange;
     inboundRules: FirewallRule[];
     outboundRules: FirewallRule[];
+    portForwardingRules: PortForwardingRule[];
 }
 
 export interface FirewallZoneDataProvider
@@ -86,7 +95,7 @@ export interface FirewallZoneDataProvider
 @Injectable
 export class HostFirewallZonesManager
 {
-    constructor(private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private remoteCommandExecutor: RemoteCommandExecutor)
+    constructor(private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager)
     {
         this._onChanges = new Subject<number>;
         this.dataProviders = [];
@@ -134,7 +143,8 @@ export class HostFirewallZonesManager
             external: {
                 interfaceNames: zoneInterfaces["external"]!,
                 inboundRules: externalZoneData.inboundRules,
-                outboundRules: externalZoneData.outboundRules
+                outboundRules: externalZoneData.outboundRules,
+                portForwardingRules: externalZoneData.portForwardingRules,
             },
             trusted: {
                 interfaceNames: zoneInterfaces["trusted"]!

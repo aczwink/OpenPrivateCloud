@@ -135,7 +135,8 @@ export class ModulesManager
                     await systemServicesManager.StartService(hostId, "docker");
 
                     //the standard docker bridge driver does not allow using custom bridges (at least not more than one i.e. "bridge" in the daemon.json). This plugin effectively allows us exactly that
-                    await remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "plugin", "install", "--grant-all-permissions", "ghcr.io/devplayer0/docker-net-dhcp:release-linux-amd64"], hostId);
+                    const pluginName = "ghcr.io/aczwink/docker-net-dhcp:latest-linux-amd64";
+                    await remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "plugin", "install", "--grant-all-permissions", pluginName], hostId);
                 }
                 break;
             case "libvirt":

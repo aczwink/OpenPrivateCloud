@@ -43,16 +43,17 @@ export class BindContainerManager
 
     public async RestartContainer(resourceReference: LightweightResourceReference, configDir: string)
     {
-        throw new Error("TODO: MISSING vnetResourceExternalId");
+        throw new Error("TODO: MISSING vnetResourceExternalId, dnsServers");
 
         const config: DockerContainerConfig = {
             additionalHosts: [],
             capabilities: [],
             dnsSearchDomains: [],
-            dnsServers: [],
+            dnsServers: [], //TODO: set this
             env: [
             ],
             imageName: "ubuntu/bind9:latest",
+            macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
             networkName: "TODO",
             portMap: [
                 {
@@ -66,6 +67,7 @@ export class BindContainerManager
                     protocol: "UDP"
                 },
             ],
+            removeOnExit: false,
             restartPolicy: "always",
             volumes: [
                 {

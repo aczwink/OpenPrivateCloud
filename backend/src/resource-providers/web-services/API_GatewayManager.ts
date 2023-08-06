@@ -186,15 +186,20 @@ server {
 
     private async RestartGateway(resourceReference: LightweightResourceReference, resourceDir: string, config: API_GatewayConfig)
     {
+        const vNetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.settings.vnetResourceExternalId);
+
+        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);
         const containerConfig: DockerContainerConfig = {
             additionalHosts: [],
             capabilities: [],
             dnsSearchDomains: [],
-            dnsServers: [],
+            dnsServers: [dockerNetwork.primaryDNS_Server],
             env: [],
+            macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
             imageName: "nginx:latest",
-            networkName: await this.managedDockerContainerManager.ResolveVNetToDockerNetworkName(config.settings.vnetResourceExternalId),
+            networkName: dockerNetwork.name,
             portMap: [],
+            removeOnExit: false,
             restartPolicy: "always",
             volumes: [
                 {

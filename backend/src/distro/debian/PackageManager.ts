@@ -130,8 +130,6 @@ class DebianPackageManager implements DistroPackageManager
                 return ["ffmpeg"];
             case "java":
                 return ["openjdk-11-jre-headless"];
-            case "letsencrypt":
-                return ["certbot"];
             case "libvirt":
                 return ["libosinfo-bin", "libvirt-daemon-system", "qemu-kvm", "virtinst"];
             case "mariadb":

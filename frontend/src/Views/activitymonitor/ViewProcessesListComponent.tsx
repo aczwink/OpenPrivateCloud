@@ -16,14 +16,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, ProgressSpinner } from "acfrontend";
+import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, ProgressSpinner, RouterState } from "acfrontend";
 import { ProcessDto } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
+import { ExtractDataFromResponseOrShowErrorMessageOnError, ShowErrorMessageOnErrorFromResponse } from "../../UI/ResponseHandler";
 
 @Injectable
 export class ViewProcessesListComponent extends Component
 {
-    constructor(private apiService: APIService)
+    constructor(private apiService: APIService, private routerState: RouterState)
     {
         super();
 
@@ -60,9 +61,14 @@ export class ViewProcessesListComponent extends Component
     private async LoadData()
     {
         this.processes = null;
-        
-        const response = await this.apiService.processes.get();
-        this.processes = response.data.Values().OrderByDescending(x => x.startTime.valueOf()).ToArray();
+
+        const hostName = this.routerState.routeParams.hostName!;
+        const response = await this.apiService.hosts._any_.processes.get(hostName);
+        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
+        {
+            this.processes = result.value.Values().OrderByDescending(x => x.startTime.valueOf()).ToArray();
+        }
     }
 
     private RenderProcess(process: ProcessDto)

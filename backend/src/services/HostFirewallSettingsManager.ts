@@ -17,7 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { HostConfigController } from "../data-access/HostConfigController";
-import { FirewallRule, FirewallZoneData, FirewallZoneDataProvider, HostFirewallZonesManager } from "./HostFirewallZonesManager";
+import { FirewallRule, FirewallZoneData, FirewallZoneDataProvider, HostFirewallZonesManager, PortForwardingRule } from "./HostFirewallZonesManager";
 import { CIDRRange } from "../common/CIDRRange";
 
 @Injectable
@@ -34,6 +34,25 @@ export class HostFirewallSettingsManager implements FirewallZoneDataProvider
     }
     
     //Public methods
+    public async AddPortForwardingRule(hostId: number, rule: PortForwardingRule)
+    {
+        const rules = await this.QueryPortForwardingRules(hostId);
+
+        rules.push(rule);
+
+        await this.PersistPortForwardingRuleSetAndApplyFirewallChanges(hostId, rules);
+    }
+
+    public async DeletePortForwardingRule(hostId: number, protocol: "TCP" | "UDP", port: number)
+    {
+        const rules = await this.QueryPortForwardingRules(hostId);
+
+        const index = rules.findIndex(x => (x.port === port) && (x.protocol === protocol));
+        rules.Remove(index);
+
+        await this.PersistPortForwardingRuleSetAndApplyFirewallChanges(hostId, rules);
+    }
+
     public async DeleteRule(hostId: number, direction: "Inbound" | "Outbound", priority: number)
     {
         const rules = await this.QueryHostFirewallRules(hostId, direction);
@@ -55,12 +74,19 @@ export class HostFirewallSettingsManager implements FirewallZoneDataProvider
             addressSpace: new CIDRRange("255.255.255.255/32"), //TODO: this is incorrect but this value is currently not used in this case
             inboundRules: await this.QueryHostFirewallRules(hostId, "Inbound"),
             outboundRules: await this.QueryHostFirewallRules(hostId, "Outbound"),
+            portForwardingRules: await this.QueryPortForwardingRules(hostId),
         };
     }
 
     public async QueryHostFirewallRules(hostId: number, direction: "Inbound" | "Outbound")
     {
         const rawRules = await this.hostConfigController.QueryConfig<FirewallRule[]>(hostId, this.DirectionToConfigKey(direction));
+        return rawRules ?? [];
+    }
+
+    public async QueryPortForwardingRules(hostId: number)
+    {
+        const rawRules = await this.hostConfigController.QueryConfig<PortForwardingRule[]>(hostId, "portForwarding");
         return rawRules ?? [];
     }
 
@@ -91,6 +117,12 @@ export class HostFirewallSettingsManager implements FirewallZoneDataProvider
     private async PersistAndApplyRuleSet(hostId: number, direction: "Inbound" | "Outbound", rules: FirewallRule[])
     {
         await this.hostConfigController.UpdateOrInsertConfig(hostId, this.DirectionToConfigKey(direction), rules);
+        this.hostFirewallZonesManager.ZoneDataChanged(hostId);
+    }
+
+    private async PersistPortForwardingRuleSetAndApplyFirewallChanges(hostId: number, rules: PortForwardingRule[])
+    {
+        await this.hostConfigController.UpdateOrInsertConfig(hostId, "portForwarding", rules);
         this.hostFirewallZonesManager.ZoneDataChanged(hostId);
     }
 }

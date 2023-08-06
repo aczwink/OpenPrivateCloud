@@ -31,15 +31,21 @@ import { HostFirewallSettingsManager } from "./services/HostFirewallSettingsMana
 import { VNetManager } from "./resource-providers/network-services/VNetManager";
 import { OpenVPNGatewayManager } from "./resource-providers/network-services/OpenVPNGatewayManager";
 import { ProcessTrackerManager } from "./services/ProcessTrackerManager";
+import { ResourceEventsManager } from "./services/ResourceEventsManager";
 
 const port = 8078;
 
 async function EnableHealthManagement()
 {
+    const rem = GlobalInjector.Resolve(ResourceEventsManager);
+    const ovpnGwMgr = GlobalInjector.Resolve(OpenVPNGatewayManager);
+
     const fwZonesMgr = GlobalInjector.Resolve(HostFirewallZonesManager);
     fwZonesMgr.RegisterDataProvider(GlobalInjector.Resolve(HostFirewallSettingsManager));
     fwZonesMgr.RegisterDataProvider(GlobalInjector.Resolve(VNetManager));
-    fwZonesMgr.RegisterDataProvider(GlobalInjector.Resolve(OpenVPNGatewayManager));
+    fwZonesMgr.RegisterDataProvider(ovpnGwMgr);
+
+    rem.RegisterListener(ovpnGwMgr);
 
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
     GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();

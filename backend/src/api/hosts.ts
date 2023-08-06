@@ -24,8 +24,24 @@ import { HostsManager } from "../services/HostsManager";
 import { HostUpdateManager } from "../services/HostUpdateManager";
 import { RemoteCommandExecutor } from "../services/RemoteCommandExecutor";
 import { HostNetworkInterfaceCardsManager } from "../services/HostNetworkInterfaceCardsManager";
-import { FirewallRule, HostFirewallZonesManager } from "../services/HostFirewallZonesManager";
+import { FirewallRule, HostFirewallZonesManager, PortForwardingRule } from "../services/HostFirewallZonesManager";
 import { HostFirewallSettingsManager } from "../services/HostFirewallSettingsManager";
+import { ProcessTrackerManager } from "../services/ProcessTrackerManager";
+
+interface NetworkInterfaceDTO
+{
+    name: string;
+    zone: string;
+}
+
+interface ProcessDto
+{
+    hostName: string;
+    id: number;
+    startTime: Date;
+    status: number;
+    title: string;
+}
 
 interface UnattendedUpgradeConfigDto
 {
@@ -38,12 +54,6 @@ interface UpdateInfoDto
     distributionName: string;
     unattendedUpgradeConfig: UnattendedUpgradeConfigDto;
     updatablePackagesCount: number;
-}
-
-interface NetworkInterfaceDTO
-{
-    name: string;
-    zone: string;
 }
 
 @APIController("hosts")
@@ -72,7 +82,8 @@ class HostsAPIController
 class HostAPIController
 {
     constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor, private hostPerformanceMeasurementService: HostPerformanceMeasurementService,
-        private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private hostFirewallZonesManager: HostFirewallZonesManager)
+        private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private hostFirewallZonesManager: HostFirewallZonesManager,
+        private processTrackerManager: ProcessTrackerManager)
     {
     }
 
@@ -138,6 +149,23 @@ class HostAPIController
             return NotFound("host does not exist");
             
         return await this.hostPerformanceMeasurementService.QueryPerformanceStats(hostId);
+    }
+
+    @Get("processes")
+    public QueryProcesses(
+        @Path hostName: string
+    )
+    {
+        return this.processTrackerManager.processes.Map(x => {
+            const res: ProcessDto = {
+                hostName: x.hostName,
+                id: x.id,
+                startTime: x.startTime,
+                status: x.status,
+                title: x.title
+            };
+            return res;
+        }).Filter(x => x.hostName === hostName).ToArray();
     }
 
     @Post("reboot")
@@ -244,6 +272,54 @@ class _api_
     )
     {
         await this.hostFirewallSettingsManager.SetRule(hostId, direction, rule);
+    }
+}
+
+@APIController("hosts/{hostName}/portForwarding")
+class _api8_
+{
+    constructor(private hostsController: HostsController, private hostFirewallSettingsManager: HostFirewallSettingsManager)
+    {
+    }
+
+    @Common()
+    public async QueryHostId(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+        return hostId;
+    }
+
+    @Post()
+    public async AddRule(
+        @Common hostId: number,
+        @Body rule: PortForwardingRule
+    )
+    {
+        await this.hostFirewallSettingsManager.AddPortForwardingRule(hostId, rule);
+    }
+
+    @Get()
+    public async QueryRuleSet(
+        @Common hostId: number,
+    )
+    {
+        const ruleSet = await this.hostFirewallSettingsManager.QueryPortForwardingRules(hostId);
+
+        return ruleSet;
+    }
+
+    @Delete("{protocol}/{port}")
+    public async DeleteRule(
+        @Common hostId: number,
+        @Path protocol: "TCP" | "UDP",
+        @Path port: number
+    )
+    {
+        await this.hostFirewallSettingsManager.DeletePortForwardingRule(hostId, protocol, port);
     }
 }
 

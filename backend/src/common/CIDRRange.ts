@@ -46,6 +46,11 @@ export class CIDRRange
         return this._netAddress;
     }
 
+    public get subnetMask()
+    {
+        return -1 << (32 - this._length);
+    }
+
     //Public methods
     public GenerateSubnetMask()
     {
@@ -66,6 +71,11 @@ export class CIDRRange
         }
 
         return [this._length, this._length - 8, this._length - 16, this._length - 24].map(GenerateSubnetMaskPart).join(".");
+    }
+
+    public Includes(address: IPv4)
+    {
+        return (address.intValue & this.subnetMask) === this.netAddress.intValue;
     }
 
     public ToString()

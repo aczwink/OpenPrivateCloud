@@ -18,9 +18,10 @@
 
 import { Injectable } from "acts-util-node";
 import { HostNetfilterService, NetfilterChain, NetfilterRuleCondition, NetfilterRuleCreationData } from "./HostNetfilterService";
-import { FirewallRule, FirewallZone, HostFirewallZonesManager } from "./HostFirewallZonesManager";
+import { FirewallRule, FirewallZone, HostFirewallZonesManager, PortForwardingRule } from "./HostFirewallZonesManager";
 import { HostNetworkInterfaceCardsManager } from "./HostNetworkInterfaceCardsManager";
 import { CIDRRange } from "../common/CIDRRange";
+import { IPv4 } from "../common/IPv4";
 
 
 interface FlatFirewallRule
@@ -189,6 +190,7 @@ export class HostFirewallManager
                     {
                         name: "FORWARD",
                         rules: [
+                            ...zones.external.portForwardingRules.map(this.GenerateIncomingDestinationNAT_ForwardRule.bind(this, externalNIC, zones.customZones)),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateInboundForwardRule(y, x.addressSpace, x.name)).Values()).Flatten().ToArray(),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateOutboundForwardRule(y, x.addressSpace, x.name)).Values()).Flatten().ToArray(),
                             ...this.AddTracingRule(isTracingEnabled),
@@ -217,6 +219,15 @@ export class HostFirewallManager
                 name: "opc_nat",
                 family: "ip",
                 chains: [
+                    {
+                        name: "PREROUTING",
+                        rules: [
+                            ...zones.external.portForwardingRules.map(this.GenerateDestinationNAT_Rule.bind(this, externalNIC))
+                        ],
+                        hook: "prerouting",
+                        prio: "dstnat",
+                        type: "nat"
+                    },
                     {
                         name: "POSTROUTING",
                         rules: [
@@ -688,6 +699,111 @@ export class HostFirewallManager
         }
 
         return result;
+    }
+
+    private GenerateDestinationNAT_Rule(externalNIC: string, portForwardingRule: PortForwardingRule): NetfilterRuleCreationData
+    {
+        return {
+            conditions: [
+                {
+                    op: "==",
+                    left: {
+                        type: "meta",
+                        key: "iifname"
+                    },
+                    right: {
+                        type: "value",
+                        value: externalNIC
+                    }
+                },
+                {
+                    op: "==",
+                    left: {
+                        type: "payload",
+                        protocol: portForwardingRule.protocol.toLowerCase() as any,
+                        field: "dport"
+                    },
+                    right: {
+                        type: "value",
+                        value: portForwardingRule.port.toString()
+                    }
+                }
+            ],
+            policy: {
+                type: "dnat",
+                addr: portForwardingRule.targetAddress,
+                port: portForwardingRule.targetPort
+            }
+        };
+    }
+
+    private GenerateIncomingDestinationNAT_ForwardRule(externalNIC: string, zones: FirewallZone[], portForwardingRule: PortForwardingRule): NetfilterRuleCreationData
+    {
+        const targetAddr = new IPv4(portForwardingRule.targetAddress);
+        const targetZone = zones.find(x => x.addressSpace.Includes(targetAddr))!;
+
+        return {
+            conditions: [
+                {
+                    op: "==",
+                    left: {
+                        type: "meta",
+                        key: "iifname"
+                    },
+                    right: {
+                        type: "value",
+                        value: externalNIC
+                    }
+                },
+                {
+                    op: "==",
+                    left: {
+                        type: "meta",
+                        key: "oifname"
+                    },
+                    right: {
+                        type: "values",
+                        values: targetZone.interfaceNames
+                    }
+                },
+                {
+                    op: "==",
+                    left: {
+                        type: "payload",
+                        field: "daddr",
+                        protocol: "ip"
+                    },
+                    right: {
+                        type: "value",
+                        value: portForwardingRule.targetAddress
+                    }
+                },
+                {
+                    op: "==",
+                    left: {
+                        type: "payload",
+                        field: "dport",
+                        protocol: portForwardingRule.protocol.toLowerCase() as any
+                    },
+                    right: {
+                        type: "value",
+                        value: portForwardingRule.targetPort.toString()
+                    }
+                },
+                {
+                    left: {
+                        type: "ct",
+                        key: "state",
+                    },
+                    op: "in",
+                    right: {
+                        type: "value",
+                        value: "new"
+                    }
+                }
+            ],
+            policy: { type: "jump", target: this.CreateCustomZoneChainName("INPUT", targetZone.name) }
+        };
     }
 
     private GenerateSourceNAT_Rule(externalNIC: string, config: FirewallZone): NetfilterRuleCreationData

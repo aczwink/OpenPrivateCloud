@@ -35,6 +35,11 @@ export class ManagedDockerContainerManager
     }
     
     //Public methods
+    public CreateMAC_Address(resourceId: number): string
+    {
+        return this.dockerManager.CreateMAC_Address(resourceId);
+    }
+
     public async DestroyContainer(resourceReference: LightweightResourceReference)
     {
         const containerName = this.DeriveContainerName(resourceReference);
@@ -91,13 +96,15 @@ export class ManagedDockerContainerManager
         }
     }
 
-    public async ResolveVNetToDockerNetworkName(vnetResourceExternalId: string): Promise<string>
+    public async ResolveVNetToDockerNetwork(vNetResourceReference: LightweightResourceReference)
     {
-        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(vnetResourceExternalId);
-        if(vnetRef === undefined)
-            throw new Error("VNET does not exist!");
-        const dockerNetName = await this.vnetManager.EnsureDockerNetworkExists(vnetRef);
-        return dockerNetName;
+        return await this.vnetManager.EnsureDockerNetworkExists(vNetResourceReference);
+    }
+
+    public async RestartContainer(resourceReference: LightweightResourceReference)
+    {
+        const containerName = this.DeriveContainerName(resourceReference);
+        await this.dockerManager.RestartContainer(resourceReference.hostId, containerName);
     }
 
     //Private methods

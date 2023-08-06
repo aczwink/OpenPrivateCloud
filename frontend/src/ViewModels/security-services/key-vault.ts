@@ -16,10 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { resourceProviders } from "openprivatecloud-common";
-import { CollectionViewModel, ComponentViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { CA_Config, CertificateDTO, KeyVaultCertificate } from "../../../dist/api";
-import { PageNotFoundComponent } from "../../PageNotFoundComponent";
+import { CA_Config, CertificateDTO, KeyVaultCertificate, KeyVaultCertificateInfo, SecretDTO, SecretListDTO } from "../../../dist/api";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -28,9 +27,42 @@ function BuildResourceId(resourceGroupName: string, resourceName: string)
     return "/" + resourceGroupName + "/" + resourceProviders.securityServices.name + "/" + resourceProviders.securityServices.keyVaultResourceTypeName.name + "/" + resourceName;
 }
 
-const certViewModel: ComponentViewModel = {
-    component: PageNotFoundComponent,
-    type: "component"
+const secretViewModel: ObjectViewModel<SecretDTO, ResourceAndGroupId & { secretName: string }> = {
+    type: "object",
+    actions: [],
+    formTitle: (ids, _) => ids.secretName,
+    requestObject: (service, ids) => service.resourceProviders._any_.securityservices.keyvault._any_.secrets._any_.get(ids.resourceGroupName, ids.resourceName, ids.secretName),
+    schemaName: "SecretDTO"
+};
+
+const secretsViewModel: CollectionViewModel<SecretListDTO, ResourceAndGroupId, SecretDTO> = {
+    type: "collection",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, secret) => service.resourceProviders._any_.securityservices.keyvault._any_.secrets.post(ids.resourceGroupName, ids.resourceName, secret),
+            schemaName: "SecretDTO"
+        }
+    ],
+    child: secretViewModel,
+    displayName: "Secrets",
+    extractId: x => x.name,
+    requestObjects: (service, ids) => service.resourceProviders._any_.securityservices.keyvault._any_.secrets.get(ids.resourceGroupName, ids.resourceName),
+    idKey: "secretName",
+    schemaName: "SecretListDTO"
+};
+
+const certViewModel: ObjectViewModel<KeyVaultCertificateInfo, ResourceAndGroupId & { certName: string }> = {
+    type: "object",
+    actions: [
+        {
+            type: "delete",
+            deleteResource: (service, ids) => service.resourceProviders._any_.securityservices.keyvault._any_.certificates._any_.delete(ids.resourceGroupName, ids.resourceName, ids.certName),
+        }
+    ],
+    formTitle: (ids, _) => ids.certName,
+    requestObject: (service, ids) => service.resourceProviders._any_.securityservices.keyvault._any_.certificates._any_.get(ids.resourceGroupName, ids.resourceName, ids.certName),
+    schemaName: "KeyVaultCertificateInfo"
 };
 
 const certsViewModel: CollectionViewModel<KeyVaultCertificate, ResourceAndGroupId, CertificateDTO> = {
@@ -40,7 +72,7 @@ const certsViewModel: CollectionViewModel<KeyVaultCertificate, ResourceAndGroupI
             type: "create",
             createResource: (service, ids, cert) => service.resourceProviders._any_.securityservices.keyvault._any_.certificates.post(ids.resourceGroupName, ids.resourceName, cert),
             schemaName: "CertificateDTO"
-        }
+        },
     ],
     child: certViewModel,
     displayName: "Certificates",
@@ -71,6 +103,16 @@ export const keyVaultViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     ],
     entries: [
         BuildResourceGeneralPageGroupEntry(BuildResourceId),
+        {
+            displayName: "",
+            entries: [
+                {
+                    child: secretsViewModel,
+                    displayName: "Secrets",
+                    key: "secrets",
+                }
+            ]
+        },
         {
             displayName: "PKI",
             entries: [

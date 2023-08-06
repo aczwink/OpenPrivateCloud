@@ -44,7 +44,7 @@ export class MountsManager
 
     public async CreateUniqueMountPointAndMount(hostId: number, devicePath: string)
     {
-        const mountPoint = await this.CreateUniqueMountPoint(hostId);
+        const mountPoint = await this.CreateUniqueMountPoint(hostId, "dev://" + devicePath);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mount", devicePath, mountPoint], hostId);
 
         return mountPoint;
@@ -52,7 +52,7 @@ export class MountsManager
 
     public async CreateUniqueLocationAndMountFull(hostId: number, type: FileSystemType, source: string, stdin?: string)
     {
-        const mountPoint = await this.CreateUniqueMountPoint(hostId);
+        const mountPoint = await this.CreateUniqueMountPoint(hostId, type + "://" + source);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mount", "-t", type, source, mountPoint], hostId, {
             stdin: stdin
         });
@@ -97,9 +97,10 @@ export class MountsManager
     }
 
     //Private methods
-    private async CreateUniqueMountPoint(hostId: number)
+    private async CreateUniqueMountPoint(hostId: number, source: string)
     {
-        const mountPoint = path.join("/media", "opc" + crypto.pseudoRandomBytes(16).toString("hex"));
+        const hash = crypto.createHash('md5').update(source).digest('hex');
+        const mountPoint = path.join("/media", "opc" + hash);
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, mountPoint);
 
         return mountPoint;

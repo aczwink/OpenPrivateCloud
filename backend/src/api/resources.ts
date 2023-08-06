@@ -54,13 +54,14 @@ class _api_
 
     @Get("search")
     public async SearchForResource(
-        @Query hostName: string,
         @Query resourceProviderName: string,
         @Query resourceTypeName: string,
-        @Query resourceNameFilter: string
+        @Query resourceNameFilter: string,
+        @Query hostName?: string,
     )
     {
-        const ids = await this.resourcesController.Search(hostName, resourceProviderName, resourceTypeName, resourceNameFilter);
+        const idsPromise = (hostName === undefined) ? this.resourcesController.Search(resourceProviderName, resourceTypeName, resourceNameFilter) : this.resourcesController.SearchOnHost(hostName, resourceProviderName, resourceTypeName, resourceNameFilter);
+        const ids = await idsPromise;
         const all = await ids.Values().Map(x => this.resourcesManager.CreateResourceReference(x)).PromiseAll();
         return all.Values().NotUndefined().Map(x => x.externalId).ToArray();
     }

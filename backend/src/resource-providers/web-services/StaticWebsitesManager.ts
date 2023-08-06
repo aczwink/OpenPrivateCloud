@@ -17,124 +17,116 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { UsersController } from "../../data-access/UsersController";
-import { HostUsersManager } from "../../services/HostUsersManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
-import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { DeploymentContext } from "../ResourceProvider";
-import { ApacheManager } from "./ApacheManager";
 import { StaticWebsiteProperties } from "./Properties";
-import { VirtualHost } from "./VirtualHost";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { TempFilesManager } from "../../services/TempFilesManager";
-import { linuxSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
 import { LightweightResourceReference } from "../../common/ResourceReference";
+import { ManagedDockerContainerManager } from "../compute-services/ManagedDockerContainerManager";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 
 export interface StaticWebsiteConfig
 {
+    port: number;
     defaultRoute?: string;
 }
 
 @Injectable
 export class StaticWebsitesManager
 {
-    constructor(private modulesManager: ModulesManager, private resourcesManager: ResourcesManager,
-        private hostUsersManager: HostUsersManager, private apacheManager: ApacheManager, private usersController: UsersController,
-        private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager,
-        private remoteFileSystemManager: RemoteFileSystemManager, private remoteCommandExecutor: RemoteCommandExecutor,
-        private tempFilesMangager: TempFilesManager)
+    constructor(private resourcesManager: ResourcesManager, private managedDockerContainerManager: ManagedDockerContainerManager, private resourceDependenciesController: ResourceDependenciesController,
+        private remoteFileSystemManager: RemoteFileSystemManager, private resourceConfigController: ResourceConfigController, private tempFilesMangager: TempFilesManager, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
 
     //Public methods
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        const siteName = this.DeriveSiteName(resourceReference);
-        const site = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
-        const port = parseInt(site.addresses.split(":")[1]);
-
-        await this.apacheManager.DisableSite(resourceReference.hostId, siteName);
-        await this.apacheManager.DisablePort(resourceReference.hostId, port);
-        await this.systemServicesManager.RestartService(resourceReference.hostId, "apache2");
-
-        await this.apacheManager.DeleteSite(resourceReference.hostId, siteName);
-
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
+    }
+
+    public ExtractContainerInfo(resourceReference: LightweightResourceReference)
+    {
+        return this.managedDockerContainerManager.ExtractContainerInfo(resourceReference);
     }
 
     public async ProvideResource(instanceProperties: StaticWebsiteProperties, context: DeploymentContext)
     {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "apache");
+        const vNetResourceReference = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.vNetExternalId);
+        if(vNetResourceReference === undefined)
+            throw new Error("VNet does not exist");
+        await this.resourceDependenciesController.EnsureResourceDependencyExists(vNetResourceReference.id, context.resourceReference.id);
 
-        const gid = await this.hostUsersManager.ResolveHostGroupId(context.hostId, linuxSpecialGroups["www-data"]);
-        const uid = await this.hostUsersManager.ResolveHostUserId(context.hostId, opcSpecialUsers.host);
+        await this.WriteConfig(context.resourceReference.id, {
+            port: instanceProperties.port,
+        });
 
-        const instanceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
-        await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(context.hostId, instanceDir, uid, gid);
+        await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        const configPath = this.GetConfigPath(context.resourceReference);
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, configPath);
+        const contentPath = this.GetContentPath(context.resourceReference);
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, contentPath);
 
-        const user = await this.usersController.QueryUser(context.userId);
+        await this.Write_nginxConfig(context.resourceReference);
 
-        const vHost = VirtualHost.Default("*:" + instanceProperties.port, user!.emailAddress);
-        vHost.properties.documentRoot = instanceDir;
-        vHost.directories = [
-            {
-                path: instanceDir,
-                require: "all granted",
-            }
-        ];
+        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetResourceReference);
 
-        const siteName = this.DeriveSiteName(context.resourceReference)
-        await this.apacheManager.CreateSite(context.hostId, siteName, vHost);
-        await this.apacheManager.EnableSite(context.hostId, siteName);
-        await this.apacheManager.EnablePort(context.hostId, instanceProperties.port);
-        await this.systemServicesManager.RestartService(context.hostId, "apache2");
+        await this.managedDockerContainerManager.EnsureContainerIsRunning(context.resourceReference, {
+            additionalHosts: [],
+            capabilities: [],
+            dnsSearchDomains: [],
+            dnsServers: [dockerNetwork.primaryDNS_Server],
+            env: [],
+            imageName: "nginx:latest",
+            macAddress: this.managedDockerContainerManager.CreateMAC_Address(context.resourceReference.id),
+            networkName: dockerNetwork.name,
+            portMap: [],
+            removeOnExit: false,
+            restartPolicy: "always",
+            volumes: [
+                {
+                    containerPath: "/etc/nginx/conf.d",
+                    hostPath: configPath,
+                    readOnly: true
+                },
+                {
+                    containerPath: "/usr/share/nginx/html",
+                    hostPath: contentPath,
+                    readOnly: true
+                }
+            ],
+        });
     }
 
-    public async QueryConfig(resourceReference: LightweightResourceReference): Promise<StaticWebsiteConfig>
+    public async QueryConfig(resourceId: number)
     {
-        const siteName = this.DeriveSiteName(resourceReference);
-        const vHost = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
-
-        return {
-            defaultRoute: vHost.directories[0].fallbackResource
-        };
-    }
-
-    public async QueryPort(resourceReference: LightweightResourceReference)
-    {
-        const siteName = this.DeriveSiteName(resourceReference);
-        const vHost = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
-
-        return parseInt(vHost.addresses.split(":")[1]);
+        const config = await this.resourceConfigController.QueryConfig<StaticWebsiteConfig>(resourceId);
+        return config!;
     }
 
     public async UpdateConfig(resourceReference: LightweightResourceReference, config: StaticWebsiteConfig)
     {
-        const siteName = this.DeriveSiteName(resourceReference);
-        const vHost = await this.apacheManager.QuerySite(resourceReference.hostId, siteName);
-
-        vHost.directories[0].fallbackResource = config.defaultRoute;
-
-        this.apacheManager.SetSite(resourceReference.hostId, siteName, vHost);
-        await this.systemServicesManager.RestartService(resourceReference.hostId, "apache2");
+        await this.WriteConfig(resourceReference.id, config);
+        await this.Write_nginxConfig(resourceReference);
+        await this.managedDockerContainerManager.RestartContainer(resourceReference);
     }
 
     public async UpdateContent(resourceReference: LightweightResourceReference, buffer: Buffer)
     {
         const hostId = resourceReference.hostId;
 
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const contentPath = this.GetContentPath(resourceReference);
 
-        await this.CleanUpFolder(hostId, resourceDir);
+        await this.CleanUpFolder(hostId, contentPath);
 
         const zipFilePath = await this.tempFilesMangager.CreateFile(hostId, buffer);
-        await this.remoteCommandExecutor.ExecuteCommand(["unzip", zipFilePath, "-d", resourceDir], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["unzip", zipFilePath, "-d", contentPath], hostId);
         await this.tempFilesMangager.Cleanup(hostId, zipFilePath);
 
-        await this.SetPermissionsRecursive(hostId, resourceDir);
+        //await this.SetPermissionsRecursive(hostId, contentPath);
     }
 
     //Private methods
@@ -152,31 +144,44 @@ export class StaticWebsitesManager
         }
     }
 
-    private DeriveSiteName(resourceReference: LightweightResourceReference)
+    private Generate_nginxConfig(config: StaticWebsiteConfig)
     {
-        return "opc-rsw-" + resourceReference.id;
+        const index = (config.defaultRoute === undefined) ? "" : ("index " + config.defaultRoute + ";");
+
+        return `
+server {
+    listen ${config.port};
+    server_name  localhost;
+
+    location / {
+        root   /usr/share/nginx/html;
+        ${index}
+    }
+}
+        `.trim();
+    }
+    
+    private GetContentPath(resourceReference: LightweightResourceReference)
+    {
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(resourceDir, "content");
     }
 
-    private async SetPermissionsRecursive(hostId: number, dirPath: string)
+    private GetConfigPath(resourceReference: LightweightResourceReference)
     {
-        const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, linuxSpecialGroups["www-data"]);
-        const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(resourceDir, "config");
+    }
 
-        const children = await this.remoteFileSystemManager.ListDirectoryContents(hostId, dirPath);
-        for (const child of children)
-        {
-            const childPath = path.join(dirPath, child);
-            const status = await this.remoteFileSystemManager.QueryStatus(hostId, childPath);
+    private async WriteConfig(resourceId: number, config: StaticWebsiteConfig)
+    {
+        await this.resourceConfigController.UpdateOrInsertConfig(resourceId, config);
+    }
 
-            await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, childPath, uid, gid);
-
-            if(status.isDirectory())
-            {
-                await this.remoteFileSystemManager.ChangeMode(hostId, childPath, 0o750);
-                await this.SetPermissionsRecursive(hostId, childPath);
-            }
-            else
-                await this.remoteFileSystemManager.ChangeMode(hostId, childPath, 0o640);
-        }
+    private async Write_nginxConfig(resourceReference: LightweightResourceReference, )
+    {
+        const configPath = this.GetConfigPath(resourceReference);
+        const config = await this.QueryConfig(resourceReference.id);
+        await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, path.join(configPath, "default.conf"), this.Generate_nginxConfig(config));
     }
 }

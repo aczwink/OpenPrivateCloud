@@ -37,7 +37,21 @@ export interface JdownloaderProperties extends BaseResourceProperties
 export interface LetsEncryptProperties extends BaseResourceProperties
 {
     type: "letsencrypt-cert";
+
     domainName: string;
+
+    /**
+     * The target key vault where the certificate will be imported to.
+     * @title Key-Vault
+     * @format resource[security-services/key-vault]
+     */
+    keyVaultExternalId: string;
+
+    /**
+     * A CIDR-range of the virtual network that is deployed when interacting with LetsEncrypt. A /30 net is sufficient. Smaller is not possible.
+     * @default 192.168.255.252/30
+     */
+    vNetAddressSpace: string;
 }
 
 export interface NextcloudProperties extends BaseResourceProperties
@@ -59,6 +73,12 @@ export interface NodeAppServiceProperties extends BaseResourceProperties
 export interface StaticWebsiteProperties extends BaseResourceProperties
 {
     type: "static-website";
+
+    /**
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vNetExternalId: string;
     
     port: number;
 }

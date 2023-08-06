@@ -50,7 +50,7 @@ export class ResourceDeploymentService
         const resourceId = await this.resourcesController.AddInstance(resourceGroup.id, storage!.id, resourceProvider.name, resourceProperties.type, resourceProperties.name);
         await this.resourceHealthManager.UpdateResourceAvailability(resourceId, HealthStatus.InDeployment);
 
-        const instanceReference = new ResourceReference({
+        const ref = new ResourceReference({
             id: resourceId,
             resourceGroupName: resourceGroup.name,
             name: resourceProperties.name,
@@ -60,7 +60,8 @@ export class ResourceDeploymentService
             hostName: host!.hostName,
             hostStoragePath: storage!.path,
         });
-        this.TryDeployInstance(resourceProvider, resourceProperties, instanceReference, hostId, storage!, userId);
+        this.TryDeployInstance(resourceProvider, resourceProperties, ref, hostId, storage!, userId);
+        return ref;
     }
 
     //Private methods

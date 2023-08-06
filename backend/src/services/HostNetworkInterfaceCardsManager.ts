@@ -18,15 +18,57 @@
 
 import { Injectable } from "acts-util-node";
 import { HostMetricsService } from "./HostMetricsService";
+import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
+import { IPv4 } from "../common/IPv4";
+import { SystemServicesManager } from "./SystemServicesManager";
 
 @Injectable
 export class HostNetworkInterfaceCardsManager
 {
-    constructor(private hostMetricsService: HostMetricsService)
+    constructor(private hostMetricsService: HostMetricsService, private remoteCommandExecutor: RemoteCommandExecutor, private systemServicesManager: SystemServicesManager)
     {
     }
 
     //Public methods
+    public async CreateBridge(hostId: number, bridgeName: string, ip: IPv4, netAddressLength: number)
+    {
+        //"stp_state", "0"
+        const bridgeCreationCommand = ["ip", "link", "add", "name", bridgeName, "type", "bridge", "forward_delay", "0"];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...bridgeCreationCommand], hostId);
+
+        const bridgeAddrAssignmentCommand = ["ip", "address", "add", "dev", bridgeName, ip.ToString() + "/" + netAddressLength];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...bridgeAddrAssignmentCommand], hostId);
+
+        const bringBridgeUpCommand = ["ip", "link", "set", "dev", bridgeName, "up"];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...bringBridgeUpCommand], hostId);
+
+        const persistentCommand = [bridgeCreationCommand, bridgeAddrAssignmentCommand, bringBridgeUpCommand].map(x => x.join(" ")).join(" && ");
+        await this.systemServicesManager.CreateOrUpdateService(hostId, {
+            before: ["docker.service"],
+            command: "/bin/bash -c '" + persistentCommand + "'",
+            environment: {},
+            groupName: "root",
+            name: bridgeName,
+            userName: "root"
+        });
+
+        await this.systemServicesManager.EnableService(hostId, bridgeName);
+    }
+
+    public async DeleteBridge(hostId: number, bridgeName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "link", "delete", bridgeName, "type", "bridge"], hostId);
+
+        await this.systemServicesManager.StopService(hostId, bridgeName);
+        await this.systemServicesManager.DeleteService(hostId, bridgeName);
+    }
+
+    public async DoesInterfaceExist(hostId: number, interfaceName: string)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["ip", "link", "show", interfaceName], hostId);
+        return result === 0;
+    }
+
     public async FindExternalNetworkInterface(hostId: number)
     {
         const stats = await this.hostMetricsService.ReadNetworkStatistics(hostId);

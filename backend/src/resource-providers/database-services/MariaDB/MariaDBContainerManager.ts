@@ -96,12 +96,12 @@ export class MariaDBContainerManager implements MariaDBInterface
 
     public async ProvideResource(instanceProperties: MariadbProperties, context: DeploymentContext)
     {
-        throw new Error("TODO: MISSING vnetResourceExternalId");
+        throw new Error("TODO: MISSING vnetResourceExternalId, mac, dnsServers");
         const config: DockerContainerConfig = {
             additionalHosts: [],
             capabilities: [],
             dnsSearchDomains: [],
-            dnsServers: [],
+            dnsServers: [], //TODO SET THIS
             env: [
                 {
                     varName: "MARIADB_ROOT_PASSWORD",
@@ -109,8 +109,10 @@ export class MariaDBContainerManager implements MariaDBInterface
                 }
             ],
             imageName: "mariadb",
+            macAddress: "TODO",
             networkName: "TODO",
             portMap: [],
+            removeOnExit: false,
             restartPolicy: "always",
             volumes: [],
         };

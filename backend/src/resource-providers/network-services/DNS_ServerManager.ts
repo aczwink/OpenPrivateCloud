@@ -26,7 +26,7 @@ import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager"
 import { EqualsAny } from "acts-util-core";
 import { BindContainerManager } from "./BindContainerManager";
 import { DNS_Record, DNS_ServerSettings, DNS_Zone } from "./models_dns";
-import { dnsmasqManager } from "./dnsmasqManager";
+import { DNS_Server_dnsmasqManager } from "./DNS_Server_dnsmasqManager";
 
 interface DNS_ServerConfig
 {
@@ -38,7 +38,7 @@ interface DNS_ServerConfig
 export class DNS_ServerManager
 {
     constructor(private resourceConfigController: ResourceConfigController, private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager,
-        private bindContainerManager: BindContainerManager, private dnsmasqManager: dnsmasqManager)
+        private bindContainerManager: BindContainerManager, private dnsmasqManager: DNS_Server_dnsmasqManager)
     {
     }
     
@@ -97,7 +97,7 @@ export class DNS_ServerManager
                 await this.bindContainerManager.DestroyContainer(resourceReference);
                 break;
             case "dnsmasq":
-                await this.dnsmasqManager.UnlinkConfig(resourceReference);
+                await this.dnsmasqManager.Stop(resourceReference);
                 break;
         }
 
@@ -202,7 +202,7 @@ export class DNS_ServerManager
                     await this.bindContainerManager.DestroyContainer(resourceReference);
                     break;
                 case "dnsmasq":
-                    await this.dnsmasqManager.UnlinkConfig(resourceReference);
+                    await this.dnsmasqManager.Stop(resourceReference);
                     break;
             }
         }

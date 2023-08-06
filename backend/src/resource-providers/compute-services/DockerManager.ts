@@ -60,8 +60,10 @@ export interface DockerContainerConfig
     env: DockerEnvironmentVariableMapping[];
     hostName?: string;
     imageName: string;
+    macAddress: string;
     networkName: string;
     portMap: DockerContainerConfigPortMapping[];
+    removeOnExit: boolean;
     restartPolicy: "always" | "no";
     volumes: DockerContainerConfigVolume[];
 }
@@ -75,6 +77,7 @@ interface DockerContainerInfoPortBinding
 interface DockerContainerNetwork
 {
     IPAddress: string;
+    MacAddress: string;
 }
 
 export interface DockerContainerInfo
@@ -109,38 +112,39 @@ export class DockerManager
     public async CreateContainerInstance(hostId: number, containerName: string, config: DockerContainerConfig)
     {
         await this.EnsureDockerIsInstalled(hostId);
-
-        const addHostsArgs = config.additionalHosts.map(x => "--add-host=" + x.domainName + ":" + x.ipAddress);
-        const capsArgs = config.capabilities.map(x => "--cap-add=" + x);
-        const dnsSearchDomainArgs = config.dnsSearchDomains.map(x => "--dns-search=" + x);
-        const dnsServerArgs = config.dnsServers.map(x => "--dns=" + x);
-        const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
-        const hostNameArgs = (config.hostName === undefined) ? [] : ["-h", config.hostName];
-        const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort + "/" + x.protocol.toLowerCase()].Values()).Flatten().ToArray();
-        const volArgs = config.volumes.Values().Map(x => ["-v", x.hostPath + ":" + x.containerPath + (x.readOnly ? ":ro" : "")].Values()).Flatten().ToArray();
-
-        const cmdArgs = [
-            "--name", containerName,
-            ...addHostsArgs,
-            ...capsArgs,
-            ...dnsSearchDomainArgs,
-            ...dnsServerArgs,
-            ...envArgs,
-            ...hostNameArgs,
-            ...portArgs,
-            ...volArgs,
-            "--net", config.networkName,
-            "--restart", config.restartPolicy,
-            config.imageName
-        ];
-
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "create", ...cmdArgs], hostId);
+        const cmdArgs = this.CreateArgs(containerName, config);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "create", ...cmdArgs, config.imageName], hostId);
     }
 
     public async CreateContainerInstanceAndStart(hostId: number, containerName: string, config: DockerContainerConfig)
     {
         await this.CreateContainerInstance(hostId, containerName, config);
         await this.StartExistingContainer(hostId, containerName);
+    }
+
+    public async CreateContainerInstanceAndStartItAndExecuteCommand(hostId: number, containerName: string, config: DockerContainerConfig, command: string[])
+    {
+        await this.EnsureDockerIsInstalled(hostId);
+        const cmdArgs = this.CreateArgs(containerName, config);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "run", ...cmdArgs, config.imageName, ...command], hostId);
+    }
+
+    public CreateMAC_Address(globallyUniqueNumber: number)
+    {
+        function OctetToString(octet: number)
+        {
+            const str = octet.toString(16);
+            if(str.length === 1)
+                return "0" + str;
+            return str;
+        }
+
+        //this is a variation of the standard docker function "generateMacAddr" in the bridge driver
+        const macAddress = [
+            0x02, 0x42, (globallyUniqueNumber >>> 24), ((globallyUniqueNumber >> 16) & 0xFF), ((globallyUniqueNumber >> 8) & 0xFF), (globallyUniqueNumber & 0xFF)
+        ];
+
+        return macAddress.map(OctetToString).join(":");
     }
 
     public async DeleteContainer(hostId: number, containerName: string)
@@ -177,6 +181,11 @@ export class DockerManager
         return result;
     }
 
+    public async RestartContainer(hostId: number, containerName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "restart", containerName], hostId);
+    }
+
     public async SpawnShell(hostId: number, containerName: string, shellType: "sh" = "sh")
     {
         const data = await this.InspectContainer(hostId, containerName);
@@ -210,5 +219,37 @@ export class DockerManager
     public async StopContainer(hostId: number, containerName: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "stop", containerName], hostId);
+    }
+
+    //Private methods
+    private CreateArgs(containerName: string, config: DockerContainerConfig)
+    {
+        const addHostsArgs = config.additionalHosts.map(x => "--add-host=" + x.domainName + ":" + x.ipAddress);
+        const capsArgs = config.capabilities.map(x => "--cap-add=" + x);
+        const dnsSearchDomainArgs = config.dnsSearchDomains.map(x => "--dns-search=" + x);
+        const dnsServerArgs = config.dnsServers.map(x => "--dns=" + x);
+        const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
+        const hostNameArgs = (config.hostName === undefined) ? [] : ["-h", config.hostName];
+        const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort + "/" + x.protocol.toLowerCase()].Values()).Flatten().ToArray();
+        const removeOnExitArgs = (config.removeOnExit === false) ? [] : ["--rm"];
+        const volArgs = config.volumes.Values().Map(x => ["-v", x.hostPath + ":" + x.containerPath + (x.readOnly ? ":ro" : "")].Values()).Flatten().ToArray();
+
+        const cmdArgs = [
+            "--name", containerName,
+            ...addHostsArgs,
+            ...capsArgs,
+            ...dnsSearchDomainArgs,
+            ...dnsServerArgs,
+            ...envArgs,
+            ...hostNameArgs,
+            ...portArgs,
+            ...removeOnExitArgs,
+            ...volArgs,
+            "--mac-address", config.macAddress,
+            "--net", config.networkName,
+            "--restart", config.restartPolicy,
+        ];
+
+        return cmdArgs;
     }
 }

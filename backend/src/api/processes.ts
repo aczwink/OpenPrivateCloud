@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,35 +19,11 @@
 import { APIController, Get, NotFound, Query } from "acts-util-apilib";
 import { ProcessTrackerManager } from "../services/ProcessTrackerManager";
 
-interface ProcessDto
-{
-    hostName: string;
-    id: number;
-    startTime: Date;
-    status: number;
-    title: string;
-}
-
 @APIController("processes")
 class ProcessesAPIController
 {
     constructor(private processTrackerManager: ProcessTrackerManager)
     {
-    }
-
-    @Get()
-    public QueryProcesses()
-    {
-        return this.processTrackerManager.processes.Map(x => {
-            const res: ProcessDto = {
-                hostName: x.hostName,
-                id: x.id,
-                startTime: x.startTime,
-                status: x.status,
-                title: x.title
-            };
-            return res;
-        }).ToArray();
     }
 
     @Get("info")

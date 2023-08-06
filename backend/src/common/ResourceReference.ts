@@ -68,6 +68,11 @@ export class ResourceReference implements LightweightResourceReference
         return this._props.hostStoragePath;
     }
 
+    public get resourceGroupName()
+    {
+        return this._props.resourceGroupName;
+    }
+
     public get resourceProviderName()
     {
         return this._props.resourceProviderName;

@@ -17,100 +17,84 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { LightweightResourceReference } from "../../common/ResourceReference";
-import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInterfaceCardsManager";
-import { DNS_ServerSettings, DNS_Zone } from "./models_dns";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
-import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { ResourceStateResult } from "../ResourceProvider";
+import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+
+interface dnsmasqConfig
+{
+    configDirPath: string;
+    configContent: string,
+    networkInterface: string
+}
 
 @Injectable
 export class dnsmasqManager
 {
-    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private systemServicesManager: SystemServicesManager,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private modulesManager: ModulesManager)
+    constructor(private systemServicesManager: SystemServicesManager, private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
 
     //Public methods
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async DeleteService(resourceReference: LightweightResourceReference)
     {
-        const running = await this.systemServicesManager.IsServiceActive(resourceReference.hostId, "dnsmasq");
-        if(running)
-            return "running";
-        return "down";
+        const serviceName = this.DeriveServiceName(resourceReference);
+        const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, serviceName);
+        if(exists)
+        {
+            await this.systemServicesManager.StopService(resourceReference.hostId, serviceName);
+            await this.systemServicesManager.DeleteService(resourceReference.hostId, serviceName);
+        }
     }
 
-    public async UnlinkConfig(resourceReference: LightweightResourceReference)
+    public async IsServiceRunning(resourceReference: LightweightResourceReference)
     {
-        const configFileName = this.DeriveConfigFileName(resourceReference);
-        const configPathInDnsMasqDir = "/etc/dnsmasq.d/" + configFileName;
-
-        await this.remoteRootFileSystemManager.RemoveFile(resourceReference.hostId, configPathInDnsMasqDir);
+        const serviceName = this.DeriveServiceName(resourceReference);
+        return await this.systemServicesManager.IsServiceActive(resourceReference.hostId, serviceName);
     }
 
-    public async WriteConfigFile(resourceReference: LightweightResourceReference, serverSettings: DNS_ServerSettings, zones: DNS_Zone[], configDir: string)
+    public async UpdateService(resourceReference: LightweightResourceReference, config: dnsmasqConfig)
     {
-        const nic = await this.hostNetworkInterfaceCardsManager.FindExternalNetworkInterface(resourceReference.hostId);
-        const configFilePath = path.join(configDir, "config");
-        const hostsPath = path.join(configDir, "hosts");
+        const configFilePath = path.join(config.configDirPath, "dnsmasq.conf");
+        const pidPath = path.join(config.configDirPath, "dnsmasq.pid");
 
-        const domains = zones.map(x => "domain=" + x.name + "\nlocal=/" + x.name + "/").join("\n");
-        const forwarders = serverSettings.forwarders.map(x => "server=" + x).join("\n");
-
-        const config = `
-interface=${nic}
-no-dhcp-interface=${nic}
-bogus-priv
-no-hosts
-addn-hosts=${hostsPath}
-domain-needed
-no-resolv
-no-poll
-${domains}
-${forwarders}
+        const configFileContent = `
+        ${config.configContent}
+bind-dynamic
+except-interface=lo
+interface=${config.networkInterface}
+pid-file=${pidPath}
         `;
+        await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, configFilePath, configFileContent.trim());
 
-        await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, configFilePath, config.trim());
-
-        const hostsText = this.GenerateHostsConfig(zones);
-        await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, hostsPath, hostsText);
-
-        const configFileName = this.DeriveConfigFileName(resourceReference);
-        const configPathInDnsMasqDir = "/etc/dnsmasq.d/" + configFileName;
-        const exists = await this.remoteFileSystemManager.Exists(resourceReference.hostId, configPathInDnsMasqDir);
+        const serviceName = this.DeriveServiceName(resourceReference);
+        const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, serviceName);
         if(!exists)
-            await this.remoteRootFileSystemManager.CreateSymbolicLink(resourceReference.hostId, configPathInDnsMasqDir, configFilePath);
-
-        await this.modulesManager.EnsureModuleIsInstalled(resourceReference.hostId, "dnsmasq");
-        await this.systemServicesManager.RestartService(resourceReference.hostId, "dnsmasq");
+            await this.CreateService(resourceReference, configFilePath);
     }
 
     //Private methods
-    private DeriveConfigFileName(resourceReference: LightweightResourceReference)
+    private async CreateService(resourceReference: LightweightResourceReference, configPath: string)
     {
-        return "opc-rdnsmasq-" + resourceReference.id;
+        const serviceName = this.DeriveServiceName(resourceReference);
+
+        await this.modulesManager.EnsureModuleIsInstalled(resourceReference.hostId, "dnsmasq");
+
+        await this.systemServicesManager.CreateOrUpdateService(resourceReference.hostId, {
+            before: [],
+            command: "dnsmasq --conf-file=" + configPath,
+            environment: {},
+            groupName: "root",
+            name: serviceName,
+            userName: "root"
+        });
+        await this.systemServicesManager.EnableService(resourceReference.hostId, serviceName);
+        await this.systemServicesManager.StartService(resourceReference.hostId, serviceName);
     }
 
-    private GenerateHostsConfig(zones: DNS_Zone[])
+    private DeriveServiceName(resourceReference: LightweightResourceReference)
     {
-        const lines = [];
-
-        for (const zone of zones)
-        {
-            for (const record of zone.records)
-            {
-                switch(record.type)
-                {
-                    case "A":
-                        lines.push(record.target + "\t" + record.name + "." + zone.name);
-                        break;
-                }
-            }
-        }
-
-        return lines.join("\n");
+        return "opc-rdnsmasq-" + resourceReference.id;
     }
 }

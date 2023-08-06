@@ -26,9 +26,7 @@ import { ResourceReference } from "../../common/ResourceReference";
 
 interface StaticWebsiteInfoDto
 {
-    hostName: string;
-    storagePath: string;
-    port: number;
+    ipAddresses: string[];
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_staticWebsiteResourceTypeName}/{resourceName}`)
@@ -53,7 +51,7 @@ class StaticWebsiteAPIController extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference,
     )
     {
-        return await this.staticWebsitesManager.QueryConfig(resourceReference);
+        return await this.staticWebsitesManager.QueryConfig(resourceReference.id);
     }
 
     @Put("config")
@@ -69,11 +67,10 @@ class StaticWebsiteAPIController extends ResourceAPIControllerBase
     public async QueryInfo(
         @Common resourceReference: ResourceReference,
     )
-    {            
+    {
+        const info = await this.staticWebsitesManager.ExtractContainerInfo(resourceReference);
         const result: StaticWebsiteInfoDto = {
-            hostName: resourceReference.hostName,
-            storagePath: resourceReference.hostStoragePath,
-            port: await this.staticWebsitesManager.QueryPort(resourceReference)
+            ipAddresses: info.ipAddresses
         };
         return result;
     }

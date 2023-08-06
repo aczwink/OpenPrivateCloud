@@ -23,13 +23,13 @@ interface HostInstanceSelection
 {
     resourceProviderName: string;
     resourceTypeName: string;
-    hostName: string;
+    hostName?: string;
     value: string | null;
     valueChanged: (newValue: string | null) => void;
 }
   
 @Injectable
-export class HostResourceSelectionComponent extends Component<HostInstanceSelection>
+export class ResourceSelectionComponent extends Component<HostInstanceSelection>
 {
     constructor(private apiService: APIService)
     {

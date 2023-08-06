@@ -82,8 +82,7 @@ class HealthAPIController
 
         const hd = await this.healthController.QueryResourceHealthData(ref.id);
         const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref.id);
-        const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref);
-        const stateResult = await resourceProvider.QueryResourceState(ref);
+        const stateResult = await this.resourceProviderManager.QueryResourceState(ref);
 
         const res: ResourceHealthDTO = {
             availabilityLog: hd!.availabilityLog,

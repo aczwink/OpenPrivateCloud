@@ -20,7 +20,7 @@ import { AutoCompleteSelectBox, BootstrapIcon, CheckBox, Component, FormField, I
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { APIService } from "../../Services/APIService";
-import { HostResourceSelectionComponent } from "../ValueEditors/HostResourceSelectionComponent";
+import { ResourceSelectionComponent } from "../ValueEditors/ResourceSelectionComponent";
 import { RoleSelectionComponent } from "../ValueEditors/RoleSelectionComponent";
 import { UserGroupSelectionComponent } from "../ValueEditors/UserGroupSelectionComponent";
 import { UserSelectionComponent } from "../ValueEditors/UserSelectionComponent";
@@ -249,12 +249,14 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
                     return <LineEdit className={className} password value={value.toString()} onChanged={valueChanged} />;
             }
 
-            if(schema.format?.startsWith("instance-same-host["))
+            if(schema.format?.startsWith("resource[") || schema.format?.startsWith("resource-same-host["))
             {
                 const idx = schema.format.indexOf("[");
+                const main = schema.format.substring(0, idx);
                 const arg = schema.format.substring(idx+1, schema.format.length - 1);
                 const parts = arg.split("/");
-                return <HostResourceSelectionComponent resourceProviderName={parts[0]} resourceTypeName={parts[1]} hostName={this.input.context!.hostName} value={value} valueChanged={valueChanged} />;
+                const hostName = (main === "resource-same-host") ? (this.input.context!.hostName) : undefined;
+                return <ResourceSelectionComponent hostName={hostName} resourceProviderName={parts[0]} resourceTypeName={parts[1]} value={value} valueChanged={valueChanged} />;
             }
         }
 

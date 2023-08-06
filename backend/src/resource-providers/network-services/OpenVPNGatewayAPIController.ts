@@ -16,15 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Common, Delete, Get, Path, Post, Put, Query } from "acts-util-apilib";
+import { APIController, Body, Common, Get, Path, Put, Query } from "acts-util-apilib";
 import { c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { ResourcesManager } from "../../services/ResourcesManager";
-import { _legacy_EasyRSAManager } from "./EasyRSAManager";
 import { OpenVPNServerConfig } from "./models";
 import { OpenVPNGatewayManager, OpenVPNGatewayPublicEndpointConfig } from "./OpenVPNGatewayManager";
 import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
 import { ResourceReference } from "../../common/ResourceReference";
-import { EasyRSAManager } from "../security-services/EasyRSAManager";
 
 interface OpenVPNGatewayInfo
 {
@@ -45,8 +43,7 @@ interface OpenVPNGatewayExternalConfig
 @APIController(`resourceProviders/{resourceGroupName}/${c_networkServicesResourceProviderName}/${c_openVPNGatewayResourceTypeName}/{resourceName}`)
 class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
 {
-    constructor(resourcesManager: ResourcesManager, private _legacy_easyRSAManager: _legacy_EasyRSAManager, private easyRSAManager: EasyRSAManager,
-        private openVPNGatwayManager: OpenVPNGatewayManager)
+    constructor(resourcesManager: ResourcesManager, private openVPNGatwayManager: OpenVPNGatewayManager)
     {
         super(resourcesManager, c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName);
     }
@@ -66,21 +63,8 @@ class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
         @Query clientName: string
     )
     {
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-        const paths = this._legacy_easyRSAManager.GetCertPaths(resourceDir, clientName);
-        const config = await this.openVPNGatwayManager.GenerateClientConfig(resourceReference.hostId, resourceReference.id, resourceDir, paths);
-
+        const config = await this.openVPNGatwayManager.GenerateClientConfig(resourceReference, clientName);
         return config;
-    }
-
-    @Post("clients")
-    public async AddClient(
-        @Common resourceReference: ResourceReference,
-        @Body client: OpenVPNGatewayClient
-    )
-    {
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-        await this.easyRSAManager.CreateClientKeyPair(resourceReference.hostId, resourceDir, client.name);
     }
 
     @Get("clients")
@@ -88,24 +72,11 @@ class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference,
     )
     {
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-        const config = await this.openVPNGatwayManager.ReadInstanceConfig(resourceReference.id);
-        const result = await this._legacy_easyRSAManager.ListClients(resourceReference.hostId, resourceDir, config.publicEndpoint.domainName);
+        const result = await this.openVPNGatwayManager.ListClients(resourceReference);
         return result.Map(x => {
             const res: OpenVPNGatewayClient = { name: x };
             return res;
         }).ToArray();
-    }
-
-    @Delete("clients")
-    public async RevokeClient(
-        @Common resourceReference: ResourceReference,
-        @Body client: OpenVPNGatewayClient
-    )
-    {
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-        await this._legacy_easyRSAManager.RevokeClient(resourceReference.hostId, resourceDir, client.name);
-        await this.openVPNGatwayManager.RestartServer(resourceReference.hostId, resourceReference.id);
     }
 
     @Get("connections")
@@ -123,7 +94,7 @@ class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
     )
     {
         const config: OpenVPNGatewayExternalConfig = {
-            publicEndpointConfig: (await this.openVPNGatwayManager.ReadInstanceConfig(resourceReference.id)).publicEndpoint,
+            publicEndpointConfig: (await this.openVPNGatwayManager.ReadConfig(resourceReference.id)).publicEndpoint,
             serverConfig: await this.openVPNGatwayManager.ReadServerConfig(resourceReference.hostId, resourceReference.id)
         }
         return config;
@@ -136,7 +107,7 @@ class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
     )
     {
         await this.openVPNGatwayManager.UpdateServerConfig(resourceReference.hostId, resourceReference.id, config.serverConfig);
-        await this.openVPNGatwayManager.UpdateInstanceConfig(resourceReference.id, config.publicEndpointConfig);
+        await this.openVPNGatwayManager.UpdatePublicEndpointConfig(resourceReference.id, config.publicEndpointConfig);
 
         await this.openVPNGatwayManager.RestartServer(resourceReference.hostId, resourceReference.id);
     }

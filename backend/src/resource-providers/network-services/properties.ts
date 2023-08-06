@@ -28,7 +28,12 @@ export interface OpenVPNGatewayProperties extends BaseResourceProperties
 {
     type: "openvpn-gateway";
     publicEndpoint: OpenVPNGatewayPublicEndpointConfig;
-    keySize: 2048 | 4096;
+
+    /**
+     * @title Key-Vault
+     * @format instance-same-host[security-services/key-vault]
+     */
+    keyVaultExternalId: string;
 }
 
 export interface VirtualNetworkProperties extends BaseResourceProperties

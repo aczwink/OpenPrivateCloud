@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { FirewallRule, Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, JournalEntry, NetworkInterfaceDTO, PartitionDto, StorageDeviceDto } from "../../dist/api";
+import { FirewallRule, Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, JournalEntry, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError, UnwrapResponse } from "../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
@@ -166,6 +166,25 @@ function BuildFirewallViewModel(direction: "Inbound" | "Outbound")
     return firewallViewModel;
 }
 
+const portForwardingViewModel: ListViewModel<PortForwardingRule, HostId> = {
+    type: "list",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, rule) => service.hosts._any_.portForwarding.post(ids.hostName, rule),
+        }
+    ],
+    boundActions: [
+        {
+            type: "delete",
+            deleteResource: (service, ids, rule) => service.hosts._any_.portForwarding._any_._any_.delete(ids.hostName, rule.protocol, rule.port),
+        }
+    ],
+    displayName: "Port forwarding rules",
+    requestObjects: (service, ids) => service.hosts._any_.portForwarding.get(ids.hostName),
+    schemaName: "PortForwardingRule"
+};
+
 const storageViewModel: ObjectViewModel<HostStorageWithInfo, { hostName: string, storageId: number }> = {
     type: "object",
     actions: [
@@ -295,6 +314,15 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     icon: {
                         type: "bootstrap",
                         name: "bricks"
+                    }
+                },
+                {
+                    child: portForwardingViewModel,
+                    displayName: "Port forwarding rules",
+                    key: "portforwarding",
+                    icon: {
+                        type: "bootstrap",
+                        name: "door-open-fill"
                     }
                 },
                 {

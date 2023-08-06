@@ -60,12 +60,7 @@ const logsViewModel: ListViewModel<OpenVPNGatewayLogEntry, ResourceAndGroupId> =
 
 const clientsViewModel: ListViewModel<OpenVPNGatewayClient, ResourceAndGroupId> = {
     type: "list",
-    actions: [
-        {
-            type: "create",
-            createResource: (service, ids, client) => service.resourceProviders._any_.networkservices.openvpngateway._any_.clients.post(ids.resourceGroupName, ids.resourceName, client)
-        }
-    ],
+    actions: [],
     boundActions: [
         {
             type: "custom",
@@ -79,11 +74,7 @@ const clientsViewModel: ListViewModel<OpenVPNGatewayClient, ResourceAndGroupId> 
                 }
             },
             matIcon: "download"
-        },
-        {
-            type: "delete",
-            deleteResource: (service, ids, client) => service.resourceProviders._any_.networkservices.openvpngateway._any_.clients.delete(ids.resourceGroupName, ids.resourceName, client)
-        },
+        }
     ],
     displayName: "Clients",
     requestObjects: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.clients.get(ids.resourceGroupName, ids.resourceName),

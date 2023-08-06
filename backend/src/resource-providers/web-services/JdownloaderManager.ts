@@ -103,6 +103,7 @@ export class JdownloaderManager
         await shell.Close();
 
         await this.systemServicesManager.CreateOrUpdateService(context.hostId, {
+            before: [],
             command: "/usr/bin/java -Djava.awt.headless=true -jar " + resourceDir + "/JDownloader.jar",
             environment: {
                 JD_HOME: resourceDir

@@ -25,7 +25,6 @@ import { ResourceReference } from "../../common/ResourceReference";
 
 interface LetsEncryptCertInfoDto
 {
-    hostName: string;
     expiryDate: Date;
 }
 
@@ -51,11 +50,10 @@ class LetsEncryptAPIController extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference,
     )
     {
-        const cert = await this.letsEncryptManager.GetCert(resourceReference);
+        const expiryDate = await this.letsEncryptManager.ReadExpiryDate(resourceReference);
             
         const result: LetsEncryptCertInfoDto = {
-            hostName: resourceReference.hostName,
-            expiryDate: cert!.expiryDate
+            expiryDate: expiryDate ?? new Date(NaN)
         };
         return result;
     }

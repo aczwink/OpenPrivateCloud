@@ -79,6 +79,13 @@ interface RulePolicyAction
     type: "accept" | "drop" | "masquerade" | "return";
 }
 
+interface RulePolicyDestinationNAT
+{
+    type: "dnat";
+    addr: string;
+    port: number;
+}
+
 interface RulePolicyJump
 {
     type: "jump";
@@ -102,7 +109,7 @@ interface RulePolicyRejection
     expr: "port-unreachable";
 }
 
-type RulePolicy = RulePolicyAction | RulePolicyJump | RulePolicyMangle | RulePolicyRejection;
+type RulePolicy = RulePolicyAction | RulePolicyDestinationNAT | RulePolicyJump | RulePolicyMangle | RulePolicyRejection;
 
 export interface NetfilterRuleCreationData
 {
@@ -121,8 +128,8 @@ export interface NetfilterChain<RuleType>
     name: string;
     rules: RuleType[];
     type?: "filter" | "nat";
-    hook?: "forward" | "input" | "output" | "postrouting";
-    prio?: number | "filter" | "srcnat";
+    hook?: "forward" | "input" | "output" | "postrouting" | "prerouting";
+    prio?: number | "dstnat" | "filter" | "srcnat";
     policy?: "accept" | "drop";
 }
 
@@ -141,13 +148,6 @@ export class HostNetfilterService
     }
 
     //Public methods
-    public async DeleteNATRule(hostId: number, familyName: string, tableName: string, chainName: string, handle: number)
-    {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "nft", "delete", "rule", familyName, tableName, chainName, "handle", handle.toString()], hostId);
-
-        await this.PersistRuleSet(hostId);
-    }
-
     public async ReadActiveRuleSet(hostId: number)
     {
         const result = await this.ReadNFTables(hostId);
@@ -272,13 +272,6 @@ export class HostNetfilterService
             policy
         };
     }
-
-    private async ExportTable(hostId: number, table: Table<NetfilterRule>)
-    {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "nft", "list", "table", table.family, table.name], hostId);
-        return result.stdOut;
-    }
-
     private OperandToNFTSourceCode(operand: NetfilteRuleConditionOperand)
     {
         switch(operand.type)
@@ -298,22 +291,10 @@ export class HostNetfilterService
         }
     }
 
-    private async PersistRuleSet(hostId: number)
-    {
-        const ruleSet = await this.ReadActiveRuleSet(hostId);
-
-        const exportedTables = await ruleSet.Values().Filter(x => x.name.startsWith("opc_")).Map(this.ExportTable.bind(this, hostId)).PromiseAll();
-
-        const textContent = "#!/usr/sbin/nft -f\n\nflush ruleset\n\n" + exportedTables.join("\n\n");
-        await this.remoteRootFileSystemManager.WriteTextFile(hostId, "/etc/nftables.conf", textContent);
-
-        const enabled = await this.systemServicesManager.IsServiceEnabled(hostId, "nftables");
-        if(!enabled)
-            await this.systemServicesManager.EnableService(hostId, "nftables");
-    }
-
     private PolicyToNFTSourceCode(policy: RulePolicy)
     {
+        if(policy.type === "dnat")
+            return "dnat to " + policy.addr + ":" + policy.port;
         if(policy.type === "jump")
             return "jump " + policy.target;
         if(policy.type === "reject")

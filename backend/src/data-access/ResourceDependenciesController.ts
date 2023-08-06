@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,51 +19,39 @@
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
-
 @Injectable
-export class ResourceConfigController
+export class ResourceDependenciesController
 {
     constructor(private dbConnMgr: DBConnectionsManager)
     {
     }
 
     //Public methods
-    public async DeleteConfig(instanceId: number)
+    public async DeleteDependenciesOf(resourceId: number)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
 
-        await conn.DeleteRows("instances_configuration", "instanceId = ?", instanceId);
+        await conn.DeleteRows("resources_dependencies", "dependantResourceId = ?", resourceId);
     }
 
-    public async QueryConfig<ConfigType>(resourceId: number)
+    public async EnsureResourceDependencyExists(resourceId: number, dependantResourceId: number)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+
+        await conn.Query("INSERT IGNORE INTO resources_dependencies (resourceId, dependantResourceId) VALUES (?, ?)", [resourceId, dependantResourceId]);
+    }
+
+    public async QueryResourcesThatDependOn(resourceProviderName: string, resourceType: string, resourceId: number)
     {
         const query = `
-        SELECT config
-        FROM instances_configuration
-        WHERE instanceId = ?
+        SELECT rd.dependantResourceId
+        FROM resources_dependencies rd
+        INNER JOIN instances r
+            ON r.id = rd.dependantResourceId
+        WHERE r.resourceProviderName = ? AND r.instanceType = ? AND rd.resourceId = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, resourceId);
-
-        if(row === undefined)
-            return undefined;
-
-        return JSON.parse(row.config) as ConfigType;
-    }
-
-    public async UpdateOrInsertConfig(resourceId: number, config: any)
-    {
-        const stringConfig = JSON.stringify(config);
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-
-        const result = await conn.UpdateRows("instances_configuration", { config: stringConfig }, "instanceId = ?", resourceId);
-        if(result.affectedRows === 0)
-        {
-            await conn.InsertRow("instances_configuration", {
-                config: stringConfig,
-                instanceId: resourceId
-            });
-        }
+        const rows = await conn.Select(query, resourceProviderName, resourceType, resourceId);
+        return rows.map(x => x.dependantResourceId as number);
     }
 }

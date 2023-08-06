@@ -43,7 +43,7 @@ export class ResourceListComponent extends Component
             <table className="table table-striped">
                 <thead>
                     <tr>
-                        <th>Resource name</th>
+                        <th onclick={this.Sort.bind(this, "name")}>Resource name</th>
                         <th>Resource type</th>
                         <th>State</th>
                         <th>Resource provider</th>
@@ -132,6 +132,12 @@ export class ResourceListComponent extends Component
         }
     }
 
+    private Sort(key: keyof ResourceOverviewDataDTO)
+    {
+        this.resources?.SortBy(x => x[key]);
+        this.Update();
+    }
+
     //Event handlers
     override async OnInitiated(): Promise<void>
     {
@@ -143,6 +149,7 @@ export class ResourceListComponent extends Component
             return;
         }
 
+        response.data.SortBy(x => x.name);
         this.resources = response.data;
     }
 }

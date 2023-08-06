@@ -23,7 +23,7 @@ import "./api/HostStorageDevicesAPIController";
 import "./api/HostStoragesAPIController";
 import "./api/resourceGroups";
 import "./api/resources";
-import "./api/ProcessesAPIController";
+import "./api/processes";
 import "./api/ResourceProviderAPIController";
 import "./api/RolesAPIController";
 import "./api/RoleAssignmentsAPIController";

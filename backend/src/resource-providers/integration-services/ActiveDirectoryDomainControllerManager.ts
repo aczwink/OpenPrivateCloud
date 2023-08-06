@@ -124,8 +124,10 @@ export class ActiveDirectoryDomainControllerManager
             ],
             hostName: config.settings.dcHostName,
             imageName: "nowsci/samba-domain",
+            macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
             networkName: "host",
             portMap: [],
+            removeOnExit: false,
             restartPolicy: "always",
             volumes: [
                 {

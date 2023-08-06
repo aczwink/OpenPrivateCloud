@@ -139,6 +139,7 @@ export class NodeAppServiceManager
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
         await this.systemServicesManager.CreateOrUpdateService(resourceReference.hostId, {
+            before: [],
             command: "node " + path.join(resourceDir, "index.js"),
             environment: env,
             groupName: opcSpecialGroups.host,

@@ -15,146 +15,302 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import path from "path";
 import { Injectable } from "acts-util-node";
-import { UsersController } from "../../data-access/UsersController";
-import { ModulesManager } from "../../services/ModulesManager";
-import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { SystemServicesManager } from "../../services/SystemServicesManager";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
-import { ApacheManager } from "./ApacheManager";
-import { CertBotListParser } from "./CertBotListParser";
+import { DeploymentContext, ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
 import { LetsEncryptProperties } from "./Properties";
-import { LightweightResourceReference } from "../../common/ResourceReference";
-  
+import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
+import { ResourceDeploymentService } from "../../services/ResourceDeploymentService";
+import { randomUUID } from "crypto";
+import { VirtualNetworkProperties } from "../network-services/properties";
+import { ResourceGroupsController } from "../../data-access/ResourceGroupsController";
+import { ResourceProviderManager } from "../../services/ResourceProviderManager";
+import { HostFirewallSettingsManager } from "../../services/HostFirewallSettingsManager";
+import { CIDRRange } from "../../common/CIDRRange";
+import { VNetManager } from "../network-services/VNetManager";
+import { PortForwardingRule } from "../../services/HostFirewallZonesManager";
+import { DockerContainerConfig, DockerManager } from "../compute-services/DockerManager";
+import { ManagedDockerContainerManager } from "../compute-services/ManagedDockerContainerManager";
+import { ResourcesManager } from "../../services/ResourcesManager";
+import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+import { UsersController } from "../../data-access/UsersController";
+import { TimeUtil } from "acts-util-core";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
+import { KeyVaultManager } from "../security-services/KeyVaultManager";
+import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
+
+interface LetsEncryptCertBotConfig
+{
+    domainName: string;
+    isRunning: boolean;
+    keyVaultResourceId: number;
+    userId: number;
+    vNetAddressSpace: string;
+}
+
+const httpPort = 80;
+
 @Injectable
 export class LetsEncryptManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private modulesManager: ModulesManager,
-        private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager)
+    constructor(private resourceConfigController: ResourceConfigController, private resourceDeploymentService: ResourceDeploymentService, private resourceGroupsController: ResourceGroupsController, 
+        private resourceProviderManager: ResourceProviderManager, private hostFirewallSettingsManager: HostFirewallSettingsManager, private vnetManager: VNetManager, private dockerManager: DockerManager,
+        private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager,
+        private usersController: UsersController, private resourceDependenciesController: ResourceDependenciesController, private keyVaultManager: KeyVaultManager,
+        private remoteRootFileSystemManager: RemoteRootFileSystemManager)
     {
     }
 
     //Public methods
-    public async DeleteResource(resourceReference: LightweightResourceReference)
+    public async DeleteResource(resourceReference: LightweightResourceReference): Promise<ResourceDeletionError | null>
     {
-        const cert = await this.GetCert(resourceReference);
-        if(cert === undefined)
-            return; //failed deployment
+        const config = await this.ReadConfig(resourceReference.id);
+        if(config.isRunning)
+        {
+            return {
+                type: "ConflictingState",
+                message: "CertBot is currently running"
+            };
+        }
 
-        const certName = this.DeriveCertificateName(resourceReference);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "certbot", "delete", "--cert-name", certName, "--non-interactive"], resourceReference.hostId);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
+
+        return null;
     }
 
-    public async GetCert(resourceReference: LightweightResourceReference)
+    public async ReadExpiryDate(resourceReference: LightweightResourceReference)
     {
-        const certName = this.DeriveCertificateName(resourceReference);
+        const config = await this.ReadConfig(resourceReference.id);
+        const kvRef = await this.resourcesManager.CreateResourceReference(config.keyVaultResourceId);
 
-        const certs = await this.ListCertificates(resourceReference.hostId);
-        const cert = certs.find(x => x.name === certName);
-        return cert;
-    }
+        const cert = await this.keyVaultManager.ReadCertificateInfo(kvRef!, config.domainName);
 
-    public async RenewCertificateIfRequired(resourceReference: LightweightResourceReference)
-    {
-        const cert = await this.GetCert(resourceReference);
-        const leftTimeUntilRenewal = (Date.now() - cert!.expiryDate.valueOf());
-        if(leftTimeUntilRenewal < 30 * 24 * 60 * 60 *1000) //letsencrypt recommends renewing after 60 days. Cert is valid for 90 days.
-            await this.RenewCertificate(resourceReference.hostId, this.DeriveCertificateName(resourceReference));
+        return cert?.expiryDate;
     }
 
     public async ProvideResource(instanceProperties: LetsEncryptProperties, context: DeploymentContext)
     {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "letsencrypt");
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "apache");
+        const kvRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.keyVaultExternalId);
+        if(kvRef === undefined)
+            throw new Error("Key vault does not exist");
+        await this.resourceDependenciesController.EnsureResourceDependencyExists(kvRef.id, context.resourceReference.id);
+
+        const config: LetsEncryptCertBotConfig = {
+            domainName: instanceProperties.domainName,
+            isRunning: false,
+            keyVaultResourceId: kvRef.id,
+            userId: context.userId,
+            vNetAddressSpace: instanceProperties.vNetAddressSpace
+        };
+        await this.WriteConfig(context.resourceReference.id, config);
+
+        const basePath = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, path.join(basePath, "etc"));
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, path.join(basePath, "logs"));
 
         const user = await this.usersController.QueryUser(context.userId);
 
-        const enabledSiteNames = await this.SaveApacheState(context.hostId);
-        await this.PrepareApacheForCertbot(context.hostId, enabledSiteNames);
+        const command = ["certonly", "--cert-name", instanceProperties.domainName, "-v", "-d", instanceProperties.domainName, "--standalone", "-m", user!.emailAddress, "--agree-tos"];
+        await this.OrchestrateCertbotWorkflow(context.resourceReference, command);
+    }
 
-        const certName = this.DeriveCertificateName(context.resourceReference);
-        const command = ["sudo", "certbot", "certonly", "--cert-name", certName, "--webroot", "-w", "/var/www/html/", "-d", instanceProperties.domainName, "-m", user!.emailAddress, "--agree-tos"];
-        try
-        {
-            await this.remoteCommandExecutor.ExecuteCommand(command, context.hostId);
-        }
-        catch(e)
-        {
-            throw e;
-        }
-        finally
-        {
-            await this.ResetApacheState(context.hostId, enabledSiteNames);
-        }
+    public async RenewCertificateIfRequired(resourceReference: ResourceReference)
+    {
+        const expiryDate = await this.ReadExpiryDate(resourceReference);
+        const leftTimeUntilRenewal = (Date.now() - expiryDate!.valueOf());
+        if(leftTimeUntilRenewal < 30 * 24 * 60 * 60 *1000) //letsencrypt recommends renewing after 60 days. Cert is valid for 90 days.
+            await this.RenewCertificate(resourceReference);
     }
 
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
-        const cert = await this.GetCert(resourceReference);
-        if(cert === undefined)
-            return "corrupt"; //probably failed deployment
-
-        if(cert.expiryDate < new Date())
-            return "down";
-
-        return "running";
+        const config = await this.ReadConfig(resourceReference.id);
+        if(config.isRunning)
+            return "running";
+        return "waiting";
     }
 
     //Private methods
-    private DeriveCertificateName(resourceReference: LightweightResourceReference)
+    private async CleanUpCertbotExecution(resourceReference: LightweightResourceReference, vNetRef: ResourceReference, originalPortForwardingRule: PortForwardingRule | undefined)
     {
-        return "opc-rlec-" + resourceReference.id;
+        await this.hostFirewallSettingsManager.DeletePortForwardingRule(vNetRef.hostId, "TCP", httpPort);
+        if(originalPortForwardingRule !== undefined)
+            await this.hostFirewallSettingsManager.AddPortForwardingRule(vNetRef.hostId, originalPortForwardingRule);
+
+        await this.hostFirewallSettingsManager.DeleteRule(vNetRef.hostId, "Inbound", 1);
+
+        await this.resourceProviderManager.DeleteResource(vNetRef);
+
+        const config = await this.ReadConfig(resourceReference.id);
+        config.isRunning = false;
+        await this.WriteConfig(resourceReference.id, config);
     }
 
-    private async ListCertificates(hostId: number)
+    private async DeployVNet(resourceReference: ResourceReference, config: LetsEncryptCertBotConfig)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "certbot", "certificates"], hostId);
-        const parser = new CertBotListParser();
-        return parser.Parse(result.stdOut);
+        const vNetProps: VirtualNetworkProperties = {
+            addressSpace: config.vNetAddressSpace,
+            enableDHCPv4: true,
+            hostName: resourceReference.hostName,
+            name: "DONT_TOUCH_LetsEncryptVNet_" + randomUUID(),
+            type: "virtual-network"
+        };
+        const rg = await this.resourceGroupsController.QueryGroupByName(resourceReference.resourceGroupName);
+        const vNetRef = await this.resourceDeploymentService.StartInstanceDeployment(vNetProps, rg!, resourceReference.hostId, config.userId);
+
+        for(let i = 0; i <= 60 * 60; i += 5) //try for one hour
+        {
+            await TimeUtil.Delay(5000);
+
+            const state = await this.resourceProviderManager.QueryResourceState(vNetRef);
+            switch(state)
+            {
+                case "corrupt":
+                case "down":
+                    throw new Error("Deployment of vnet failed");
+                case "running":
+                    return vNetRef;
+            }
+        }
+
+        throw new Error("Deployment of vnet failed");
     }
 
-    private async PrepareApacheForCertbot(hostId: number, enabledSiteNames: string[])
+    private DeriveContainerName(resourceId: number)
     {
-        await enabledSiteNames.Values().Map(name => this.apacheManager.DisableSite(hostId, name)).PromiseAll();
-        await this.apacheManager.EnableSite(hostId, "000-default");
-
-        await this.systemServicesManager.RestartService(hostId, "apache2");
+        return "opc-rlecb-" + resourceId;
     }
 
-    private async RenewCertificate(hostId: number, certName: string)
+    private async ImportCertificateIntoKeyVault(resourceReference: LightweightResourceReference)
     {
-        const enabledSiteNames = await this.SaveApacheState(hostId);
-        await this.PrepareApacheForCertbot(hostId, enabledSiteNames);
+        const config = await this.ReadConfig(resourceReference.id);
 
+        const baseDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const domainDir = path.join(baseDir, "etc", "live", config.domainName);
+
+        const cert = await this.remoteRootFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(domainDir, "fullchain.pem"));
+        const privateKey = await this.remoteRootFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(domainDir, "privkey.pem"));
+
+        const kvRef = await this.resourcesManager.CreateResourceReference(config.keyVaultResourceId);
+
+        await this.keyVaultManager.ImportCertificate(kvRef!, config.domainName, privateKey, cert);
+    }
+
+    private async PrepareCertbotExecution(resourceReference: ResourceReference)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.isRunning = true;
+        await this.WriteConfig(resourceReference.id, config);
+        
+        const vNetRef = await this.DeployVNet(resourceReference, config);
+        await this.vnetManager.SetFirewallRule(vNetRef, "Inbound", {
+            action: "Allow",
+            comment: "Allow http for certbot verification",
+            destination: "Any",
+            destinationPortRanges: httpPort.toString(),
+            priority: 1,
+            protocol: "TCP",
+            source: "Any"
+        });
+
+        await this.hostFirewallSettingsManager.SetRule(resourceReference.hostId, "Inbound", {
+            action: "Allow",
+            comment: "Allow http for certbot verification",
+            destination: "Any",
+            destinationPortRanges: httpPort.toString(),
+            priority: 1,
+            protocol: "TCP",
+            source: "Any"
+        });
+
+        const portForwardingRules = await this.hostFirewallSettingsManager.QueryPortForwardingRules(resourceReference.hostId);
+        const originalPortForwardingRule = portForwardingRules.find(x => (x.port === httpPort) && (x.protocol === "TCP"));
+
+        if(originalPortForwardingRule !== undefined)
+            await this.hostFirewallSettingsManager.DeletePortForwardingRule(resourceReference.hostId, "TCP", httpPort);
+
+        const containerAddress = new CIDRRange(config.vNetAddressSpace).netAddress.Next().Next();
+        await this.hostFirewallSettingsManager.AddPortForwardingRule(resourceReference.hostId, {
+            port: httpPort,
+            protocol: "TCP",
+            targetAddress: containerAddress.ToString(),
+            targetPort: httpPort
+        });
+        await TimeUtil.Delay(5000); //wait for firewall to refresh
+
+        return {
+            vNetRef,
+            originalPortForwardingRule
+        };
+    }
+
+    private async ReadConfig(resourceId: number)
+    {
+        const configOptional = await this.resourceConfigController.QueryConfig<LetsEncryptCertBotConfig>(resourceId);
+        return configOptional!;
+    }
+
+    private async RenewCertificate(resourceReference: ResourceReference)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+
+        const command = ["renew", "--cert-name", config.domainName, "--no-random-sleep-on-renew"];
+        await this.OrchestrateCertbotWorkflow(resourceReference, command);
+    }
+
+    private async OrchestrateCertbotWorkflow(resourceReference: ResourceReference, command: string[])
+    {
+        const state = await this.PrepareCertbotExecution(resourceReference);
         try
         {
-            const commands = ["sudo", "certbot", "renew", "--cert-name", certName, "--no-random-sleep-on-renew"];
-            await this.remoteCommandExecutor.ExecuteCommand(commands, hostId);
-        }
-        catch(error)
-        {
-            throw error;
+            await this.RunCommandInContainer(resourceReference, state.vNetRef, command);
         }
         finally
         {
-            await this.ResetApacheState(hostId, enabledSiteNames);
+            await this.CleanUpCertbotExecution(resourceReference, state.vNetRef, state.originalPortForwardingRule);
         }
+
+        await this.ImportCertificateIntoKeyVault(resourceReference);
     }
 
-    private async ResetApacheState(hostId: number, enabledSiteNames: string[])
+    private async RunCommandInContainer(resourceReference: LightweightResourceReference, vNetResourceReference: LightweightResourceReference, command: string[])
     {
-        await this.apacheManager.DisableSite(hostId, "000-default");
-        await enabledSiteNames.Values().Map(name => this.apacheManager.EnableSite(hostId, name)).PromiseAll();
+        const baseDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetResourceReference);
 
-        await this.systemServicesManager.RestartService(hostId, "apache2");
+        const containerConfig: DockerContainerConfig = {
+            additionalHosts: [],
+            capabilities: [],
+            dnsSearchDomains: [],
+            dnsServers: [dockerNetwork.primaryDNS_Server],
+            env: [],
+            imageName: "certbot/certbot",
+            macAddress: this.dockerManager.CreateMAC_Address(resourceReference.id),
+            networkName: dockerNetwork.name,
+            portMap: [],
+            removeOnExit: true,
+            restartPolicy: "no",
+            volumes: [
+                {
+                    containerPath: "/etc/letsencrypt",
+                    hostPath: path.join(baseDir, "etc"),
+                    readOnly: false
+                },
+                {
+                    containerPath: "/var/log/letsencrypt",
+                    hostPath: path.join(baseDir, "logs"),
+                    readOnly: false
+                }
+            ]
+        };
+
+        const containerName = this.DeriveContainerName(resourceReference.id);
+        await this.dockerManager.CreateContainerInstanceAndStartItAndExecuteCommand(resourceReference.hostId, containerName, containerConfig, command);
     }
-    
-    private async SaveApacheState(hostId: number)
+
+    private async WriteConfig(resourceId: number, config: LetsEncryptCertBotConfig)
     {
-        const sites = await this.apacheManager.QuerySites(hostId);
-        const enabledSiteNames = sites.Values()
-            .Filter(x => x.enabled)
-            .Map(x => x.name).ToArray();
-        return enabledSiteNames;
+        await this.resourceConfigController.UpdateOrInsertConfig(resourceId, config);
     }
 }

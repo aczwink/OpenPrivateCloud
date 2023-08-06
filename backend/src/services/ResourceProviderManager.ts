@@ -20,19 +20,22 @@ import { Instantiatable } from "acts-util-core";
 import { GlobalInjector, Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../data-access/ResourceConfigController";
 import { ResourcesController } from "../data-access/ResourcesController";
-import { BaseResourceProperties, ResourceProvider, ResourceTypeDefinition } from "../resource-providers/ResourceProvider";
+import { BaseResourceProperties, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../resource-providers/ResourceProvider";
 import { APISchemaService } from "./APISchemaService";
 import { PermissionsManager } from "./PermissionsManager";
 import { ResourceLogsController } from "../data-access/ResourceLogsController";
 import { HealthController } from "../data-access/HealthController";
 import { RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { ResourceReference } from "../common/ResourceReference";
+import { ErrorService } from "./ErrorService";
+import { ResourceDependenciesController } from "../data-access/ResourceDependenciesController";
 
 @Injectable
 export class ResourceProviderManager
 {
-    constructor(private apiSchemaService: APISchemaService, private resourcesController: ResourcesController, private permissionsManager: PermissionsManager,
-        private instanceConfigController: ResourceConfigController, private instanceLogsController: ResourceLogsController, private healthController: HealthController, private roleAssignmentsController: RoleAssignmentsController)
+    constructor(private apiSchemaService: APISchemaService, private resourcesController: ResourcesController, private permissionsManager: PermissionsManager, private errorService: ErrorService,
+        private instanceConfigController: ResourceConfigController, private instanceLogsController: ResourceLogsController, private healthController: HealthController, private roleAssignmentsController: RoleAssignmentsController,
+        private resourceDependenciesController: ResourceDependenciesController)
     {
         this._resourceProviders = [];
     }
@@ -48,6 +51,8 @@ export class ResourceProviderManager
     {
         const resourceProvider = this.FindResourceProviderByName(resourceReference.resourceProviderName);
         const resourceId = resourceReference.id;
+
+        await this.resourceDependenciesController.DeleteDependenciesOf(resourceId);
 
         //first everything that the user is also able to do himself
         const roleAssignments = await this.roleAssignmentsController.QueryResourceLevelRoleAssignments(resourceReference.id);
@@ -91,6 +96,22 @@ export class ResourceProviderManager
     {
         const resourceProvider = this.FindResourceProviderByName(resourceReference.resourceProviderName);
         await resourceProvider.InstancePermissionsChanged(resourceReference);
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    {
+        const resourceProvider = this.FindResourceProviderByResource(resourceReference);
+        try
+        {
+            return await resourceProvider.QueryResourceState(resourceReference);
+        }
+        catch(e)
+        {
+            return {
+                state: "down",
+                context: this.errorService.ExtractDataAsMultipleLines(e),
+            };
+        }
     }
 
     public Register(resourceProviderClass: Instantiatable<ResourceProvider<any>>)

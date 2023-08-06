@@ -102,8 +102,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
                 await this.jdownloaderManager.DeleteResource(resourceReference);
                 break;
             case resourceProviders.webServices.letsencryptCertResourceType.name:
-                await this.letsEncryptManager.DeleteResource(resourceReference);
-                break;
+                return await this.letsEncryptManager.DeleteResource(resourceReference);
             case resourceProviders.webServices.nextcloudResourceType.name:
                 await this.nextcloudManager.DeleteResource(resourceReference);
                 break;

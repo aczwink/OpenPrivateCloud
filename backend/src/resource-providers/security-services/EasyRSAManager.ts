@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import path from "path";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 
@@ -22,6 +23,19 @@ export interface CA_Config
 {
     commonName: string;
     keySize: 2048 | 4096;
+}
+
+export interface CA_FilePaths
+{
+    caCertPath: string;
+    dhPath: string;
+    crlPath: string;
+}
+
+export interface CertKeyPaths
+{
+    certPath: string;
+    keyPath: string;
 }
 
 @Injectable
@@ -61,5 +75,35 @@ export class EasyRSAManager
         await this.remoteCommandExecutor.ExecuteCommand(["./easyrsa", "--batch", "--keysize=" + keySize, "build-server-full", serverName, "nopass"], hostId, {
             workingDirectory: cadir
         });
+    }
+
+    public GetCAPaths(cadir: string): CA_FilePaths
+    {
+        const pkiPath = path.join(cadir, "pki");
+        return {
+            caCertPath: path.join(pkiPath, "ca.crt"),
+            crlPath: path.join(pkiPath, "crl.pem"),
+            dhPath: path.join(pkiPath, "dh.pem"),
+        };
+    }
+
+    public GetCertAndKeyPaths(cadir: string, name: string): CertKeyPaths
+    {
+        const pkiPath = path.join(cadir, "pki");
+        return {
+            certPath: path.join(pkiPath, "issued", name + ".crt"),
+            keyPath: path.join(pkiPath, "private", name + ".key"),
+        };
+    }
+
+    public async RevokeCertificate(hostId: number, cadir: string, name: string)
+    {
+        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        await shell.ChangeDirectory(cadir);
+
+        await shell.ExecuteCommand(["./easyrsa", "--batch", "revoke", name]);
+        await shell.ExecuteCommand(["./easyrsa", "gen-crl"]);
+
+        await shell.Close();
     }
 }

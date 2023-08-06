@@ -97,10 +97,8 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
                 await this.dnsServerManager.ProvideResource(instanceProperties, context);
                 return {};
             case "openvpn-gateway":
-                const config = await this.openVPNGatwayManager.ProvideResource(instanceProperties, context);
-                return {
-                    config
-                };
+                await this.openVPNGatwayManager.ProvideResource(instanceProperties, context);
+                return {};
             case "virtual-network":
                 await this.vnetManager.ProvideResource(instanceProperties, context);
                 return {};

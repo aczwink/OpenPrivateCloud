@@ -17,7 +17,7 @@
  * */
 
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
-import { APIController, Body, Common, Get, Path, Post } from "acts-util-apilib";
+import { APIController, Body, Common, Delete, Get, NotFound, Path, Post } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_keyVaultResourceTypeName, c_securityServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
@@ -27,6 +27,20 @@ import { CA_Config } from "../EasyRSAManager";
 interface CertificateDTO
 {
     type: "client" | "server";
+    name: string;
+}
+
+interface SecretDTO
+{
+    name: string;
+    /**
+     * @format secret
+     */
+    secretValue: string;
+}
+
+interface SecretListDTO
+{
     name: string;
 }
 
@@ -64,6 +78,27 @@ class _api_ extends ResourceAPIControllerBase
         return this.keyVaultManager.ListCertificates(resourceReference);
     }
 
+    @Get("certificates/{name}")
+    public async QueryCertificate(
+        @Common resourceReference: ResourceReference,
+        @Path name: string
+    )
+    {
+        const cert = await this.keyVaultManager.ReadCertificateInfo(resourceReference, name);
+        if(cert === undefined)
+            return NotFound("Certificate does not exist");
+        return cert;
+    }
+
+    @Delete("certificates/{name}")
+    public async RevokeCertificate(
+        @Common resourceReference: ResourceReference,
+        @Path name: string
+    )
+    {
+        await this.keyVaultManager.RevokeCertificate(resourceReference, name);
+    }
+
     @Get("pkiconfig")
     public QueryPKI_Config(
         @Common resourceReference: ResourceReference,
@@ -79,5 +114,39 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         await this.keyVaultManager.UpdatePKI_Config(resourceReference, caConfig);
+    }
+
+    @Post("secrets")
+    public async CreateSecret(
+        @Common resourceReference: ResourceReference,
+        @Body secret: SecretDTO
+    )
+    {
+        await this.keyVaultManager.CreateSecret(resourceReference, secret.name, secret.secretValue);
+    }
+
+    @Get("secrets/{name}")
+    public async QuerySecret(
+        @Common resourceReference: ResourceReference,
+        @Path name: string
+    )
+    {
+        const value = await this.keyVaultManager.QuerySecret(resourceReference, name);
+        const res: SecretDTO = {
+            name,
+            secretValue: value
+        }
+        return res;
+    }
+
+    @Get("secrets")
+    public async QuerySecrets(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        const names = await this.keyVaultManager.QuerySecretNames(resourceReference);
+        return names.map<SecretListDTO>(x => ({
+            name: x
+        }));
     }
 }

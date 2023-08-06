@@ -57,7 +57,7 @@ export interface DeploymentResult
     config?: any;
 }
 
-export type ResourceState = "corrupt" | "down" | "in deployment" | "running" | "stopped";
+export type ResourceState = "corrupt" | "down" | "in deployment" | "running" | "stopped" | "waiting";
 type ResourceStateWithContext = { state: ResourceState; context: string; };
 export type ResourceStateResult = ResourceState | ResourceStateWithContext;
 

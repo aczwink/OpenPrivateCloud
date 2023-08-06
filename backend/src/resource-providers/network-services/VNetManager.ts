@@ -26,10 +26,10 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { CIDRRange } from "../../common/CIDRRange";
 import { SysCtlConfService } from "./SysCtlConfService";
 import { ResourcesManager } from "../../services/ResourcesManager";
-import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { ModulesManager } from "../../services/ModulesManager";
-import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { FirewallRule, FirewallZoneData, FirewallZoneDataProvider } from "../../services/HostFirewallZonesManager";
+import { dnsmasqManager } from "./dnsmasqManager";
+import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInterfaceCardsManager";
+import { ModulesManager } from "../../services/ModulesManager";
 
 interface VNetSettings
 {
@@ -58,9 +58,8 @@ export interface VNetConfig
 @Injectable
 export class VNetManager implements FirewallZoneDataProvider
 {
-    constructor(private resourceConfigController: ResourceConfigController, private remoteCommandExecutor: RemoteCommandExecutor, private sysCtlConfService: SysCtlConfService,
-        private resourcesManager: ResourcesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private modulesManager: ModulesManager, private systemServicesManager: SystemServicesManager,
-        private hostFirewallManager: HostFirewallManager)
+    constructor(private resourceConfigController: ResourceConfigController, private remoteCommandExecutor: RemoteCommandExecutor, private sysCtlConfService: SysCtlConfService, private modulesManager: ModulesManager,
+        private resourcesManager: ResourcesManager, private hostFirewallManager: HostFirewallManager, private dnsmasqManager: dnsmasqManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager)
     {
     }
 
@@ -78,17 +77,15 @@ export class VNetManager implements FirewallZoneDataProvider
         const existsDocker = await this.DoesDockerNetworkExist(resourceReference);
         if(existsDocker)
         {
-            const dockerNetName = this.DeriveServiceName(resourceReference);
+            const dockerNetName = this.DeriveDockerNetworkName(resourceReference);
             await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "rm", dockerNetName], resourceReference.hostId);
         }
 
         const exists = await this.DoesBridgeExist(resourceReference);
         if(exists)
-            await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "link", "delete", bridgeName, "type", "bridge"], resourceReference.hostId);
+            await this.hostNetworkInterfaceCardsManager.DeleteBridge(resourceReference.hostId, bridgeName);
 
-        const serviceName = this.DeriveServiceName(resourceReference);
-        await this.systemServicesManager.StopService(resourceReference.hostId, serviceName);
-        await this.systemServicesManager.DeleteService(resourceReference.hostId, serviceName);
+        await this.dnsmasqManager.DeleteService(resourceReference);
 
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
@@ -107,17 +104,24 @@ export class VNetManager implements FirewallZoneDataProvider
 
     public async EnsureDockerNetworkExists(resourceReference: LightweightResourceReference)
     {
-        const dockerNetName = this.DeriveServiceName(resourceReference);
+        const dockerNetName = this.DeriveDockerNetworkName(resourceReference);
 
         const exists = await this.DoesDockerNetworkExist(resourceReference);
         if(!exists)
         {
+            await this.modulesManager.EnsureModuleIsInstalled(resourceReference.hostId, "docker");
+
             const bridgeName = this.DeriveBridgeName(resourceReference);
-            const driverName = "ghcr.io/devplayer0/docker-net-dhcp:release-linux-amd64";
+            const driverName = "ghcr.io/aczwink/docker-net-dhcp:latest-linux-amd64";
             await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "create", "-d", driverName, "--ipam-driver", "null", "-o", "bridge=" + bridgeName, dockerNetName], resourceReference.hostId);
         }
 
-        return dockerNetName;
+        const config = await this.QueryConfig(resourceReference);
+        const range = new CIDRRange(config.settings.addressSpace);
+        return {
+            name: dockerNetName,
+            primaryDNS_Server: this.SubdivideAddressSpace(range).gatewayIP.ToString() //always use gateway as DNS server
+        };
     }
 
     public MatchNetworkInterfaceName(nicName: string): string | null
@@ -136,7 +140,8 @@ export class VNetManager implements FirewallZoneDataProvider
         return {
             addressSpace: new CIDRRange(config.settings.addressSpace),
             inboundRules: config.inboundRules,
-            outboundRules: config.outboundRules
+            outboundRules: config.outboundRules,
+            portForwardingRules: [],
         };
     }
 
@@ -164,33 +169,6 @@ export class VNetManager implements FirewallZoneDataProvider
                 action: "Allow",
                 comment: "DHCP Client. Required for VMs and Containers!"
             });
-            inboundRules.push({
-                priority: 102,
-                destinationPortRanges: "Any",
-                protocol: "ICMP",
-                source: "Any",
-                destination: "Any",
-                action: "Allow",
-                comment: "Ping. Recommended for diagnosis"
-            });
-            inboundRules.push({
-                priority: 103,
-                destinationPortRanges: "22",
-                protocol: "TCP",
-                source: "Any",
-                destination: "Any",
-                action: "Allow",
-                comment: "SSH. Recommended for diagnosis"
-            });
-            inboundRules.push({
-                priority: 1000,
-                destinationPortRanges: "Any",
-                protocol: "Any",
-                source: instanceProperties.addressSpace,
-                destination: instanceProperties.addressSpace,
-                action: "Allow",
-                comment: "Allow communication inside the vnet"
-            });
 
             outboundRules.push({
                 priority: 100,
@@ -211,6 +189,34 @@ export class VNetManager implements FirewallZoneDataProvider
                 comment: "DHCP Server. Required for VMs and Containers!"
             });
         }
+
+        inboundRules.push({
+            priority: 102,
+            destinationPortRanges: "Any",
+            protocol: "ICMP",
+            source: "Any",
+            destination: "Any",
+            action: "Allow",
+            comment: "Ping. Recommended for diagnosis"
+        });
+        inboundRules.push({
+            priority: 103,
+            destinationPortRanges: "22",
+            protocol: "TCP",
+            source: "Any",
+            destination: "Any",
+            action: "Allow",
+            comment: "SSH. Recommended for diagnosis"
+        });
+        inboundRules.push({
+            priority: 1000,
+            destinationPortRanges: "Any",
+            protocol: "Any",
+            source: instanceProperties.addressSpace,
+            destination: instanceProperties.addressSpace,
+            action: "Allow",
+            comment: "Allow communication inside the vnet"
+        });
 
         const config: VNetConfig = {
             settings: {
@@ -242,14 +248,7 @@ export class VNetManager implements FirewallZoneDataProvider
     {
         const exists = await this.DoesBridgeExist(resourceReference);
         if(!exists)
-        {
-            await this.CreateBridge(resourceReference); //bridge will be deleted on every reboot
-            const exists2 = await this.DoesBridgeExist(resourceReference);
-            if(exists2)
-                return "running";
-
             return { state: "down", context: "bridge is down" };
-        }
         return "running";
     }
 
@@ -281,10 +280,7 @@ export class VNetManager implements FirewallZoneDataProvider
         const range = new CIDRRange(config.settings.addressSpace);
         const subdiv = this.SubdivideAddressSpace(range);
 
-        //"stp_state", "0"
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "link", "add", "name", bridgeName, "type", "bridge", "forward_delay", "0"], resourceReference.hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "address", "add", "dev", bridgeName, subdiv.gatewayIP.ToString() + "/" + range.length], resourceReference.hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "link", "set", "dev", bridgeName, "up"], resourceReference.hostId);
+        await this.hostNetworkInterfaceCardsManager.CreateBridge(resourceReference.hostId, bridgeName, subdiv.gatewayIP, range.length);
     }
 
     private DeriveBridgeName(resourceReference: LightweightResourceReference)
@@ -292,22 +288,20 @@ export class VNetManager implements FirewallZoneDataProvider
         return "opc-virbr" + resourceReference.id;
     }
 
-    private DeriveServiceName(resourceReference: LightweightResourceReference)
+    private DeriveDockerNetworkName(resourceReference: LightweightResourceReference)
     {
-        return "opc-rvnet-" + resourceReference.id;
+        return "opc-rdnet" + resourceReference.id;
     }
 
     private async DoesBridgeExist(resourceReference: LightweightResourceReference)
     {
         const bridgeName = this.DeriveBridgeName(resourceReference);
-
-        const result = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["ip", "link", "show", bridgeName], resourceReference.hostId);
-        return result === 0;
+        return await this.hostNetworkInterfaceCardsManager.DoesInterfaceExist(resourceReference.hostId, bridgeName);
     }
 
     private async DoesDockerNetworkExist(resourceReference: LightweightResourceReference)
     {
-        const dockerNetName = this.DeriveServiceName(resourceReference);
+        const dockerNetName = this.DeriveDockerNetworkName(resourceReference);
         const result = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["sudo", "docker", "network", "inspect", dockerNetName], resourceReference.hostId);
         return result === 0;
     }
@@ -331,35 +325,20 @@ export class VNetManager implements FirewallZoneDataProvider
         const bridgeName = this.DeriveBridgeName(resourceReference);
         const dhcpRange = subdiv.firstDHCP_Address.ToString() + "," + subdiv.lastDHCP_Address.ToString();
 
-        const configPath = path.join(resourceDir, "dnsmasq.conf");
-        const pidPath = path.join(resourceDir, "dnsmasq.pid");
         const leasePath = path.join(resourceDir, "dnsmasq.leases");
 
         const dnsmasqConfig = `
 strict-order
-bind-dynamic
-except-interface=lo
-interface=${bridgeName}
 dhcp-range=${dhcpRange}
-pid-file=${pidPath}
 dhcp-leasefile=${leasePath}
 dhcp-no-override
 dhcp-authoritative
         `;
 
-        await this.remoteRootFileSystemManager.WriteTextFile(resourceReference.hostId, configPath, dnsmasqConfig.trim());
-
-        await this.modulesManager.EnsureModuleIsInstalled(resourceReference.hostId, "dnsmasq");
-
-        const serviceName = this.DeriveServiceName(resourceReference);
-        await this.systemServicesManager.CreateOrUpdateService(resourceReference.hostId, {
-            command: "dnsmasq --conf-file=" + configPath,
-            environment: {},
-            groupName: "root",
-            name: serviceName,
-            userName: "root"
+        await this.dnsmasqManager.UpdateService(resourceReference, {
+            configDirPath: resourceDir,
+            configContent: dnsmasqConfig,
+            networkInterface: bridgeName
         });
-        await this.systemServicesManager.EnableService(resourceReference.hostId, serviceName);
-        await this.systemServicesManager.StartService(resourceReference.hostId, serviceName);
     }
 }

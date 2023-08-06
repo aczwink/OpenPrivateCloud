@@ -139,7 +139,19 @@ export class ResourcesController
         return await conn.SelectOne<OverviewInstanceData>(query, instanceId);
     }
 
-    public async Search(hostName: string, resourceProviderName: string, resourceTypeName: string, resourceNameFilter: string)
+    public async Search(resourceProviderName: string, resourceTypeName: string, resourceNameFilter: string)
+    {
+        const query = `
+        SELECT i.id
+        FROM instances i
+        WHERE i.resourceProviderName = ? AND i.instanceType = ? AND name LIKE ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, resourceProviderName, resourceTypeName, "%" + resourceNameFilter + "%");
+        return rows.map(x => x.id as number);
+    }
+
+    public async SearchOnHost(hostName: string, resourceProviderName: string, resourceTypeName: string, resourceNameFilter: string)
     {
         const query = `
         SELECT i.id

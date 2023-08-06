@@ -23,11 +23,13 @@ import { ConfigModel } from "../common/config/ConfigModel";
 import { ConfigParser } from "../common/config/ConfigParser";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
+import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 
 type SystemServiceAction = "disable" | "enable" | "restart" | "start" | "stop";
 
 interface ServiceProperties
 {
+    before: string[];
     command: string;
     environment: Dictionary<string>;
     groupName: string;
@@ -38,7 +40,7 @@ interface ServiceProperties
 @Injectable
 export class SystemServicesManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteRootFileSystemManager: RemoteRootFileSystemManager)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
 
@@ -46,11 +48,13 @@ export class SystemServicesManager
     public async CreateOrUpdateService(hostId: number, props: ServiceProperties)
     {
         const env = props.environment.Entries().Map(x => "Environment=" + x.key + "=" + x.value).Join("\n");
+        const before = (props.before.length === 0) ? "" : ("Before=" + props.before.join(" "))
         const text = `
 [Unit]
 Description=${props.name} Service
 Wants=network.target
 After=network.target
+${before}
     
 [Service]
 ${env}
@@ -74,6 +78,13 @@ WantedBy=multi-user.target
     public DisableService(hostId: number, serviceName: string)
     {
         return this.ExecuteServiceAction(hostId, serviceName, "disable");
+    }
+
+    public async DoesServiceUnitExist(hostId: number, serviceName: string)
+    {
+        const unitPath = "/etc/systemd/system/" + serviceName + ".service";
+        const exists = await this.remoteFileSystemManager.Exists(hostId, unitPath)
+        return exists;
     }
 
     public EnableService(hostId: number, serviceName: string)
@@ -109,6 +120,7 @@ WantedBy=multi-user.target
         const model = new ConfigModel(data);
 
         return {
+            before: model.GetProperty("Unit", "Before")!.toString().split(" "),
             command: model.GetProperty("Service", "ExecStart")!.toString(),
             environment: data.Values().Map(x => (x.type === "KeyValue" &&  x.key === "Environment") ? x : null).NotNull().Map(x => x.value!.toString().split("=")).ToDictionary(x => x[0], x => x[1]),
             groupName: model.GetProperty("Service", "Group")!.toString(),
