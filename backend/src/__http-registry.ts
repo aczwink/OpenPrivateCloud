@@ -32,7 +32,7 @@ import "./api/UserGroupsAPIController";
 import "./api/UserAPIController";
 import "./api/UsersAPIController";
 
-import "./resource-providers/backup-services/BackupVaultAPIController";
+import "./resource-providers/backup-services/api/backup-vault";
 import "./resource-providers/compute-services/DockerContainerAPIController";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/database-services/MariaDB/MariaDBAPIController";

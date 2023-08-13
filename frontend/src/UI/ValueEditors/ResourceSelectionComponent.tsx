@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { AutoCompleteSelectBox, Component, Injectable, JSX_CreateElement, ProgressSpinner } from "acfrontend";
+import { AutoCompleteSelectBox, Component, Injectable, JSX_CreateElement } from "acfrontend";
 import { APIService } from "../../Services/APIService";
 
 interface HostInstanceSelection
@@ -39,13 +39,11 @@ export class ResourceSelectionComponent extends Component<HostInstanceSelection>
 
     protected Render(): RenderValue
     {
-        if( this.state === null )
-            return <ProgressSpinner />;
-
+        const selection = (this.state === null) ? null : { key: this.state, displayValue: this.state };
         return <AutoCompleteSelectBox<string>
             onChanged={newValue => this.input.valueChanged(newValue.key)}
             onLoadSuggestions={this.LoadResources.bind(this)}
-            selection={{ key: this.state, displayValue: this.state }} />;
+            selection={selection} />;
     }
 
     //Private variables

@@ -20,7 +20,9 @@ import { Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { TaskSchedulingManager } from "../../services/TaskSchedulingManager";
 import { BackupProcessService } from "./BackupProcessService";
-import { BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "./models";
+import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger, KeyVaultBackupConfig } from "./models";
+import { LightweightResourceReference } from "../../common/ResourceReference";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 
 interface BackupVaultConfig
 {
@@ -37,11 +39,32 @@ interface BackupVaultConfig
 @Injectable
 export class BackupVaultManager
 {
-    constructor(private instanceConfigController: ResourceConfigController, private backupProcessService: BackupProcessService, private taskSchedulingManager: TaskSchedulingManager)
+    constructor(private resourceConfigController: ResourceConfigController, private backupProcessService: BackupProcessService, private taskSchedulingManager: TaskSchedulingManager, private resourceDependenciesController: ResourceDependenciesController)
     {
     }
 
     //Public methods
+    public async AddDatabaseSource(resourceReference: LightweightResourceReference, source: BackupVaultDatabaseConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.sources.databases.push(source);
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
+    public async AddFileStorageSource(resourceReference: LightweightResourceReference, source: BackupVaultFileStorageConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.sources.fileStorages.push(source);
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
+    public async AddKeyVaultSource(resourceReference: LightweightResourceReference, source: KeyVaultBackupConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.sources.keyVaults.push(source);
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
     public async EnsureBackupTimerIsRunningIfConfigured(resourceId: number)
     {
         const config = await this.ReadConfig(resourceId);
@@ -54,14 +77,16 @@ export class BackupVaultManager
 
     public async ReadConfig(resourceId: number): Promise<BackupVaultConfig>
     {
-        const config = await this.instanceConfigController.QueryConfig<BackupVaultConfig>(resourceId);
+        const config = await this.resourceConfigController.QueryConfig<BackupVaultConfig>(resourceId);
 
         if(config === undefined)
         {
             return {
                 sources: {
                     databases: [],
-                    fileStorages: []
+                    controllerDB: { enable: false },
+                    fileStorages: [],
+                    keyVaults: []
                 },
                 target: {
                     type: "storage-device",
@@ -87,6 +112,36 @@ export class BackupVaultManager
         return config;
     }
 
+    public async RemoveDatabaseSource(resourceReference: LightweightResourceReference, externalId: string, databaseName: string)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+
+        const idx = config.sources.databases.findIndex(x => x.externalId === externalId);
+        config.sources.databases.Remove(idx);
+
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
+    public async RemoveFileStorageSource(resourceReference: LightweightResourceReference, externalId: string)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+
+        const idx = config.sources.fileStorages.findIndex(x => x.externalId === externalId);
+        config.sources.fileStorages.Remove(idx);
+
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
+    public async RemoveKeyVaultSource(resourceReference: LightweightResourceReference, resourceId: number)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+
+        const idx = config.sources.keyVaults.findIndex(x => x.resourceId === resourceId);
+        config.sources.keyVaults.Remove(idx);
+
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
     public async StartBackupProcess(instanceId: number)
     {
         const config = await this.ReadConfig(instanceId);
@@ -94,7 +149,40 @@ export class BackupVaultManager
         await this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(instanceId, config.sources, config.target, config.retention);
     }
 
-    public async WriteConfig(instanceId: number, config: BackupVaultConfig)
+    public async UpdateControllerDBSource(resourceReference: LightweightResourceReference, source: BackupVaultControllerDatabaseConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.sources.controllerDB = source;
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
+    public async UpdateRetentionConfig(resourceReference: LightweightResourceReference, targetConfig: BackupVaultRetentionConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.retention = targetConfig;
+        await this.WriteConfig(resourceReference.id, config);
+
+        this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(resourceReference.id, config.sources, config.target, config.retention);
+    }
+
+    public async UpdateTargetConfig(resourceReference: LightweightResourceReference, targetConfig: BackupVaultTargetConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.target = targetConfig;
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
+    public async UpdateTriggerConfig(resourceReference: LightweightResourceReference, targetConfig: BackupVaultTrigger)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.trigger = targetConfig;
+        await this.WriteConfig(resourceReference.id, config);
+
+        this.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
+    }
+
+    //Private methods
+    private async WriteConfig(resourceId: number, config: BackupVaultConfig)
     {
         const obj = {
             sources: config.sources,
@@ -105,7 +193,26 @@ export class BackupVaultManager
                 lastScheduleTime: (config.state.lastScheduleTime === undefined) ? undefined : config.state.lastScheduleTime.toISOString()
             }
         };
-        await this.instanceConfigController.UpdateOrInsertConfig(instanceId, obj);
+        await this.resourceConfigController.UpdateOrInsertConfig(resourceId, obj);
+
+        await this.UpdateResourceDependencies(resourceId, config);
+    }
+
+    private async UpdateResourceDependencies(resourceId: number, config: BackupVaultConfig)
+    {
+        const dependencies = [];
+
+        //TODO: convert all the other external ids to internal ones when storing data
+        dependencies.push(...config.sources.keyVaults.map(x => x.resourceId));
+
+        if(config.target.type === "webdav")
+        {
+            dependencies.push(config.target.password.keyVaultResourceId);
+            if(config.target.encryptionKey !== undefined)
+                dependencies.push(config.target.encryptionKey.keyVaultResourceId);
+        }
+
+        await this.resourceDependenciesController.SetResourceDependencies(resourceId, dependencies);
     }
 
     //Event handlers

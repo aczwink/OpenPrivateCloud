@@ -30,6 +30,20 @@ interface CertificateDTO
     name: string;
 }
 
+interface KeyDTO
+{
+    name: string;
+}
+
+interface KeyCreationDTO
+{
+    name: string;
+    /**
+     * In bits
+     */
+    keySize: 2048 | 4096;
+}
+
 interface SecretDTO
 {
     name: string;
@@ -99,6 +113,26 @@ class _api_ extends ResourceAPIControllerBase
         await this.keyVaultManager.RevokeCertificate(resourceReference, name);
     }
 
+    @Post("keys")
+    public async CreateKey(
+        @Common resourceReference: ResourceReference,
+        @Body data: KeyCreationDTO
+    )
+    {
+        await this.keyVaultManager.CreateKey(resourceReference, data.name, data.keySize);
+    }
+
+    @Get("keys")
+    public async QueryKeys(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        const names = await this.keyVaultManager.QueryKeyNames(resourceReference);
+        return names.map<KeyDTO>(x => ({
+            name: x
+        }));
+    }
+
     @Get("pkiconfig")
     public QueryPKI_Config(
         @Common resourceReference: ResourceReference,
@@ -125,13 +159,22 @@ class _api_ extends ResourceAPIControllerBase
         await this.keyVaultManager.CreateSecret(resourceReference, secret.name, secret.secretValue);
     }
 
+    @Delete("secrets/{name}")
+    public async DeleteSecret(
+        @Common resourceReference: ResourceReference,
+        @Path name: string
+    )
+    {
+        await this.keyVaultManager.DeleteSecret(resourceReference, name);
+    }
+
     @Get("secrets/{name}")
     public async QuerySecret(
         @Common resourceReference: ResourceReference,
         @Path name: string
     )
     {
-        const value = await this.keyVaultManager.QuerySecret(resourceReference, name);
+        const value = await this.keyVaultManager.ReadSecret(resourceReference, name);
         const res: SecretDTO = {
             name,
             secretValue: value

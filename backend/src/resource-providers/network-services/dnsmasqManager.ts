@@ -70,7 +70,9 @@ pid-file=${pidPath}
 
         const serviceName = this.DeriveServiceName(resourceReference);
         const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, serviceName);
-        if(!exists)
+        if(exists)
+            await this.systemServicesManager.RestartService(resourceReference.hostId, serviceName);
+        else
             await this.CreateService(resourceReference, configFilePath);
     }
 

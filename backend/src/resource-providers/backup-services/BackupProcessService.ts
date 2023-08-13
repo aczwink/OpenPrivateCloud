@@ -22,8 +22,10 @@ import { ResourcesController } from "../../data-access/ResourcesController";
 import { ProcessTracker, ProcessTrackerManager } from "../../services/ProcessTrackerManager";
 import { BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig } from "./models";
 import { BackupTargetMountService, MountedBackupTarget } from "./BackupTargetMountService";
-import { FileStorageBackupProcessService } from "./FileStorageBackupProcessService";
-import { DatabaseBackupProcessService } from "./DatabaseBackupProcessService";
+import { FileStorageBackupProcessService } from "./processors/FileStorageBackupProcessService";
+import { DatabaseBackupProcessService } from "./processors/DatabaseBackupProcessService";
+import { ControllerDatabaseBackupService } from "./processors/ControllerDatabaseBackupService";
+import { KeyVaultBackupProcessService } from "./processors/KeyVaultBackupProcessService";
 
  
 @Injectable
@@ -31,8 +33,8 @@ export class BackupProcessService
 {
     constructor(private processTrackerManager: ProcessTrackerManager, private instancesController: ResourcesController,
         private hostStoragesController: HostStoragesController, private instanceLogsController: ResourceLogsController,
-        private backupTargetMountService: BackupTargetMountService,
-        private fileStorageBackupProcessService: FileStorageBackupProcessService,
+        private backupTargetMountService: BackupTargetMountService, private controllerDatabaseBackupService: ControllerDatabaseBackupService,
+        private fileStorageBackupProcessService: FileStorageBackupProcessService, private keyVaultBackupProcessService: KeyVaultBackupProcessService,
         private databaseBackupProcessService: DatabaseBackupProcessService)
     {
     }
@@ -53,7 +55,11 @@ export class BackupProcessService
             for (const fileStorage of sources.fileStorages)
                 await this.fileStorageBackupProcessService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, fileStorage, mountStatus.targetPath, mountStatus.targetFileSystemType, retention, processTracker);
             for (const database of sources.databases)
-                await this.databaseBackupProcessService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, retention, mountStatus.encryptionPassphrase, processTracker);
+                await this.databaseBackupProcessService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, retention, mountStatus.encryptionKeyKeyVaultReference, processTracker);
+            if(sources.controllerDB.enable)
+                await this.controllerDatabaseBackupService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, mountStatus.targetPath, retention, processTracker);
+            for(const keyVault of sources.keyVaults)
+                await this.keyVaultBackupProcessService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, mountStatus.targetPath, retention, keyVault, processTracker);
         }
         catch(e)
         {
@@ -95,9 +101,13 @@ export class BackupProcessService
     private async DoBackup(hostId: number, sources: BackupVaultSourcesConfig, mountStatus: MountedBackupTarget, processTracker: ProcessTracker)
     {
         for (const fileStorage of sources.fileStorages)
-            await this.fileStorageBackupProcessService.BackupFileStorage(hostId, fileStorage, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
+            await this.fileStorageBackupProcessService.BackupFileStorage(hostId, fileStorage, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
         for (const database of sources.databases)
-            await this.databaseBackupProcessService.BackupDatabase(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionPassphrase, processTracker);
+            await this.databaseBackupProcessService.BackupDatabase(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
+        if(sources.controllerDB.enable)
+            await this.controllerDatabaseBackupService.Backup(hostId, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
+        for(const keyVault of sources.keyVaults)
+            await this.keyVaultBackupProcessService.Backup(hostId, keyVault, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
     }
 
     private async MountAndDoBackup(hostId: number, sources: BackupVaultSourcesConfig, target: BackupVaultTargetConfig, processTracker: ProcessTracker)

@@ -129,6 +129,8 @@ export class ResourceListComponent extends Component
                 return <div className="text-danger"><BootstrapIcon>hourglass-split</BootstrapIcon></div>;
             case "stopped":
                 return <div className="text-danger"><BootstrapIcon>stop-fill</BootstrapIcon></div>;
+            case "waiting":
+                return <div className="text-primary"><BootstrapIcon>clock-history</BootstrapIcon></div>;
         }
     }
 

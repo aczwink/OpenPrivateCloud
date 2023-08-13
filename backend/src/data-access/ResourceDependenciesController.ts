@@ -54,4 +54,11 @@ export class ResourceDependenciesController
         const rows = await conn.Select(query, resourceProviderName, resourceType, resourceId);
         return rows.map(x => x.dependantResourceId as number);
     }
+
+    public async SetResourceDependencies(resourceId: number, dependencyResourceIds: number[])
+    {
+        await this.DeleteDependenciesOf(resourceId);
+        for (const dependency of dependencyResourceIds)
+            await this.EnsureResourceDependencyExists(dependency, resourceId);
+    }
 }

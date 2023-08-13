@@ -18,26 +18,24 @@
 
 import { Injectable } from "acts-util-node";
 import path from "path";
-import { ProcessTracker } from "../../services/ProcessTrackerManager";
-import { TargetFileSystemType } from "./BackupTargetMountService";
-import { BackupVaultFileStorageConfig, BackupVaultRetentionConfig } from "./models";
-import { FileStoragesManager } from "../file-services/FileStoragesManager";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { TempFilesManager } from "../../services/TempFilesManager";
+import { ProcessTracker } from "../../../services/ProcessTrackerManager";
+import { TargetFileSystemType } from "../BackupTargetMountService";
+import { BackupVaultFileStorageConfig, BackupVaultRetentionConfig } from "../models";
+import { FileStoragesManager } from "../../file-services/FileStoragesManager";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { RemoteRootFileSystemManager } from "../../../services/RemoteRootFileSystemManager";
+import { RemoteCommandExecutor } from "../../../services/RemoteCommandExecutor";
 import { BuildBackupPath, CreateGPGEncryptionCommandOrPipe, ParseReplacedName, ReplaceSpecialCharacters } from "./Shared";
 
 @Injectable
 export class FileStorageBackupProcessService
 {
-    constructor(private fileStoragesManager: FileStoragesManager, private resourcesManager: ResourcesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteCommandExecutor: RemoteCommandExecutor,
-        private tempFilesManager: TempFilesManager)
+    constructor(private fileStoragesManager: FileStoragesManager, private resourcesManager: ResourcesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
     
     //Public methods
-    public async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker)
+    public async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionKeyKeyVaultReference: string | undefined, processTracker: ProcessTracker)
     {
         const sourceRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(fileStorage.externalId);
         if(sourceRef === undefined)
@@ -73,7 +71,7 @@ export class FileStorageBackupProcessService
             {
                 processTracker.Add("Backing up snapshot", snapshotName);
 
-                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, encryptionPassphrase, processTracker);
+                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, encryptionKeyKeyVaultReference, processTracker);
             }
             else
             {
@@ -82,7 +80,7 @@ export class FileStorageBackupProcessService
 
                 const prevSourceDir = path.join(this.fileStoragesManager.GetSnapshotsPath(sourceRef), prevSnapshotName);
 
-                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, encryptionPassphrase, processTracker, prevSourceDir);
+                await this.BackupFileStorageSnapshot(hostId, sourceDir, targetDir, targetFileSystemType, encryptionKeyKeyVaultReference, processTracker, prevSourceDir);
             }
 
             processTracker.Add("Finished copying snapshot", snapshotName);
@@ -127,13 +125,13 @@ export class FileStorageBackupProcessService
     }
 
     //Private methods
-    private async BackupFileStorageSnapshot(hostId: number, sourceDir: string, targetDir: string, targetFileSystemType: TargetFileSystemType, encryptionPassphrase: string | undefined, processTracker: ProcessTracker, prevSourceDir?: string)
+    private async BackupFileStorageSnapshot(hostId: number, sourceDir: string, targetDir: string, targetFileSystemType: TargetFileSystemType, encryptionKeyKeyVaultReference: string | undefined, processTracker: ProcessTracker, prevSourceDir?: string)
     {
         switch(targetFileSystemType)
         {
             case "btrfs":
             {
-                if(encryptionPassphrase !== undefined)
+                if(encryptionKeyKeyVaultReference !== undefined)
                     throw new Error("should never happen");
 
                 const cmdExtra = [];
@@ -156,30 +154,23 @@ export class FileStorageBackupProcessService
                 processTracker.Add("Doing tar/gz backup");
 
                 const snapshotName = ReplaceSpecialCharacters(path.basename(sourceDir), targetFileSystemType);
-                const targetPath = path.join(targetDir, snapshotName + ".tar.gz" + (encryptionPassphrase === undefined ? "" : ".gpg"));
-
-                let secretPath = undefined;
-                if(encryptionPassphrase !== undefined)
-                    secretPath = await this.tempFilesManager.CreateSecretFile(hostId, encryptionPassphrase);
+                const targetPath = path.join(targetDir, snapshotName + ".tar.gz" + (encryptionKeyKeyVaultReference === undefined ? "" : ".gpg"));
 
                 await this.remoteCommandExecutor.ExecuteCommand({
                     type: "redirect-stdout",
-                    source: CreateGPGEncryptionCommandOrPipe({
+                    source: await CreateGPGEncryptionCommandOrPipe({
                         type: "pipe",
                         source: ["tar", "-cf", "-", "-C", sourceDir, "."],
                         target: ["gzip"]
-                    }, secretPath),
+                    }, encryptionKeyKeyVaultReference),
                     target: [targetPath],
                     sudo: true
                 }, hostId);
-
-                if(secretPath !== undefined)
-                    await this.tempFilesManager.Cleanup(hostId, secretPath);
             }
             break;
             case "linux":
             {
-                if(encryptionPassphrase !== undefined)
+                if(encryptionKeyKeyVaultReference !== undefined)
                     throw new Error("should never happen");
 
                 processTracker.Add("Doing rsync backup");

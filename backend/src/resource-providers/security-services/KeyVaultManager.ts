@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import crypto from "crypto";
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
@@ -27,6 +28,7 @@ import { ResourceConfigController } from "../../data-access/ResourceConfigContro
 import { ResourceEventsManager } from "../../services/ResourceEventsManager";
 import { securityServicesEvents } from "./events";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { Command } from "../../services/SSHService";
 
 interface KeyVaultCertificate
 {
@@ -57,6 +59,44 @@ export class KeyVaultManager
     }
 
     //Public methods
+    public async CreateEncryptionCommand(input: Command, encryptionKeyKeyVaultReference: string): Promise<Command>
+    {
+        const result = await this.ResolveKeyVaultReference(encryptionKeyKeyVaultReference);
+        if(result.objectType !== "key")
+            throw new Error("Invalid key reference: " + encryptionKeyKeyVaultReference);
+        const keyPath = path.join(this.GetKeysDir(result.kvRef), result.objectName);
+        
+        return {
+            type: "pipe",
+            source: input,
+            target: [
+                "gpg",
+                "-z", "0", //no compression
+                "--passphrase-file", keyPath,
+                "--cipher-algo", "AES256",
+                "--symmetric",
+                "--batch",
+                "--no-symkey-cache", //don't cache password in keyring
+                "-" //write to stdout
+            ]
+        };
+    }
+
+    public async CreateKey(resourceReference: LightweightResourceReference, name: string, keySize: number)
+    {
+        const value = crypto.randomBytes(keySize / 8);
+        
+        const keyPath = path.join(this.GetKeysDir(resourceReference), name);
+        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, keyPath, value);
+    }
+
+    public async CreateKeyVaultReference(keyVaultResourceId: number, objectType: "key" | "secret", objectName: string): Promise<string>
+    {
+        const kvRef = await this.resourcesManager.CreateResourceReference(keyVaultResourceId);
+
+        return kvRef!.externalId + "/" + objectType + "s/" + objectName;
+    }
+
     public async CreateSecret(resourceReference: LightweightResourceReference, name: string, value: string)
     {
         const secretPath = path.join(this.GetSecretsDir(resourceReference), name);
@@ -66,6 +106,11 @@ export class KeyVaultManager
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
+    }
+
+    public async DeleteSecret(resourceReference: LightweightResourceReference, name: string)
+    {
+        return await this.remoteFileSystemManager.UnlinkFile(resourceReference.hostId, path.join(this.GetSecretsDir(resourceReference), name));
     }
 
     public async GenerateCertificate(resourceReference: LightweightResourceReference, type: "client" | "server", name: string)
@@ -119,6 +164,10 @@ export class KeyVaultManager
     {
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
 
+        const keysDir = this.GetKeysDir(context.resourceReference);
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, keysDir);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, keysDir, 0o700);
+
         const secretsDir = this.GetSecretsDir(context.resourceReference);
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, secretsDir);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, secretsDir, 0o700);
@@ -159,6 +208,11 @@ export class KeyVaultManager
         }
     }
 
+    public async QueryKeyNames(resourceReference: LightweightResourceReference)
+    {
+        return await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetKeysDir(resourceReference));
+    }
+
     public async QueryPKI_Config(resourceReference: LightweightResourceReference)
     {
         const config = await this.QueryConfig(resourceReference.id);
@@ -168,11 +222,6 @@ export class KeyVaultManager
     public QueryResourceState(resourceReference: LightweightResourceReference): ResourceStateResult
     {
         return "running";
-    }
-
-    public async QuerySecret(resourceReference: LightweightResourceReference, name: string)
-    {
-        return await this.remoteFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(this.GetSecretsDir(resourceReference), name));
     }
 
     public async QuerySecretNames(resourceReference: LightweightResourceReference)
@@ -207,6 +256,36 @@ export class KeyVaultManager
             certData,
             keyData
         };
+    }
+
+    public async ReadSecret(resourceReference: LightweightResourceReference, name: string)
+    {
+        return await this.remoteFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(this.GetSecretsDir(resourceReference), name));
+    }
+
+    public async ReadSecretFromReference(keyVaultSecretReference: string)
+    {
+        const result = await this.ResolveKeyVaultReference(keyVaultSecretReference);
+        return this.ReadSecret(result.kvRef, result.objectName);
+    }
+
+    public async ResolveKeyVaultReference(keyVaultReference: string)
+    {
+        const types: ("key" | "secret")[] = ["key", "secret"];
+        for (const type of types)
+        {
+            const parts = keyVaultReference.split("/" + type + "s/");
+            if(parts.length === 2)
+            {
+                const kvRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(parts[0]);
+                return {
+                    kvRef: kvRef!,
+                    objectName: parts[1],
+                    objectType: type
+                }
+            }
+        }
+        throw new Error("Malformed key vault reference: " + keyVaultReference);
     }
 
     public async RevokeCertificate(resourceReference: LightweightResourceReference, name: string)
@@ -244,6 +323,13 @@ export class KeyVaultManager
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
         const caDir = path.join(resourceDir, "ca");
         return caDir;
+    }
+
+    private GetKeysDir(resourceReference: LightweightResourceReference)
+    {
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const secretsDir = path.join(resourceDir, "keys");
+        return secretsDir;
     }
 
     private GetImportedCertsDir(resourceReference: LightweightResourceReference)

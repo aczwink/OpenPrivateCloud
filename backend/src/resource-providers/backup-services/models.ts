@@ -18,6 +18,24 @@
 
 import { TimeSchedule } from "../../common/TimeSchedule";
 
+export interface BackupVaultDatabaseConfig
+{
+    /**
+     * @title MariaDB Instance
+     * @format instance-same-host[database-services/mariadb]
+     */
+     externalId: string;
+     databaseName: string;
+}
+
+export interface BackupVaultControllerDatabaseConfig
+{
+    /**
+     * Important: The controller database includes credentials to all hosts and should never backed up to an untrusted source without encryption!
+     */
+    enable: boolean;
+}
+
 export interface BackupVaultFileStorageConfig
 {
     /**
@@ -32,23 +50,20 @@ export interface BackupVaultFileStorageConfig
     createSnapshotBeforeBackup: boolean;
 }
 
-export interface BackupVaultDatabaseConfig
+export interface KeyVaultBackupConfig
 {
-    /**
-     * @title MariaDB Instance
-     * @format instance-same-host[database-services/mariadb]
-     */
-     externalId: string;
-     databaseName: string;
+    resourceId: number;
 }
 
 export interface BackupVaultSourcesConfig
 {
-    fileStorages: BackupVaultFileStorageConfig[];
     databases: BackupVaultDatabaseConfig[];
+    controllerDB: BackupVaultControllerDatabaseConfig;
+    fileStorages: BackupVaultFileStorageConfig[];
+    keyVaults: KeyVaultBackupConfig[];
 }
 
-interface BackupVaultStorageDeviceTargetConfig
+export interface BackupVaultStorageDeviceTargetConfig
 {
     type: "storage-device";
     storageDeviceUUID: string;
@@ -57,17 +72,17 @@ interface BackupVaultStorageDeviceTargetConfig
 export interface BackupVaultWebDAVTargetConfig
 {
     type: "webdav";
-    serverUrl: string;
+    serverURL: string;
+    rootPath: string;
     userName: string;
-    /**
-     * @format secret
-     */
-    password: string;
-    /**
-     * Leave blank for no encryption
-     * @format multi-line
-     */
-     encryptionPassphrase: string;
+    password: {
+        keyVaultResourceId: number;
+        secretName: string;
+    };
+    encryptionKey?: {
+        keyVaultResourceId: number;
+        keyName: string;
+    };
 }
 
 export type BackupVaultTargetConfig = BackupVaultStorageDeviceTargetConfig | BackupVaultWebDAVTargetConfig;

@@ -25,6 +25,7 @@ import { RoleSelectionComponent } from "../ValueEditors/RoleSelectionComponent";
 import { UserGroupSelectionComponent } from "../ValueEditors/UserGroupSelectionComponent";
 import { UserSelectionComponent } from "../ValueEditors/UserSelectionComponent";
 import { RenderTitle } from "../ValuePresentation";
+import { KeyVaultObjectReferenceSelectionComponent } from "../ValuePresenters/KeyVaultObjectReferenceSelectionComponent";
 
 export interface ObjectEditorContext
 {
@@ -83,14 +84,29 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
             value.push(newItem);
             valueChanged(value);
         }
+        function OnDeleteItem(idx: number)
+        {
+            value.Remove(idx);
+            valueChanged(value);
+        }
+
+        function RenderItem(x: any, idx: number)
+        {
+            const renderedItem = context.RenderValue(x, schema.items, newValue => {
+                value[idx] = newValue;
+                valueChanged(value);
+            }, "");
+
+            return <div className="row">
+                <div className="col">{renderedItem}</div>
+                <div className="col-auto align-self-center"><button type="button" className="btn btn-danger" onclick={() => OnDeleteItem(idx)}><BootstrapIcon>dash</BootstrapIcon></button></div>
+            </div>
+        }
 
         return <fragment>
             <h5>{schema.title ?? fallback}</h5>
             <div className="form-text">{schema.description ?? ""}</div>
-            {value.map( (x, idx) => this.RenderValue(x, schema.items, newValue => {
-                value[idx] = newValue;
-                valueChanged(value);
-            }, ""))}
+            {value.map(RenderItem)}
             <button type="button" className="btn btn-primary" onclick={OnAddItem}><BootstrapIcon>plus</BootstrapIcon></button>
         </fragment>
     }
@@ -243,6 +259,10 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
                         onChanged={newValue => valueChanged(newValue.key)}
                         onLoadSuggestions={this.LoadHostNames.bind(this)}
                         selection={ (value.trim().length === 0 ? null : ({ key: value, displayValue: value}))} />;
+                case "key-vault-reference[key]":
+                    return <KeyVaultObjectReferenceSelectionComponent objectType="key" value={value} onChanged={valueChanged} />;
+                case "key-vault-reference[secret]":
+                    return <KeyVaultObjectReferenceSelectionComponent objectType="secret" value={value} onChanged={valueChanged} />;
                 case "role":
                     return <RoleSelectionComponent roleId={value} valueChanged={valueChanged} />;
                 case "secret":

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,6 +17,7 @@
  * */
 import child_process from "child_process";
 import { Injectable } from "acts-util-node";
+import { TimeUtil } from "acts-util-core";
 
 interface CommandExecutionResult
 {
@@ -36,6 +37,23 @@ export class LocalCommandExecutor
             throw new Error("Command '" + command.join(" ") + "' failed. stderr: " + result.stderr);
 
         return result;
+    }
+
+    public async ExecuteCommandWithoutEncoding(command: string[])
+    {
+        const commandLine = command.join(" ");
+        const childProcess = child_process.spawn(commandLine, [], {
+            shell: true,
+        });
+
+        const buffers: Buffer[] = [];
+        childProcess.stdout.on("data", buffer => buffers.push(buffer));
+
+        const exitCode = await this.ChildProcessToPromise(childProcess);
+        if(exitCode !== 0)
+            throw new Error("Command '" + command.join(" ") + "' failed.");
+
+        return Buffer.concat(buffers);
     }
 
     //Private methods
