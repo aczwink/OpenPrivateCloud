@@ -214,7 +214,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
             this.data = null;
             ref.Close();
 
-            await action.updateResource(this.apiService, this.routerState.routeParams, index, clone);
+            await action.updateResource(this.apiService, this.routerState.routeParams, clone, object, index);
 
             this.QueryData();
         });

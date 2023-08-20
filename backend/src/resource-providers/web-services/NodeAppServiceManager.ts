@@ -17,8 +17,6 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { HostStoragesController } from "../../data-access/HostStoragesController";
-import { ResourcesController } from "../../data-access/ResourcesController";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
@@ -28,14 +26,31 @@ import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { opcSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
 import { Dictionary } from "acts-util-core";
 import { LightweightResourceReference } from "../../common/ResourceReference";
+import { ResourceConfigController } from "../../data-access/ResourceConfigController";
+import { KeyVaultManager } from "../security-services/KeyVaultManager";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 
-interface NodeEnvironmentVariableMapping
+interface NodeEnvironmentVariableMappingKeyVaultSecretValue
 {
-    varName: string;
+    type: "keyvault-secret";
+    keyVaultResourceId: number;
+    secretName: string;
+}
+interface NodeEnvironmentVariableMappingStringValue
+{
+    type: "string";
     value: string;
 }
 
-export interface NodeAppConfig
+type NodeEnvironmentVariableMappingValue = NodeEnvironmentVariableMappingKeyVaultSecretValue | NodeEnvironmentVariableMappingStringValue;
+
+export interface NodeEnvironmentVariableMapping
+{
+    varName: string;
+    value: NodeEnvironmentVariableMappingValue;
+}
+
+export interface NodeAppServiceConfig
 {
     autoStart: boolean;
     env: NodeEnvironmentVariableMapping[];
@@ -44,16 +59,22 @@ export interface NodeAppConfig
 @Injectable
 export class NodeAppServiceManager
 {
-    constructor(private resourcesManager: ResourcesManager, private modulesManager: ModulesManager, private instancesController: ResourcesController,
-        private hostStoragesController: HostStoragesController, private remoteFileSystemManager: RemoteFileSystemManager,
-        private systemServicesManager: SystemServicesManager)
+    constructor(private resourcesManager: ResourcesManager, private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceDependenciesController: ResourceDependenciesController,
+        private systemServicesManager: SystemServicesManager, private resourceConfigController: ResourceConfigController, private keyVaultManager: KeyVaultManager)
     {
     }
 
     //Public methods
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
-        await this.systemServicesManager.DeleteService(resourceReference.hostId, this.DeriveSystemUnitName(resourceReference));
+        const serviceName = this.DeriveSystemUnitName(resourceReference);
+        const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, serviceName);
+        if(exists)
+        {
+            await this.systemServicesManager.StopService(resourceReference.hostId, serviceName);
+            await this.systemServicesManager.DeleteService(resourceReference.hostId, serviceName);
+        }
+
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
@@ -84,15 +105,17 @@ export class NodeAppServiceManager
         await this.UpdateService(context.resourceReference, {});
     }
 
-    public async QueryConfig(resourceReference: LightweightResourceReference): Promise<NodeAppConfig>
+    public async QueryConfig(resourceReference: LightweightResourceReference): Promise<NodeAppServiceConfig>
     {
-        const serviceName = this.DeriveSystemUnitName(resourceReference);
-        const serviceProps = await this.systemServicesManager.ReadServiceUnit(resourceReference.hostId, serviceName);
-
-        return {
-            autoStart: await this.systemServicesManager.IsServiceEnabled(resourceReference.hostId, serviceName),
-            env: serviceProps.environment.Entries().Map(kv => ({ varName: kv.key.toString(), value: kv.value! })).ToArray()
-        };
+        const config = await this.resourceConfigController.QueryConfig<NodeAppServiceConfig>(resourceReference.id);
+        if(config === undefined)
+        {
+            return {
+                autoStart: false,
+                env: []
+            };
+        }
+        return config;
     }
 
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
@@ -100,6 +123,14 @@ export class NodeAppServiceManager
         const isRunning = await this.IsAppServiceRunning(resourceReference);
         if(isRunning)
             return "running";
+        const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, this.DeriveSystemUnitName(resourceReference));
+        if(!exists)
+        {
+            return {
+                state: "corrupt",
+                context: "service does not exist"
+            };
+        }
         return "stopped";
     }
 
@@ -109,9 +140,35 @@ export class NodeAppServiceManager
         return await this.systemServicesManager.QueryStatus(resourceReference.hostId, serviceName);
     }
 
-    public async UpdateConfig(resourceReference: LightweightResourceReference, config: NodeAppConfig)
+    public async UpdateConfig(resourceReference: LightweightResourceReference, config: NodeAppServiceConfig)
     {
-        const env = config.env.Values().ToDictionary(e => e.varName, e => e.value);
+        await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
+
+        const dependencies = [];
+
+        const env: Dictionary<string> = {};
+        for (const envVar of config.env)
+        {
+            let value;
+            switch(envVar.value.type)
+            {
+                case "keyvault-secret":
+                    {
+                        const kvRef = await this.resourcesManager.CreateResourceReference(envVar.value.keyVaultResourceId)
+                        value = await this.keyVaultManager.ReadSecret(kvRef!, envVar.value.secretName);
+
+                        dependencies.push(envVar.value.keyVaultResourceId);
+                    }
+                    break;
+                case "string":
+                    value = envVar.value.value;
+                    break;
+            }
+            env[envVar.varName] = value;
+        }
+
+        this.resourceDependenciesController.SetResourceDependencies(resourceReference.id, dependencies);
+
         await this.UpdateService(resourceReference, env);
 
         const serviceName = this.DeriveSystemUnitName(resourceReference);

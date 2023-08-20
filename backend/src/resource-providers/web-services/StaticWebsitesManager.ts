@@ -19,7 +19,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { DeploymentContext } from "../ResourceProvider";
+import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { StaticWebsiteProperties } from "./Properties";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { TempFilesManager } from "../../services/TempFilesManager";
@@ -30,8 +30,14 @@ import { ResourceConfigController } from "../../data-access/ResourceConfigContro
 
 export interface StaticWebsiteConfig
 {
-    port: number;
     defaultRoute?: string;
+
+    /**
+     * Files that should be scanned for (left-to-right) in case of a request with a trailing slash in the URL.
+     */
+    indexFileNames: string;
+
+    port: number;
 }
 
 @Injectable
@@ -61,6 +67,7 @@ export class StaticWebsitesManager
         await this.resourceDependenciesController.EnsureResourceDependencyExists(vNetResourceReference.id, context.resourceReference.id);
 
         await this.WriteConfig(context.resourceReference.id, {
+            indexFileNames: "index.html",
             port: instanceProperties.port,
         });
 
@@ -107,6 +114,11 @@ export class StaticWebsitesManager
         return config!;
     }
 
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    {
+        return await this.managedDockerContainerManager.QueryResourceState(resourceReference);
+    }
+
     public async UpdateConfig(resourceReference: LightweightResourceReference, config: StaticWebsiteConfig)
     {
         await this.WriteConfig(resourceReference.id, config);
@@ -146,7 +158,7 @@ export class StaticWebsitesManager
 
     private Generate_nginxConfig(config: StaticWebsiteConfig)
     {
-        const index = (config.defaultRoute === undefined) ? "" : ("index " + config.defaultRoute + ";");
+        const index = (config.defaultRoute === undefined) ? "" : ("try_files $uri $uri/ " + config.defaultRoute + ";");
 
         return `
 server {
@@ -156,6 +168,7 @@ server {
     location / {
         root   /usr/share/nginx/html;
         ${index}
+        index ${config.indexFileNames};
     }
 }
         `.trim();

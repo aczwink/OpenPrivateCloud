@@ -172,7 +172,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
             case resourceProviders.webServices.nodeAppServiceResourceType.name:
                 return await this.nodeAppServiceManager.QueryResourceState(resourceReference);
             case resourceProviders.webServices.staticWebsiteResourceType.name:
-                return "running";
+                return await this.staticWebsitesManager.QueryResourceState(resourceReference);
         }
         return "corrupt";
     }

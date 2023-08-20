@@ -17,7 +17,7 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { LightweightResourceReference } from "../../common/ResourceReference";
+import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { API_GatewayProperties } from "./Properties";
 import { ResourcesManager } from "../../services/ResourcesManager";
@@ -29,6 +29,9 @@ import { EqualsAny } from "acts-util-core";
 
 export interface API_EntryConfig
 {
+    /**
+     * Important: If you specify a path, the request path will be URL-decoded. To avoid that, specify only a host i.e. https://10.0.0.1:443 (notice the missing trailing slash).
+     */
     backendURL: string;
     frontendDomainName: string;
 }
@@ -65,7 +68,7 @@ export class API_GatewayManager
         config.apiEntries.push(api);
         await this.UpdateConfig(resourceReference.id, config);
 
-        await this.UpdateGateway(resourceReference);
+        this.UpdateGateway(resourceReference);
     }
 
     public async DeleteAPI(resourceReference: LightweightResourceReference, api2delete: API_EntryConfig)
@@ -77,7 +80,7 @@ export class API_GatewayManager
         
         await this.UpdateConfig(resourceReference.id, config);
 
-        await this.UpdateGateway(resourceReference);
+        this.UpdateGateway(resourceReference);
     }
 
     public async DeleteResource(resourceReference: LightweightResourceReference)
@@ -98,7 +101,7 @@ export class API_GatewayManager
         });
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
 
-        await this.UpdateGateway(context.resourceReference);
+        this.UpdateGateway(context.resourceReference);
     }
 
     public async QueryAPIs(resourceReference: LightweightResourceReference)
@@ -123,12 +126,25 @@ export class API_GatewayManager
         return config.settings;
     }
 
+    public async UpdateAPI(resourceReference: LightweightResourceReference, oldFrontendDomainName: string, newAPI_Props: API_EntryConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+
+        const idx = config.apiEntries.findIndex(x => x.frontendDomainName === oldFrontendDomainName);
+        config.apiEntries.Remove(idx);
+        config.apiEntries.push(newAPI_Props);
+        
+        await this.UpdateConfig(resourceReference.id, config);
+
+        this.UpdateGateway(resourceReference);
+    }
+
     public async UpdateSettings(resourceReference: LightweightResourceReference, settings: API_GatewaySettings)
     {
         const config = await this.ReadConfig(resourceReference.id);
         config.settings = settings;
         await this.UpdateConfig(resourceReference.id, config);
-        await this.UpdateGateway(resourceReference);
+        this.UpdateGateway(resourceReference);
     }
 
     //Private methods

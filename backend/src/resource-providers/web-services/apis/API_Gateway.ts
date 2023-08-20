@@ -17,7 +17,7 @@
  * */
 
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
-import { APIController, Body, Common, Delete, Get, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Delete, Get, Path, Post, Put } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_apiGatewayResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
@@ -72,6 +72,16 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         return this.apiGatewayManager.QueryAPIs(resourceReference);
+    }
+
+    @Put("apis")
+    public async UpdateAPI(
+        @Common resourceReference: ResourceReference,
+        @BodyProp oldFrontendDomainName: string,
+        @BodyProp newProps: API_EntryConfig
+    )
+    {
+        await this.apiGatewayManager.UpdateAPI(resourceReference, oldFrontendDomainName, newProps);
     }
 
     @Get("settings")

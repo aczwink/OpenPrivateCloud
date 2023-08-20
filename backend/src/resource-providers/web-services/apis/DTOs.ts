@@ -16,28 +16,31 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { BaseResourceProperties } from "../ResourceProvider";
-
-export interface DockerContainerProperties extends BaseResourceProperties
+interface NodeEnvironmentVariableMappingKeyVaultSecretValueDTO
 {
-    type: "docker-container";
-
+    type: "keyvault-secret";
     /**
-     * @title Virtual network
-     * @format resource-same-host[network-services/virtual-network]
+     * @format key-vault-reference[secret]
+     * @title Secret
      */
-    vnetResourceId: string;
+    keyVaultSecretReference: string;
+}
+interface NodeEnvironmentVariableMappingStringValueDTO
+{
+    type: "string";
+    value: string;
 }
 
-export interface VirtualMachineProperties extends BaseResourceProperties
+type NodeEnvironmentVariableMappingValueDTO = NodeEnvironmentVariableMappingKeyVaultSecretValueDTO | NodeEnvironmentVariableMappingStringValueDTO;
+
+export interface NodeEnvironmentVariableMappingDTO
 {
-    type: "virtual-machine";
-    os: "ubuntu-lts-latest" | "ubuntu-server-lts-latest" | "ubuntu-latest" | "ubuntu-server-latest";
-    /**
-     * @title Size of the OS Disk in GB
-     * @default 25
-     */
-    osDiskSize: number;
+    varName: string;
+    value: NodeEnvironmentVariableMappingValueDTO;
 }
 
-export type ComputeServicesProperties = DockerContainerProperties | VirtualMachineProperties;
+export interface NodeAppServiceConfigDTO
+{
+    autoStart: boolean;
+    env: NodeEnvironmentVariableMappingDTO[];
+}

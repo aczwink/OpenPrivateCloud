@@ -19,10 +19,10 @@
 import { APIController, Body, Common, FormField, Get, Path, Post, Put } from "acts-util-apilib";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 import { c_staticWebsiteResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { StaticWebsiteConfig, StaticWebsitesManager } from "./StaticWebsitesManager";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { ResourceReference } from "../../common/ResourceReference";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { StaticWebsiteConfig, StaticWebsitesManager } from "../StaticWebsitesManager";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { ResourceReference } from "../../../common/ResourceReference";
 
 interface StaticWebsiteInfoDto
 {
@@ -30,7 +30,7 @@ interface StaticWebsiteInfoDto
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_staticWebsiteResourceTypeName}/{resourceName}`)
-class StaticWebsiteAPIController extends ResourceAPIControllerBase
+class _api_ extends ResourceAPIControllerBase
 {
     constructor(resourcesManager: ResourcesManager, private staticWebsitesManager: StaticWebsitesManager)
     {

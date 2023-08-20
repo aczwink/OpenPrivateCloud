@@ -20,7 +20,6 @@ import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { FirewallRule, VNetSettings } from "../../../dist/api";
-import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -51,17 +50,9 @@ function BuildFirewallViewModel(direction: "Inbound" | "Outbound")
             {
                 type: "edit",
                 schemaName: "FirewallRule",
-                updateResource: async (service, ids, idx, rule) => {
-                    const response = await service.resourceProviders._any_.networkservices.virtualnetwork._any_.firewall._any_.get(ids.resourceGroupName, ids.resourceName, direction);
-                    const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
-                    if(result.ok)
-                    {
-                        const ruleToDelete = result.value[idx];
-                        await service.resourceProviders._any_.networkservices.virtualnetwork._any_.firewall._any_.delete(ids.resourceGroupName, ids.resourceName, direction, { priority: ruleToDelete.priority });
-                        return service.resourceProviders._any_.networkservices.virtualnetwork._any_.firewall._any_.put(ids.resourceGroupName, ids.resourceName, direction, rule);
-                    }
-
-                    return response;
+                updateResource: async (service, ids, rule, originalRule) => {                    
+                    await service.resourceProviders._any_.networkservices.virtualnetwork._any_.firewall._any_.delete(ids.resourceGroupName, ids.resourceName, direction, { priority: originalRule.priority });
+                    return service.resourceProviders._any_.networkservices.virtualnetwork._any_.firewall._any_.put(ids.resourceGroupName, ids.resourceName, direction, rule);
                 },
             },
             {

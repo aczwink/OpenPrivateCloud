@@ -19,11 +19,12 @@
 import { APIController, Body, BodyProp, Common, FormField, Get, Path, Post, Put } from "acts-util-apilib";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 import { c_nodeAppServiceResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { HostsController } from "../../data-access/HostsController";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { NodeAppConfig, NodeAppServiceManager } from "./NodeAppServiceManager";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { ResourceReference } from "../../common/ResourceReference";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { NodeAppServiceConfig, NodeAppServiceManager, NodeEnvironmentVariableMapping } from "../NodeAppServiceManager";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { ResourceReference } from "../../../common/ResourceReference";
+import { NodeAppServiceConfigDTO, NodeEnvironmentVariableMappingDTO } from "./DTOs";
+import { KeyVaultManager } from "../../security-services/KeyVaultManager";
 
 interface NodeAppServiceInfoDto
 {
@@ -42,9 +43,9 @@ interface NodeAppServiceStatus
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_nodeAppServiceResourceTypeName}/{resourceName}`)
-class NodeAppServiceAPIController extends ResourceAPIControllerBase
+class _api_ extends ResourceAPIControllerBase
 {
-    constructor(resourcesManager: ResourcesManager, private nodeAppServiceManager: NodeAppServiceManager, private hostsController: HostsController)
+    constructor(resourcesManager: ResourcesManager, private nodeAppServiceManager: NodeAppServiceManager, private keyVaultManager: KeyVaultManager)
     {
         super(resourcesManager, c_webServicesResourceProviderName, c_nodeAppServiceResourceTypeName);
     }
@@ -63,16 +64,18 @@ class NodeAppServiceAPIController extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference,
     )
     {
-        return this.nodeAppServiceManager.QueryConfig(resourceReference);
+        const config = await this.nodeAppServiceManager.QueryConfig(resourceReference);
+        return this.MapConfigToDTO(config);
     }
 
     @Put("config")
     public async UpdateConfig(
         @Common resourceReference: ResourceReference,
-        @Body config: NodeAppConfig
+        @Body config: NodeAppServiceConfigDTO
     )
     {
-        return this.nodeAppServiceManager.UpdateConfig(resourceReference, config);
+        const realConfig = await this.MapConfigFromDTO(config);
+        return this.nodeAppServiceManager.UpdateConfig(resourceReference, realConfig);
     }
 
     @Get("info")
@@ -116,5 +119,72 @@ class NodeAppServiceAPIController extends ResourceAPIControllerBase
     )
     {
         await this.nodeAppServiceManager.UpdateContent(resourceReference, file.buffer);
+    }
+
+    //Private methods
+    private async MapConfigFromDTO(dto: NodeAppServiceConfigDTO): Promise<NodeAppServiceConfig>
+    {
+        return {
+            autoStart: dto.autoStart,
+            env: await dto.env.Values().Map(this.MapEnvFromDTO.bind(this)).PromiseAll()
+        };
+    }
+
+    private async MapConfigToDTO(config: NodeAppServiceConfig): Promise<NodeAppServiceConfigDTO>
+    {
+        return {
+            autoStart: config.autoStart,
+            env: await config.env.Values().Map(this.MapEnvToDTO.bind(this)).PromiseAll()
+        };
+    }
+
+    private async MapEnvFromDTO(dto: NodeEnvironmentVariableMappingDTO): Promise<NodeEnvironmentVariableMapping>
+    {
+        switch(dto.value.type)
+        {
+            case "keyvault-secret":
+            {
+                const ref = await this.keyVaultManager.ResolveKeyVaultReference(dto.value.keyVaultSecretReference);
+                return {
+                    value: {
+                        type: "keyvault-secret",
+                        keyVaultResourceId: ref.kvRef.id,
+                        secretName: ref.objectName
+                    },
+                    varName: dto.varName
+                };
+            }
+            case "string":
+                return {
+                    value: {
+                        type: "string",
+                        value: dto.value.value
+                    },
+                    varName: dto.varName
+                };
+        }
+    }
+
+    private async MapEnvToDTO(env: NodeEnvironmentVariableMapping): Promise<NodeEnvironmentVariableMappingDTO>
+    {
+        switch(env.value.type)
+        {
+            case "keyvault-secret":
+                return {
+                    value: {
+                        type: "keyvault-secret",
+                        keyVaultSecretReference: await this.keyVaultManager.CreateKeyVaultReference(env.value.keyVaultResourceId, "secret", env.value.secretName)
+                    },
+                    varName: env.varName
+                };
+            case "string":
+                return {
+                    value: {
+                        type: "string",
+                        value: env.value.value
+                    },
+                    varName: env.varName
+                };
+        }
     }
 }

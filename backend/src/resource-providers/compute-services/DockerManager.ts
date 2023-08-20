@@ -32,7 +32,7 @@ export interface DockerContainerConfigPortMapping
     protocol: "TCP" | "UDP";
 }
 
-interface DockerContainerConfigVolume
+export interface DockerContainerConfigVolume
 {
     hostPath: string;
     containerPath: string;

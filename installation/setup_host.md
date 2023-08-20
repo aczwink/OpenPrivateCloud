@@ -8,6 +8,8 @@ UUID=<the UUID of the partition. Get it via blkid> /mnt/<storage name> auto defa
 # Special for Raspberry Pi
 Run sudo raspi-config for general setup of the device
 
+The following works for Raspberry Pi 3B and 4.
+
 Disable Bluetooth:
 sudo sh -c "echo 'dtoverlay=disable-bt' >> /boot/config.txt"
 

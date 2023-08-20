@@ -33,11 +33,11 @@ export interface FirewallRule
     destinationPortRanges: string;
     protocol: "Any" | "TCP" | "UDP" | "ICMP";
     /**
-     * A CIDR-range or the special keyword "Any".
+     * An IP address, a CIDR-range or the special keyword "Any".
      */
     source: string;
     /**
-     * A CIDR-range or the special keyword "Any".
+     * An IP address, a CIDR-range or the special keyword "Any".
      */
     destination: string;
     action: "Allow" | "Deny";
@@ -106,7 +106,7 @@ export class HostFirewallZonesManager
     {
         if(nicName === "lo")
             return "trusted";
-        if(nicName.startsWith("en")) //ethernet
+        if(nicName.startsWith("en") || nicName.startsWith("eth")) //ethernet
             return "external";
         if(nicName.startsWith("vnet"))
             return "qemu-vm-nic";

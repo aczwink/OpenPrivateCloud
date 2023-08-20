@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { ContainerAppServiceConfig, DockerContainerInfo, DockerContainerLogDto } from "../../../dist/api";
+import { ContainerAppServiceConfigDTO, DockerContainerInfo, DockerContainerLogDto } from "../../../dist/api";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
@@ -56,11 +56,11 @@ const overviewViewModel: ObjectViewModel<DockerContainerInfo, ResourceAndGroupId
     schemaName: "DockerContainerInfo",
 };
 
-const configViewModel: ObjectViewModel<ContainerAppServiceConfig, ResourceAndGroupId> = {
+const configViewModel: ObjectViewModel<ContainerAppServiceConfigDTO, ResourceAndGroupId> = {
     actions: [
         {
             type: "edit",
-            propertiesSchemaName: "ContainerAppServiceConfig",
+            propertiesSchemaName: "ContainerAppServiceConfigDTO",
             loadContext: async (service, ids) => {
                 const response = await service.resourceProviders._any_.computeservices.dockercontainer._any_.info.get(ids.resourceGroupName, ids.resourceName);
                 const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
@@ -76,7 +76,7 @@ const configViewModel: ObjectViewModel<ContainerAppServiceConfig, ResourceAndGro
     ],
     formTitle: _ => "Container configuration",
     requestObject: async (service, ids) => service.resourceProviders._any_.computeservices.dockercontainer._any_.config.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "ContainerAppServiceConfig",
+    schemaName: "ContainerAppServiceConfigDTO",
     type: "object"
 };
 

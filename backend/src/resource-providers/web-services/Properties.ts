@@ -24,7 +24,7 @@ export interface API_GatewayProperties extends BaseResourceProperties
 
     /**
      * @title Virtual network
-     * @format instance-same-host[network-services/virtual-network]
+     * @format resource-same-host[network-services/virtual-network]
      */
     vnetResourceExternalId: string;
 }

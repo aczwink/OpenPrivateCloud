@@ -32,6 +32,7 @@ import { VNetManager } from "./resource-providers/network-services/VNetManager";
 import { OpenVPNGatewayManager } from "./resource-providers/network-services/OpenVPNGatewayManager";
 import { ProcessTrackerManager } from "./services/ProcessTrackerManager";
 import { ResourceEventsManager } from "./services/ResourceEventsManager";
+import { HostFirewallManager } from "./services/HostFirewallManager";
 
 const port = 8078;
 
@@ -49,6 +50,8 @@ async function EnableHealthManagement()
 
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
     GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
+
+    GlobalInjector.Resolve(HostFirewallManager); //ensure this service exists because it listens to events which have to reset the host firewall
 }
 
 async function SetupServer()

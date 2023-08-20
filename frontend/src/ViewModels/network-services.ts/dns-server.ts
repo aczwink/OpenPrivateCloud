@@ -42,7 +42,10 @@ const recordsViewModel: ListViewModel<DNS_Record, ZoneId> = {
         {
             type: "edit",
             schemaName: "DNS_Record",
-            updateResource: (service, ids, index, properties) => service.resourceProviders._any_.networkservices.dnsserver._any_.zones._any_.records._any_.put(ids.resourceGroupName, ids.resourceName, ids.zoneName, index, properties),
+            updateResource: (service, ids, newProperties, oldProperties) => service.resourceProviders._any_.networkservices.dnsserver._any_.zones._any_.records.put(ids.resourceGroupName, ids.resourceName, ids.zoneName, {
+                existingRecord: oldProperties,
+                newRecord: newProperties
+            }),
         },
         {
             type: "delete",

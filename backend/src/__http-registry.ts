@@ -33,21 +33,21 @@ import "./api/UserAPIController";
 import "./api/UsersAPIController";
 
 import "./resource-providers/backup-services/api/backup-vault";
-import "./resource-providers/compute-services/DockerContainerAPIController";
+import "./resource-providers/compute-services/api/docker-container-app-service";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/database-services/MariaDB/MariaDBAPIController";
 import "./resource-providers/file-services/FileStorageAPIController";
 import "./resource-providers/integration-services/api/ad-dc";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
-import "./resource-providers/network-services/DNS_ServerAPI_Controller";
+import "./resource-providers/network-services/api/dns-server";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";
 import "./resource-providers/network-services/VNetAPI_Controller";
 import "./resource-providers/security-services/apis/key-vault";
 import "./resource-providers/web-services/apis/API_Gateway";
 import "./resource-providers/web-services/JdownloaderAPIController";
 import "./resource-providers/web-services/LetsEncryptAPIController";
-import "./resource-providers/web-services/NodeAppServiceAPIController";
-import "./resource-providers/web-services/StaticWebsiteAPIController";
+import "./resource-providers/web-services/apis/node-app-service";
+import "./resource-providers/web-services/apis/static-website";
 
 async function LoadAPIControllers()
 {

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -41,18 +41,14 @@ export class RemoteConnectionsManager
         if(conn === undefined)
         {
             conn = this.connections[hostId] = {
-                sshConn: new LockedProperty(await this.InitiateSSHConnection(hostId))
+                sshConn: new LockedProperty(await this.AcquireNewSelfManagedConnection(hostId))
             };
         }
 
         return await conn.sshConn.Lock();
     }
 
-    //Private variables
-    private connections: Dictionary<ConnectionInfo>;
-
-    //Private methods
-    private async InitiateSSHConnection(hostId: number)
+    public async AcquireNewSelfManagedConnection(hostId: number)
     {
         const creds = await this.hostsController.RequestHostCredentials(hostId);
         if(creds === undefined)
@@ -60,4 +56,7 @@ export class RemoteConnectionsManager
 
         return await this.sshService.ConnectWithCredentials(creds.hostName, opcSpecialUsers.host, creds.password);
     }
+
+    //Private variables
+    private connections: Dictionary<ConnectionInfo>;
 }

@@ -90,7 +90,7 @@ export class KeyVaultManager
         await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, keyPath, value);
     }
 
-    public async CreateKeyVaultReference(keyVaultResourceId: number, objectType: "key" | "secret", objectName: string): Promise<string>
+    public async CreateKeyVaultReference(keyVaultResourceId: number, objectType: "certificate" | "key" | "secret", objectName: string): Promise<string>
     {
         const kvRef = await this.resourcesManager.CreateResourceReference(keyVaultResourceId);
 
@@ -146,6 +146,11 @@ export class KeyVaultManager
         await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, path.join(importDirs.privateDir, name + ".pem"), privateKey, 0o600);
 
         const config = await this.QueryConfig(resourceReference.id);
+
+        const idx = config.state.certificates.findIndex(x => (x.name === name) && (x.generatedByCA === false));
+        if(idx !== -1)
+            config.state.certificates.Remove(idx);
+
         config.state.certificates.push({
             generatedByCA: false,
             name,
@@ -271,7 +276,7 @@ export class KeyVaultManager
 
     public async ResolveKeyVaultReference(keyVaultReference: string)
     {
-        const types: ("key" | "secret")[] = ["key", "secret"];
+        const types: ("certificate" | "key" | "secret")[] = ["certificate", "key", "secret"];
         for (const type of types)
         {
             const parts = keyVaultReference.split("/" + type + "s/");

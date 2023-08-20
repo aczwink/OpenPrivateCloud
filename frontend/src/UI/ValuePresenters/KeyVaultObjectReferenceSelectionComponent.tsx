@@ -23,7 +23,7 @@ import { APIService } from "../../Services/APIService";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
 
 @Injectable
-export class KeyVaultObjectReferenceSelectionComponent extends Component<{ objectType: "key" | "secret"; value: string | null; onChanged: (newValue: string | null) => void; }>
+export class KeyVaultObjectReferenceSelectionComponent extends Component<{ objectType: "certificate" | "key" | "secret"; value: string | null; onChanged: (newValue: string | null) => void; }>
 {
     constructor(private apiService: APIService)
     {
@@ -63,6 +63,16 @@ export class KeyVaultObjectReferenceSelectionComponent extends Component<{ objec
         const parts = this.kvExternalId!.split("/");
         switch(this.input.objectType)
         {
+            case "certificate":
+            {
+                const response = await this.apiService.resourceProviders._any_.securityservices.keyvault._any_.certificates.get(parts[1], parts[4]);
+                const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(data.ok)
+                    this.possibleObjectNames = data.value.map(x => x.name);
+                else
+                    this.OnKeyVaultReferenceChanged(null);
+            }
+            break;
             case "key":
             {
                 const response = await this.apiService.resourceProviders._any_.securityservices.keyvault._any_.keys.get(parts[1], parts[4]);

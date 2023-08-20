@@ -47,6 +47,12 @@ interface RuleConditionPrefixOperand
     len: number;
 }
 
+interface RuleConditionRangeOperand
+{
+    type: "range";
+    range: number[];
+}
+
 interface RuleConditionValueOperand
 {
     type: "value";
@@ -59,7 +65,7 @@ interface RuleConditionValueListOperand
     values: string[];
 }
 
-export type NetfilteRuleConditionOperand = RuleConditionConnectionTrackOperand | RuleConditionMetaOperand | RuleConditionPayloadOperand | RuleConditionPrefixOperand | RuleConditionValueOperand | RuleConditionValueListOperand;
+export type NetfilteRuleConditionOperand = RuleConditionConnectionTrackOperand | RuleConditionMetaOperand | RuleConditionPayloadOperand | RuleConditionPrefixOperand | RuleConditionRangeOperand | RuleConditionValueOperand | RuleConditionValueListOperand;
 
 export interface NetfilterRuleCondition
 {
@@ -152,6 +158,14 @@ export class HostNetfilterService
     {
         const result = await this.ReadNFTables(hostId);
         return result;
+    }
+
+    public async ReadNetfilterVersion(hostId: number)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["/usr/sbin/nft", "-v"], hostId);
+        const parts = result.stdOut.split(" ");
+        const versionPart = parts[1].substring(1);
+        return versionPart.split(".").map(x => parseInt(x));
     }
 
     public async WriteRuleSet(hostId: number, tables: Table<NetfilterRuleCreationData>[])
@@ -284,6 +298,8 @@ export class HostNetfilterService
                 return [operand.protocol, operand.field].filter(x => x !== undefined).join(" ");
             case "prefix":
                 return [operand.addr + "/" + operand.len];
+            case "range":
+                return [operand.range[0] + "-" + operand.range[1]];
             case "value":
                 return operand.value;
             case "values":

@@ -27,6 +27,7 @@ import { HostNetworkInterfaceCardsManager } from "../services/HostNetworkInterfa
 import { FirewallRule, HostFirewallZonesManager, PortForwardingRule } from "../services/HostFirewallZonesManager";
 import { HostFirewallSettingsManager } from "../services/HostFirewallSettingsManager";
 import { ProcessTrackerManager } from "../services/ProcessTrackerManager";
+import { FirewallDebugSettings, HostFirewallTracingManager } from "../services/HostFirewallTracingManager";
 
 interface NetworkInterfaceDTO
 {
@@ -272,6 +273,62 @@ class _api_
     )
     {
         await this.hostFirewallSettingsManager.SetRule(hostId, direction, rule);
+    }
+}
+
+@APIController("hosts/{hostName}/firewallTracing")
+class _api9_
+{
+    constructor(private hostsController: HostsController, private hostFirewallTracingManager: HostFirewallTracingManager)
+    {
+    }
+
+    @Common()
+    public async QueryHostId(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+        return hostId;
+    }
+
+    @Get()
+    public QueryConfig(
+        @Common hostId: number,
+    )
+    {
+        return this.hostFirewallTracingManager.GetTracingSettings(hostId);
+    }
+
+    @Put()
+    public async UpdateConfig(
+        @Common hostId: number,
+        @Body config: FirewallDebugSettings
+    )
+    {
+        const enabled = config.hookBridgeForward || config.hookForward || config.hookInput || config.hookOutput;
+        if(enabled)
+            await this.hostFirewallTracingManager.EnableTracing(hostId, config);
+        else
+            await this.hostFirewallTracingManager.DisableTracing(hostId);
+    }
+
+    @Delete("data")
+    public ClearData(
+        @Common hostId: number,
+    )
+    {
+        return this.hostFirewallTracingManager.ClearCapturedData(hostId);
+    }
+
+    @Get("data")
+    public QueryData(
+        @Common hostId: number,
+    )
+    {
+        return this.hostFirewallTracingManager.ReadCapturedData(hostId);
     }
 }
 

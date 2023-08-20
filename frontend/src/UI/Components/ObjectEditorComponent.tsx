@@ -259,6 +259,8 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
                         onChanged={newValue => valueChanged(newValue.key)}
                         onLoadSuggestions={this.LoadHostNames.bind(this)}
                         selection={ (value.trim().length === 0 ? null : ({ key: value, displayValue: value}))} />;
+                case "key-vault-reference[certificate]":
+                    return <KeyVaultObjectReferenceSelectionComponent objectType="certificate" value={value} onChanged={valueChanged} />;
                 case "key-vault-reference[key]":
                     return <KeyVaultObjectReferenceSelectionComponent objectType="key" value={value} onChanged={valueChanged} />;
                 case "key-vault-reference[secret]":

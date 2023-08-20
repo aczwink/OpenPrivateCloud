@@ -18,11 +18,12 @@
 
 import { APIController, Body, BodyProp, Common, Get, Path, Post, Put } from "acts-util-apilib";
 import { c_computeServicesResourceProviderName, c_dockerContainerResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { ContainerAppServiceConfig, ContainerAppServiceManager } from "./ContainerAppServiceManager";
-import { DockerContainerConfig } from "./DockerManager";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { ResourceReference } from "../../common/ResourceReference";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { ContainerAppServiceConfig, ContainerAppServiceManager } from "../ContainerAppServiceManager";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { ResourceReference } from "../../../common/ResourceReference";
+import { ContainerAppServiceConfigDTO } from "./DTOs";
+import { KeyVaultManager } from "../../security-services/KeyVaultManager";
 
 
 interface DockerContainerInfo
@@ -48,7 +49,7 @@ interface DockerContainerLogDto
 @APIController(`resourceProviders/{resourceGroupName}/${c_computeServicesResourceProviderName}/${c_dockerContainerResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
-    constructor(instancesManager: ResourcesManager, private dockerContainerManager: ContainerAppServiceManager)
+    constructor(instancesManager: ResourcesManager, private dockerContainerManager: ContainerAppServiceManager, private keyVaultManager: KeyVaultManager)
     {
         super(instancesManager, c_computeServicesResourceProviderName, c_dockerContainerResourceTypeName);
     }
@@ -76,16 +77,18 @@ class _api_ extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference
     )
     {
-        return this.dockerContainerManager.QueryContainerConfig(resourceReference.id);
+        const config = await this.dockerContainerManager.QueryContainerConfig(resourceReference.id);
+        return this.MapConfigToDTO(config);
     }
 
     @Put("config")
     public async UpdateContainerConfig(
         @Common resourceReference: ResourceReference,
-        @Body config: ContainerAppServiceConfig
+        @Body config: ContainerAppServiceConfigDTO
     )
     {
-        return this.dockerContainerManager.UpdateContainerConfig(resourceReference.id, config);
+        const realConfig = await this.MapConfigFromDTO(config);
+        return this.dockerContainerManager.UpdateContainerConfig(resourceReference.id, realConfig);
     }
 
     @Get("info")
@@ -122,5 +125,56 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         await this.dockerContainerManager.UpdateContainerImage(resourceReference);
+    }
+
+    //Private methods
+    private async MapConfigFromDTO(dto: ContainerAppServiceConfigDTO): Promise<ContainerAppServiceConfig>
+    {
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(dto.vnetResourceId);
+        const certRef = (dto.certificate === undefined) ? undefined : await this.keyVaultManager.ResolveKeyVaultReference(dto.certificate.keyVaultCertificateReference)
+
+        return {
+            env: dto.env,
+            imageName: dto.imageName,
+            secrets: await dto.secrets.Values().Map(async x => {
+                const resolved = await this.keyVaultManager.ResolveKeyVaultReference(x.keyVaultSecretReference);
+                return {
+                    keyVaultId: resolved.kvRef.id,
+                    keyVaultSecretName: resolved.objectName,
+                    mountPointSecretName: x.mountPointSecretName
+                };
+            }).PromiseAll(),
+            vnetResourceId: vnetRef!.id,
+            cert: (dto.certificate === undefined) ? undefined : {
+                certificateMountPoint: dto.certificate.certificateMountPoint,
+                certificateName: certRef!.objectName,
+                keyVaultId: certRef!.kvRef.id,
+                privateKeyMountPoint: dto.certificate.privateKeyMountPoint
+            }
+        }
+    }
+
+    private async MapConfigToDTO(config: ContainerAppServiceConfig): Promise<ContainerAppServiceConfigDTO>
+    {
+        const vnetRef = await this.resourcesManager.CreateResourceReference(config.vnetResourceId);
+
+        return {
+            certificate: (config.cert === undefined) ? undefined : {
+                certificateMountPoint: config.cert.certificateMountPoint,
+                keyVaultCertificateReference: await this.keyVaultManager.CreateKeyVaultReference(config.cert.keyVaultId, "certificate", config.cert.certificateName),
+                privateKeyMountPoint: config.cert.privateKeyMountPoint
+            },
+            env: config.env,
+            imageName: config.imageName,
+            secrets: await config.secrets.Values().Map(async x => {
+                const keyVaultSecretReference = await this.keyVaultManager.CreateKeyVaultReference(x.keyVaultId, "secret", x.keyVaultSecretName);
+
+                return {
+                    keyVaultSecretReference,
+                    mountPointSecretName: x.mountPointSecretName
+                };
+            }).PromiseAll(),
+            vnetResourceId: vnetRef!.externalId,
+        }
     }
 }

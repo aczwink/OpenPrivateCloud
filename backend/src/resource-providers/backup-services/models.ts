@@ -22,7 +22,7 @@ export interface BackupVaultDatabaseConfig
 {
     /**
      * @title MariaDB Instance
-     * @format instance-same-host[database-services/mariadb]
+     * @format resource-same-host[database-services/mariadb]
      */
      externalId: string;
      databaseName: string;
@@ -40,7 +40,7 @@ export interface BackupVaultFileStorageConfig
 {
     /**
      * @title File storage
-     * @format instance-same-host[file-services/file-storage]
+     * @format resource-same-host[file-services/file-storage]
      */
     externalId: string;
 

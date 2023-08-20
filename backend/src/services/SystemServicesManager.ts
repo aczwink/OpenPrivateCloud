@@ -119,8 +119,9 @@ WantedBy=multi-user.target
         const data = await parser.Parse(hostId, "/etc/systemd/system/" + serviceName + ".service");
         const model = new ConfigModel(data);
 
+        const before = model.GetProperty("Unit", "Before");
         return {
-            before: model.GetProperty("Unit", "Before")!.toString().split(" "),
+            before: (before === undefined) ? [] : before!.toString().split(" "),
             command: model.GetProperty("Service", "ExecStart")!.toString(),
             environment: data.Values().Map(x => (x.type === "KeyValue" &&  x.key === "Environment") ? x : null).NotNull().Map(x => x.value!.toString().split("=")).ToDictionary(x => x[0], x => x[1]),
             groupName: model.GetProperty("Service", "Group")!.toString(),

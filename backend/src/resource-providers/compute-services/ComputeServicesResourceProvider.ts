@@ -86,6 +86,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
         {
             case "docker-container":
                 await this.dockerManager.EnsureDockerIsInstalled(context.hostId);
+                await this.dockerContainerManager.ProvideResource(instanceProperties, context);
                 break;
             case "virtual-machine":
                 await this.virtualMachineManager.ProvideResource(instanceProperties, context);

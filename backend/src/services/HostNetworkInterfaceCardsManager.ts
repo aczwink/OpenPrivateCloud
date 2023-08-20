@@ -72,7 +72,7 @@ export class HostNetworkInterfaceCardsManager
     public async FindExternalNetworkInterface(hostId: number)
     {
         const stats = await this.hostMetricsService.ReadNetworkStatistics(hostId);
-        const filtered = stats.filter(x => x.interfaceName.startsWith("en"));
+        const filtered = stats.filter(x => x.interfaceName.startsWith("en") || x.interfaceName.startsWith("eth"));
         if(filtered.length != 1)
             throw new Error("Method not implemented.");
         return filtered[0].interfaceName;

@@ -30,6 +30,7 @@ import { FirewallRule, FirewallZoneData, FirewallZoneDataProvider } from "../../
 import { dnsmasqManager } from "./dnsmasqManager";
 import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInterfaceCardsManager";
 import { ModulesManager } from "../../services/ModulesManager";
+import { DistroInfoService } from "../../services/DistroInfoService";
 
 interface VNetSettings
 {
@@ -59,7 +60,8 @@ export interface VNetConfig
 export class VNetManager implements FirewallZoneDataProvider
 {
     constructor(private resourceConfigController: ResourceConfigController, private remoteCommandExecutor: RemoteCommandExecutor, private sysCtlConfService: SysCtlConfService, private modulesManager: ModulesManager,
-        private resourcesManager: ResourcesManager, private hostFirewallManager: HostFirewallManager, private dnsmasqManager: dnsmasqManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager)
+        private resourcesManager: ResourcesManager, private hostFirewallManager: HostFirewallManager, private dnsmasqManager: dnsmasqManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager,
+        private distroInfoService: DistroInfoService)
     {
     }
 
@@ -112,7 +114,9 @@ export class VNetManager implements FirewallZoneDataProvider
             await this.modulesManager.EnsureModuleIsInstalled(resourceReference.hostId, "docker");
 
             const bridgeName = this.DeriveBridgeName(resourceReference);
-            const driverName = "ghcr.io/aczwink/docker-net-dhcp:latest-linux-amd64";
+            const arch = await this.distroInfoService.FetchCPU_Architecture(resourceReference.hostId);
+            const pluginArch = (arch === "arm64") ? "arm64-v8" : "amd64";
+            const driverName = "ghcr.io/aczwink/docker-net-dhcp:latest-linux-" + pluginArch;
             await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "create", "-d", driverName, "--ipam-driver", "null", "-o", "bridge=" + bridgeName, dockerNetName], resourceReference.hostId);
         }
 

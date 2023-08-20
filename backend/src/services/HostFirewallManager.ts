@@ -22,6 +22,7 @@ import { FirewallRule, FirewallZone, HostFirewallZonesManager, PortForwardingRul
 import { HostNetworkInterfaceCardsManager } from "./HostNetworkInterfaceCardsManager";
 import { CIDRRange } from "../common/CIDRRange";
 import { IPv4 } from "../common/IPv4";
+import { HostFirewallTracingManager } from "./HostFirewallTracingManager";
 
 
 interface FlatFirewallRule
@@ -36,9 +37,13 @@ interface FlatFirewallRule
 @Injectable
 export class HostFirewallManager
 {
-    constructor(private hostNetFilterService: HostNetfilterService, private hostFirewallZonesManager: HostFirewallZonesManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager)
+    constructor(private hostNetFilterService: HostNetfilterService, private hostFirewallZonesManager: HostFirewallZonesManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager,
+        private hostFirewallTracingManager: HostFirewallTracingManager)
     {
         this.hostFirewallZonesManager.SubscribeForChanges({
+            next: this.ApplyRuleSet.bind(this)
+        });
+        this.hostFirewallTracingManager.SubscribeForChanges({
             next: this.ApplyRuleSet.bind(this)
         });
     }
@@ -47,65 +52,66 @@ export class HostFirewallManager
     public async ApplyRuleSet(hostId: number)
     {
         const externalNIC = await this.hostNetworkInterfaceCardsManager.FindExternalNetworkInterface(hostId);
-        const isTracingEnabled = false; //monitor with: "nft monitor trace"
         const zones = await this.hostFirewallZonesManager.QueryZones(hostId);
 
         const externalZoneInputChainName = "ENTER_zone_external";
         const externalZoneOutputChainName = "EXIT_zone_external";
 
+        const bridgeChains: NetfilterChain<NetfilterRuleCreationData>[] = [
+            ...zones.customZones.Values().Map(this.CreateCustomZoneBridgeFilterChain.bind(this)).ToArray(),
+            {
+                name: "FORWARD",
+                rules: [
+                    ...this.AddTracingRule(hostId, "BRIDGE_FORWARD"),
+                    {
+                        //accept traffic originated from us
+                        conditions: [
+                            {
+                                left: {
+                                    type: "ct",
+                                    key: "state",
+                                },
+                                op: "in",
+                                right: {
+                                    type: "values",
+                                    values: ["established", "related"]
+                                }
+                            }
+                        ],
+                        policy: { type: "accept" },
+                    },
+                    {
+                        //allow arp
+                        conditions: [
+                            {
+                                op: "==",
+                                left: {
+                                    type: "payload",
+                                    field: "type",
+                                    protocol: "ether",
+                                },
+                                right: {
+                                    type: "value",
+                                    value: "arp"
+                                }
+                            },
+                        ],
+                        policy: { type: "accept" }
+                    },
+                    ...zones.customZones.Values().Map(this.CreateCustomZoneBridgeFilterJumpRule.bind(this)).ToArray(),
+                ],
+                hook: "forward",
+                policy: "drop",
+                prio: "filter",
+                type: "filter"
+            }
+        ];
+        const nftVersion = await this.hostNetFilterService.ReadNetfilterVersion(hostId);
         await this.hostNetFilterService.WriteRuleSet(hostId, [
             {
                 name: "opc_filter",
                 family: "bridge",
-                chains: [
-                    ...zones.customZones.Values().Map(this.CreateCustomZoneBridgeFilterChain.bind(this, isTracingEnabled)).ToArray(),
-                    {
-                        name: "FORWARD",
-                        rules: [
-                            {
-                                //accept traffic originated from us
-                                conditions: [
-                                    {
-                                        left: {
-                                            type: "ct",
-                                            key: "state",
-                                        },
-                                        op: "in",
-                                        right: {
-                                            type: "values",
-                                            values: ["established", "related"]
-                                        }
-                                    }
-                                ],
-                                policy: { type: "accept" },
-                            },
-                            {
-                                //allow arp
-                                conditions: [
-                                    {
-                                        op: "==",
-                                        left: {
-                                            type: "payload",
-                                            field: "type",
-                                            protocol: "ether",
-                                        },
-                                        right: {
-                                            type: "value",
-                                            value: "arp"
-                                        }
-                                    },
-                                ],
-                                policy: { type: "accept" }
-                            },
-                            ...zones.customZones.Values().Map(this.CreateCustomZoneBridgeFilterJumpRule.bind(this)).ToArray(),
-                            ...this.AddTracingRule(isTracingEnabled),
-                        ],
-                        hook: "forward",
-                        policy: "drop",
-                        prio: "filter",
-                        type: "filter"
-                    }
-                ]
+                chains: (nftVersion[0] === 0) ? [] : bridgeChains, //no support for connection tracking in client tools below v1.x :(
             },
             {
                 name: "opc_filter",
@@ -116,14 +122,12 @@ export class HostFirewallManager
                         name: externalZoneInputChainName,
                         rules: [
                             ...this.CreateNetFilterRules(zones.external.inboundRules),
-                            ...this.AddTracingRule(isTracingEnabled),
                         ]
                     },
                     {
                         name: externalZoneOutputChainName,
                         rules: [
                             ...this.CreateNetFilterRules(zones.external.outboundRules),
-                            ...this.AddTracingRule(isTracingEnabled),
                             {
                                 //the default for the external zone is to accept
                                 conditions: [],
@@ -133,12 +137,13 @@ export class HostFirewallManager
                     },
 
                     //CUSTOM ZONES
-                    ...zones.customZones.Values().Map(this.CreateCustomZoneChains.bind(this, isTracingEnabled)).Map(x => x.Values()).Flatten().ToArray(),
+                    ...zones.customZones.Values().Map(this.CreateCustomZoneChains.bind(this)).Map(x => x.Values()).Flatten().ToArray(),
 
                     //Hooks
                     {
                         name: "INPUT",
                         rules: [
+                            ...this.AddTracingRule(hostId, "INPUT"),
                             {
                                 //drop invalid traffic
                                 conditions: [
@@ -176,7 +181,6 @@ export class HostFirewallManager
                             ...zones.trusted.interfaceNames.map(this.CreateTrustedZoneInputRule.bind(this)),
                             ...zones.external.interfaceNames.map(x => this.CreateInputJumpRule(x, externalZoneInputChainName) ),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateInputJumpRule(y, this.CreateCustomZoneChainName("OUTPUT", x.name))).Values()).Flatten().ToArray(),
-                            ...this.AddTracingRule(isTracingEnabled),
                             {
                                 conditions: [],
                                 policy: { type: "reject", expr: "port-unreachable" }
@@ -190,10 +194,14 @@ export class HostFirewallManager
                     {
                         name: "FORWARD",
                         rules: [
+                            ...this.AddTracingRule(hostId, "FORWARD"),
                             ...zones.external.portForwardingRules.map(this.GenerateIncomingDestinationNAT_ForwardRule.bind(this, externalNIC, zones.customZones)),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateInboundForwardRule(y, x.addressSpace, x.name)).Values()).Flatten().ToArray(),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateOutboundForwardRule(y, x.addressSpace, x.name)).Values()).Flatten().ToArray(),
-                            ...this.AddTracingRule(isTracingEnabled),
+                            {
+                                conditions: [],
+                                policy: { type: "reject", expr: "port-unreachable" }
+                            }
                         ],
                         hook: "forward",
                         policy: "drop",
@@ -203,10 +211,27 @@ export class HostFirewallManager
                     {
                         name: "OUTPUT",
                         rules: [
+                            ...this.AddTracingRule(hostId, "OUTPUT"),
                             ...zones.trusted.interfaceNames.map(this.CreateTrustedZoneOutputRule.bind(this)),
+                            {
+                                //allow answers from localhost to connections initiated by remote host
+                                conditions: [
+                                    {
+                                        left: {
+                                            type: "ct",
+                                            key: "state",
+                                        },
+                                        op: "in",
+                                        right: {
+                                            type: "values",
+                                            values: ["established", "related"]
+                                        }
+                                    }
+                                ],
+                                policy: { type: "accept" },
+                            },
                             ...zones.external.interfaceNames.map(x => this.CreateOutputJumpRule(x, externalZoneOutputChainName) ),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateOutputJumpRule(y, this.CreateCustomZoneChainName("INPUT", x.name))).Values()).Flatten().ToArray(),
-                            ...this.AddTracingRule(isTracingEnabled),
                         ],
                         hook: "output",
                         policy: "drop", //default is to drop anything that doesn't pass other rules
@@ -274,13 +299,23 @@ export class HostFirewallManager
     }
 
     //Private methods
-    private AddTracingRule(isTracingEnabled: boolean): NetfilterRuleCreationData[]
+    private AddTracingRule(hostId: number, hook: "BRIDGE_FORWARD" | "FORWARD" | "INPUT" | "OUTPUT"): NetfilterRuleCreationData[]
     {
+        const isTracingEnabled = this.hostFirewallTracingManager.IsTracingEnabled(hostId, hook);
         if(!isTracingEnabled)
             return [];
+
+        const conds = this.hostFirewallTracingManager.GetTracingConditions(hostId)!;
+        const rule: FlatFirewallRule = {
+            action: "Allow",
+            protocol: conds.protocol,
+            portRange: (conds.destinationPort === undefined) ? undefined : { from: conds.destinationPort, to: conds.destinationPort },
+        };
+        const nftRule = this.ConvertToNetFilterRule(rule);
+
         return [
             {
-                conditions: [],
+                conditions: nftRule.conditions,
                 policy: {
                     type: "mangle",
                     key: {
@@ -315,9 +350,6 @@ export class HostFirewallManager
 
         if(rule.portRange !== undefined)
         {
-            if(rule.portRange.from !== rule.portRange.to)
-                throw new Error("implement range");
-
             conditions.push({
                 op: "==",
                 left: {
@@ -325,9 +357,12 @@ export class HostFirewallManager
                     field: "dport",
                     protocol: rule.protocol.toLowerCase() as any,
                 },
-                right: {
+                right: (rule.portRange.from === rule.portRange.to) ? {
                     type: "value",
                     value: rule.portRange.from.toString()
+                } : {
+                    type: "range",
+                    range: [rule.portRange.from, rule.portRange.to]
                 }
             });
         }
@@ -405,14 +440,13 @@ export class HostFirewallManager
         };
     }
 
-    private CreateCustomZoneBridgeFilterChain(isTracingEnabled: boolean, customZone: FirewallZone): NetfilterChain<NetfilterRuleCreationData>
+    private CreateCustomZoneBridgeFilterChain(customZone: FirewallZone): NetfilterChain<NetfilterRuleCreationData>
     {
         return {
             name: "zone_" + customZone.name.ReplaceAll("-", "_"),
             rules: [
                 ...this.CreateNetFilterRules(customZone.outboundRules),
                 ...this.CreateNetFilterRules(customZone.inboundRules),
-                ...this.AddTracingRule(isTracingEnabled),
             ]
         };
     }
@@ -458,14 +492,13 @@ export class HostFirewallManager
         return mapped + "_zone_" + customZoneName.ReplaceAll("-", "_");
     }
 
-    private CreateCustomZoneChains(isTracingEnabled: boolean, customZone: FirewallZone): NetfilterChain<NetfilterRuleCreationData>[]
+    private CreateCustomZoneChains(customZone: FirewallZone): NetfilterChain<NetfilterRuleCreationData>[]
     {
         return [
             {
                 name: this.CreateCustomZoneChainName("INPUT", customZone.name),
                 rules: [
                     ...this.CreateNetFilterRules(customZone.inboundRules),
-                    ...this.AddTracingRule(isTracingEnabled),
                 ],
             },
             {
@@ -477,7 +510,6 @@ export class HostFirewallManager
                         conditions: [],
                         policy: { type: "accept" }
                     },
-                    ...this.AddTracingRule(isTracingEnabled),
                 ]
             },
         ];
@@ -654,6 +686,13 @@ export class HostFirewallManager
         };
     }
 
+    private EnsureIsCIDR_Range(address: string): string
+    {
+        if(address.includes("/"))
+            return address;
+        return address + "/32";
+    }
+
     private FlattenFirewallRule(rule: FirewallRule): FlatFirewallRule[]
     {
         const result: FlatFirewallRule[] = [];
@@ -690,8 +729,8 @@ export class HostFirewallManager
                             action: rule.action,
                             portRange,
                             protocol: proto,
-                            destinationAddressRange: (destinationPart === "Any") ? undefined : destinationPart,
-                            sourceAddressRange: (sourcePart === "Any") ? undefined : sourcePart,
+                            destinationAddressRange: (destinationPart === "Any") ? undefined : this.EnsureIsCIDR_Range(destinationPart),
+                            sourceAddressRange: (sourcePart === "Any") ? undefined : this.EnsureIsCIDR_Range(sourcePart),
                         });
                     }
                 }

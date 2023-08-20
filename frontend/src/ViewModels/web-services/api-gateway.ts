@@ -47,6 +47,11 @@ const apisViewModel: ListViewModel<API_EntryConfig, ResourceAndGroupId> = {
     ],
     boundActions: [
         {
+            type: "edit",
+            updateResource: (service, ids, newProps, oldProps) => service.resourceProviders._any_.webservices.apigateway._any_.apis.put(ids.resourceGroupName, ids.resourceName, { oldFrontendDomainName: oldProps.frontendDomainName, newProps }),
+            schemaName: "API_EntryConfig"
+        },
+        {
             type: "delete",
             deleteResource: (service, ids, api) => service.resourceProviders._any_.webservices.apigateway._any_.apis.delete(ids.resourceGroupName, ids.resourceName, api),
         }

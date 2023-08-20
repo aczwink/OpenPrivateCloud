@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import crypto from "crypto";
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { DeploymentContext, ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
@@ -22,7 +23,6 @@ import { LetsEncryptProperties } from "./Properties";
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ResourceDeploymentService } from "../../services/ResourceDeploymentService";
-import { randomUUID } from "crypto";
 import { VirtualNetworkProperties } from "../network-services/properties";
 import { ResourceGroupsController } from "../../data-access/ResourceGroupsController";
 import { ResourceProviderManager } from "../../services/ResourceProviderManager";
@@ -149,11 +149,13 @@ export class LetsEncryptManager
 
     private async DeployVNet(resourceReference: ResourceReference, config: LetsEncryptCertBotConfig)
     {
+        const random = crypto.pseudoRandomBytes(32).toString("hex");
+
         const vNetProps: VirtualNetworkProperties = {
             addressSpace: config.vNetAddressSpace,
             enableDHCPv4: true,
             hostName: resourceReference.hostName,
-            name: "DONT_TOUCH_LetsEncryptVNet_" + randomUUID(),
+            name: "DONT_TOUCH_LetsEncryptVNet_" + random,
             type: "virtual-network"
         };
         const rg = await this.resourceGroupsController.QueryGroupByName(resourceReference.resourceGroupName);

@@ -132,14 +132,15 @@ export class DNS_ServerManager
         return true;
     }
 
-    public async EditZoneRecord(resourceReference: LightweightResourceReference, zoneName: string, recordIndex: number, record: DNS_Record)
+    public async EditZoneRecord(resourceReference: LightweightResourceReference, zoneName: string, existingRecord: DNS_Record, newRecord: DNS_Record)
     {
         const config = await this.ReadConfig(resourceReference.id);
         const zone = config.zones.find(x => x.name === zoneName);
         if(zone === undefined)
             return false;
 
-        zone.records[recordIndex] = record;
+        const idx = zone.records.findIndex(x => EqualsAny(x, existingRecord));
+        zone.records[idx] = newRecord;
 
         await this.UpdateConfig(resourceReference, config);
 

@@ -27,6 +27,7 @@ import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { SystemServicesManager } from "./SystemServicesManager";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
+import DebianPackageManager from "../distro/debian/PackageManager";
 
  
 @Injectable
@@ -59,9 +60,18 @@ class InternalModulesManager
     private async ResolveDistroPackageManager(hostId: number): Promise<DistroPackageManager>
     {
         const id = await this.distroInfoService.FetchId(hostId);
-        const pkg = await import("../distro/" + id + "/PackageManager");
-        
-        return GlobalInjector.Resolve<DistroPackageManager>(pkg.default);
+        return this.ResolveDistroPackageManagerById(id!);
+    }
+
+    private ResolveDistroPackageManagerById(id: string): DistroPackageManager
+    {
+        switch(id)
+        {
+            case "debian":
+            case "ubuntu":
+                return GlobalInjector.Resolve(DebianPackageManager);
+        }
+        throw new Error("Distribution not supported: " + id);
     }
 }
 
@@ -101,6 +111,7 @@ export class ModulesManager
                 break;
             case "docker":
                 {
+                    const distroInfoService = GlobalInjector.Resolve(DistroInfoService);
                     const hostStoragesController = GlobalInjector.Resolve(HostStoragesController);
                     const hostStoragesManager = GlobalInjector.Resolve(HostStoragesManager);
                     const remoteCommandExecutor = GlobalInjector.Resolve(RemoteCommandExecutor);
@@ -135,7 +146,9 @@ export class ModulesManager
                     await systemServicesManager.StartService(hostId, "docker");
 
                     //the standard docker bridge driver does not allow using custom bridges (at least not more than one i.e. "bridge" in the daemon.json). This plugin effectively allows us exactly that
-                    const pluginName = "ghcr.io/aczwink/docker-net-dhcp:latest-linux-amd64";
+                    const arch = await distroInfoService.FetchCPU_Architecture(hostId);
+                    const pluginArch = (arch === "arm64") ? "arm64-v8" : "amd64";
+                    const pluginName = "ghcr.io/aczwink/docker-net-dhcp:latest-linux-" + pluginArch;
                     await remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "plugin", "install", "--grant-all-permissions", pluginName], hostId);
                 }
                 break;

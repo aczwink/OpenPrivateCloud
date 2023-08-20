@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -30,7 +30,7 @@ export interface EditAction<ObjectType, IdType>
 {
     type: "edit";
     schemaName: string;
-    updateResource: (service: APIService, ids: IdType, index: number, properties: ObjectType) => Promise<ResponseData<number, number, void>>;
+    updateResource: (service: APIService, ids: IdType, newProperties: ObjectType, oldProperties: ObjectType, index: number) => Promise<ResponseData<number, number, void>>;
 }
 
 export interface DeleteAction<ObjectType, IdType>

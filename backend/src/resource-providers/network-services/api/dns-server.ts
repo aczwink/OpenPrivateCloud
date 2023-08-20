@@ -17,12 +17,12 @@
  * */
 
 import { c_dnsServerResourceTypeName, c_networkServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { APIController, Body, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { ResourceReference } from "../../common/ResourceReference";
-import { DNS_ServerManager } from "./DNS_ServerManager";
-import { DNS_ServerSettings, DNS_Record } from "./models_dns";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { ResourceReference } from "../../../common/ResourceReference";
+import { DNS_ServerManager } from "../DNS_ServerManager";
+import { DNS_ServerSettings, DNS_Record } from "../models_dns";
 
 interface DNS_ZoneDTO
 {
@@ -129,15 +129,15 @@ class _api_ extends ResourceAPIControllerBase
         return zone.records;
     }
 
-    @Put("zones/{zoneName}/records/{recordIndex}")
+    @Put("zones/{zoneName}/records")
     public async EditZoneRecord(
         @Common resourceReference: ResourceReference,
         @Path zoneName: string,
-        @Path recordIndex: number,
-        @Body record: DNS_Record
+        @BodyProp existingRecord: DNS_Record,
+        @BodyProp newRecord: DNS_Record
     )
     {
-        const success = await this.dnsServerManager.EditZoneRecord(resourceReference, zoneName, recordIndex, record);
+        const success = await this.dnsServerManager.EditZoneRecord(resourceReference, zoneName, existingRecord, newRecord);
         if(!success)
             return NotFound("zone or record not found");
     }

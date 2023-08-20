@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { NodeAppConfig, NodeAppServiceInfoDto, NodeAppServiceStatus } from "../../../dist/api";
+import { NodeAppServiceConfigDTO, NodeAppServiceInfoDto, NodeAppServiceStatus } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { UploadNodeAppServieContentComponent } from "../../Views/node-app-service/UploadNodeAppServieContentComponent";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
@@ -58,18 +58,18 @@ const statusViewModel: ObjectViewModel<NodeAppServiceStatus, ResourceAndGroupId>
     schemaName: "NodeAppServiceStatus"
 };
 
-const configViewModel: ObjectViewModel<NodeAppConfig, ResourceAndGroupId> = {
+const configViewModel: ObjectViewModel<NodeAppServiceConfigDTO, ResourceAndGroupId> = {
     actions: [
         {
             type: "edit",
-            propertiesSchemaName: "NodeAppConfig",
+            propertiesSchemaName: "NodeAppServiceConfigDTO",
             requestObject: async (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.config.get(ids.resourceGroupName, ids.resourceName),
             updateResource: (service, ids, newValue) => service.resourceProviders._any_.webservices.nodeappservice._any_.config.put(ids.resourceGroupName, ids.resourceName, newValue)
         }
     ],
     formTitle: _ => "Configuration",
     requestObject: async (service, ids) => service.resourceProviders._any_.webservices.nodeappservice._any_.config.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "NodeAppConfig",
+    schemaName: "NodeAppServiceConfigDTO",
     type: "object"
 };
 

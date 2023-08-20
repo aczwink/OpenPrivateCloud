@@ -18,9 +18,9 @@
 
 import { FirewallRule, Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, JournalEntry, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
-import { ExtractDataFromResponseOrShowErrorMessageOnError, UnwrapResponse } from "../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
+import { HostFirewallTracingComponent } from "../Views/host/HostFirewallTracingComponent";
 import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
@@ -140,17 +140,9 @@ function BuildFirewallViewModel(direction: "Inbound" | "Outbound")
             {
                 type: "edit",
                 schemaName: "FirewallRule",
-                updateResource: async (service, ids, idx, rule) => {
-                    const response = await service.hosts._any_.firewall._any_.get(ids.hostName, direction);
-                    const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
-                    if(result.ok)
-                    {
-                        const ruleToDelete = result.value[idx];
-                        await service.hosts._any_.firewall._any_.delete(ids.hostName, direction, { priority: ruleToDelete.priority });
-                        return service.hosts._any_.firewall._any_.put(ids.hostName, direction, rule);
-                    }
-
-                    return response;
+                updateResource: async (service, ids, rule, originalRule) => {
+                    await service.hosts._any_.firewall._any_.delete(ids.hostName, direction, { priority: originalRule.priority });
+                    return service.hosts._any_.firewall._any_.put(ids.hostName, direction, rule);
                 },
             },
             {
@@ -283,6 +275,14 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     child: nicsViewModel,
                     displayName: "Network interfaces",
                     key: "nics"
+                },
+                {
+                    child: {
+                        type: "component",
+                        component: HostFirewallTracingComponent
+                    },
+                    displayName: "Firewall Tracing",
+                    key: "firewallTracing"
                 },
                 {
                     child: storageDevicesViewModel,

@@ -15,37 +15,54 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-
+import path from "path";
 import { Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
-import { ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
-import { DockerContainerConfig, DockerContainerInfo, DockerEnvironmentVariableMapping, DockerManager } from "./DockerManager";
+import { DeploymentContext, ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
+import { DockerContainerConfig, DockerContainerConfigVolume, DockerContainerInfo, DockerEnvironmentVariableMapping, DockerManager } from "./DockerManager";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { VNetManager } from "../network-services/VNetManager";
+import { DockerContainerProperties } from "./Properties";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
+import { KeyVaultManager } from "../security-services/KeyVaultManager";
+import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+
+interface Certificate
+{
+    keyVaultId: number;
+    certificateName: string;
+    certificateMountPoint: string;
+    privateKeyMountPoint: string;
+}
+
+export interface ContainerAppServiceEnvironmentVariableMapping
+{
+    varName: string;
+    value: string;
+}
+
+interface Secret
+{
+    keyVaultId: number;
+    keyVaultSecretName: string;
+    mountPointSecretName: string;
+}
 
 export interface ContainerAppServiceConfig
 {
-    /**
-     * @title Certificate
-     * @format instance-same-host[web-services/letsencrypt-cert]
-     */
-    //certResourceExternalId?: string;
-
-    env: DockerEnvironmentVariableMapping[];
+    cert?: Certificate;
+    env: ContainerAppServiceEnvironmentVariableMapping[];
     imageName: string;
-
-    /**
-     * @title Virtual network
-     * @format instance-same-host[network-services/virtual-network]
-     */
-    vnetResourceExternalId: string;
+    secrets: Secret[];
+    vnetResourceId: number;
 }
 
 @Injectable
 export class ContainerAppServiceManager
 {
-    constructor(private dockerManager: DockerManager, private instanceConfigController: ResourceConfigController, private vnetManager: VNetManager, private resourcesManager: ResourcesManager)
+    constructor(private dockerManager: DockerManager, private instanceConfigController: ResourceConfigController, private vnetManager: VNetManager, private resourcesManager: ResourcesManager,
+        private resourceDependenciesController: ResourceDependenciesController, private keyVaultManager: KeyVaultManager, private remoteFileSystemManager: RemoteFileSystemManager)
     {
     }
 
@@ -66,6 +83,7 @@ export class ContainerAppServiceManager
             };
         }
         await this.dockerManager.DeleteContainer(resourceReference.hostId, containerName);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
 
         return null;
     }
@@ -91,19 +109,23 @@ export class ContainerAppServiceManager
         return containerData;
     }
 
+    public async ProvideResource(instanceProperties: DockerContainerProperties, context: DeploymentContext)
+    {
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.vnetResourceId);
+        await this.UpdateContainerConfig(context.resourceReference.id, {
+            env: [],
+            imageName: "hello-world",
+            secrets: [],
+            vnetResourceId: vnetRef!.id,
+        });
+
+        await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+    }
+
     public async QueryContainerConfig(resourceId: number): Promise<ContainerAppServiceConfig>
     {
         const config = await this.instanceConfigController.QueryConfig<ContainerAppServiceConfig>(resourceId);
-        if(config === undefined)
-        {
-            return {
-                env: [],
-                imageName: "",
-                vnetResourceExternalId: ""
-            };
-        }
-
-        return config;
+        return config!;
     }
 
     public async QueryContainerStatus(resourceReference: LightweightResourceReference)
@@ -148,6 +170,11 @@ export class ContainerAppServiceManager
     public async UpdateContainerConfig(resourceId: number, config: ContainerAppServiceConfig)
     {
         await this.instanceConfigController.UpdateOrInsertConfig(resourceId, config);
+
+        const dependencies = [config.vnetResourceId, ...config.secrets.map(x => x.keyVaultId)];
+        if(config.cert !== undefined)
+            dependencies.push(config.cert.keyVaultId);
+        await this.resourceDependenciesController.SetResourceDependencies(resourceId, dependencies);
     }
 
     public async UpdateContainerImage(resourceReference: LightweightResourceReference)
@@ -174,10 +201,11 @@ export class ContainerAppServiceManager
         return "opc-rdc-" + resourceReference.id;
     }
 
-    private HasConfigChanged(containerData: DockerContainerInfo, config: ContainerAppServiceConfig)
+    private async HasConfigChanged(containerData: DockerContainerInfo, config: ContainerAppServiceConfig)
     {
         const currentEnv = this.ParseEnv(containerData);
-        if(!this.ArrayEqualsAnyOrder(currentEnv.ToArray(), config.env, "varName"))
+        const desiredEnv = await this.ResolveEnv(config.env);
+        if(!this.ArrayEqualsAnyOrder(currentEnv.ToArray(), desiredEnv, "varName"))
             return true;
 
         return !(
@@ -193,6 +221,11 @@ export class ContainerAppServiceManager
             .Filter(x => x.varName !== "PATH");
     }
 
+    private async ResolveEnv(env: ContainerAppServiceEnvironmentVariableMapping[]): Promise<DockerEnvironmentVariableMapping[]>
+    {
+        return env;
+    }
+
     private async StartContainer(resourceReference: LightweightResourceReference)
     {
         const config = await this.QueryContainerConfig(resourceReference.id);
@@ -202,27 +235,68 @@ export class ContainerAppServiceManager
         if(containerData?.State.Running)
             throw new Error("Container is already running");
 
-        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.vnetResourceExternalId);
-        if(vnetRef === undefined)
-            throw new Error("VNET does not exist!");
-        const dockerNetwork = await this.vnetManager.EnsureDockerNetworkExists(vnetRef);
+        const vnetRef = await this.resourcesManager.CreateResourceReference(config.vnetResourceId);
+        const dockerNetwork = await this.vnetManager.EnsureDockerNetworkExists(vnetRef!);
+
+        const volumes: DockerContainerConfigVolume[] = [];
+        if(config.cert !== undefined)
+        {
+            const kvRef = await this.resourcesManager.CreateResourceReference(config.cert.keyVaultId);
+            const paths = await this.keyVaultManager.QueryCertificatePaths(kvRef!, config.cert.certificateName);
+
+            volumes.push(
+                {
+                    containerPath: config.cert.certificateMountPoint,
+                    hostPath: paths.certPath,
+                    readOnly: true,
+                },
+                {
+                    containerPath: config.cert.privateKeyMountPoint,
+                    hostPath: paths.keyPath,
+                    readOnly: true,
+                }
+            );
+        }
+        if(config.secrets.length > 0)
+        {
+            const resourcesDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+            const secretsDir = path.join(resourcesDir, "secrets");
+            await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, secretsDir);
+
+            //TODO: should use tmpfs instead just like docker swarm does
+            for (const secret of config.secrets)
+            {
+                const secretDir = path.join(secretsDir, secret.mountPointSecretName);
+
+                const kvRef = await this.resourcesManager.CreateResourceReference(secret.keyVaultId);
+                const secretValue = await this.keyVaultManager.ReadSecret(kvRef!, secret.keyVaultSecretName);
+
+                await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, secretDir, secretValue);
+            }
+
+            volumes.push({
+                containerPath: "/run/secrets",
+                hostPath: secretsDir,
+                readOnly: true
+            });
+        }
 
         const dockerConfig: DockerContainerConfig = {
             additionalHosts: [],
             capabilities: [],
             dnsSearchDomains: [],
             dnsServers: [dockerNetwork.primaryDNS_Server],
-            env: config.env,
+            env: await this.ResolveEnv(config.env),
             macAddress: this.dockerManager.CreateMAC_Address(resourceReference.id),
             imageName: config.imageName,
             networkName: dockerNetwork.name,
             portMap: [],
             removeOnExit: false,
             restartPolicy: "always",
-            volumes: [],
+            volumes,
         };
 
-        if((containerData !== undefined) && this.HasConfigChanged(containerData, config))
+        if((containerData !== undefined) && await this.HasConfigChanged(containerData, config))
         {
             await this.dockerManager.DeleteContainer(resourceReference.hostId, containerName);
             await this.dockerManager.CreateContainerInstance(resourceReference.hostId, containerName, dockerConfig);
