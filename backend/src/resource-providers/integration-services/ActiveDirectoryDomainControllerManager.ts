@@ -24,6 +24,7 @@ import { ManagedDockerContainerManager } from "../compute-services/ManagedDocker
 import { DockerContainerConfig } from "../compute-services/DockerManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
+import { DistroInfoService } from "../../services/DistroInfoService";
 
 export interface ADDC_Settings
 {
@@ -41,7 +42,8 @@ interface ADDC_Config
 @Injectable
 export class ActiveDirectoryDomainControllerManager
 {
-    constructor(private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController)
+    constructor(private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController,
+        private distroInfoService: DistroInfoService)
     {
     }
     
@@ -94,6 +96,9 @@ export class ActiveDirectoryDomainControllerManager
     {
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
+        const arch = await this.distroInfoService.FetchCPU_Architecture(resourceReference.hostId);
+        const imageName = (arch === "arm64") ? "ghcr.io/aczwink/samba-domain:latest" : "nowsci/samba-domain";
+
         const containerConfig: DockerContainerConfig = {
             additionalHosts: [
                 {
@@ -123,8 +128,7 @@ export class ActiveDirectoryDomainControllerManager
                 }
             ],
             hostName: config.settings.dcHostName,
-            imageName: "nowsci/samba-domain",
-            macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
+            imageName,
             networkName: "host",
             portMap: [],
             removeOnExit: false,

@@ -31,7 +31,7 @@ export interface OpenVPNGatewayProperties extends BaseResourceProperties
 
     /**
      * @title Key-Vault
-     * @format instance-same-host[security-services/key-vault]
+     * @format resource-same-host[security-services/key-vault]
      */
     keyVaultExternalId: string;
 }

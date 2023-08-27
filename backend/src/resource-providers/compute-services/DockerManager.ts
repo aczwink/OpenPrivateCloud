@@ -60,7 +60,10 @@ export interface DockerContainerConfig
     env: DockerEnvironmentVariableMapping[];
     hostName?: string;
     imageName: string;
-    macAddress: string;
+    /**
+     * Set to undefined if using host network
+     */
+    macAddress?: string;
     networkName: string;
     portMap: DockerContainerConfigPortMapping[];
     removeOnExit: boolean;
@@ -230,6 +233,7 @@ export class DockerManager
         const dnsServerArgs = config.dnsServers.map(x => "--dns=" + x);
         const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
         const hostNameArgs = (config.hostName === undefined) ? [] : ["-h", config.hostName];
+        const macAddressArgs = (config.macAddress === undefined) ? [] : ["--mac-address", config.macAddress];
         const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort + "/" + x.protocol.toLowerCase()].Values()).Flatten().ToArray();
         const removeOnExitArgs = (config.removeOnExit === false) ? [] : ["--rm"];
         const volArgs = config.volumes.Values().Map(x => ["-v", x.hostPath + ":" + x.containerPath + (x.readOnly ? ":ro" : "")].Values()).Flatten().ToArray();
@@ -245,7 +249,7 @@ export class DockerManager
             ...portArgs,
             ...removeOnExitArgs,
             ...volArgs,
-            "--mac-address", config.macAddress,
+            ...macAddressArgs,
             "--net", config.networkName,
             "--restart", config.restartPolicy,
         ];

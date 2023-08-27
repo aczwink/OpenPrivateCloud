@@ -112,7 +112,7 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
             case resourceProviders.networkServices.dnsServerResourceType.name:
                 return await this.dnsServerManager.QueryResourceState(resourceReference);
             case resourceProviders.networkServices.openVPNGatewayResourceType.name:
-                return "running";
+                return await this.openVPNGatwayManager.QueryResourceState(resourceReference);
             case resourceProviders.networkServices.virtualNetworkResourceType.name:
                 return await this.vnetManager.QueryResourceState(resourceReference);
         }

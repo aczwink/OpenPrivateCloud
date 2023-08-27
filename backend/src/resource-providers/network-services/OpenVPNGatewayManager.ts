@@ -31,7 +31,7 @@ import path from "path";
 import { Dictionary } from "acts-util-core";
 import { CIDRRange } from "../../common/CIDRRange";
 import { LightweightResourceReference } from "../../common/ResourceReference";
-import { DeploymentContext } from "../ResourceProvider";
+import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { ModulesManager } from "../../services/ModulesManager";
 import { SysCtlConfService } from "./SysCtlConfService";
 import { OpenVPNGatewayProperties } from "./properties";
@@ -217,6 +217,15 @@ ${taData}
         await this.AutoStartServer(context.hostId, context.resourceReference.id);
     }
 
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    {
+        const serviceName = this.DeriveSystemDServiceName(resourceReference.id);
+        const isActive = await this.systemServicesManager.IsServiceActive(resourceReference.hostId, serviceName);
+        if(!isActive)
+            return { state: "down", context: "service is not active" };
+        return "running";
+    }
+
     public async ReadConfig(instanceId: number): Promise<OpenVPNGatewayInternalConfig>
     {
         const config = await this.resourceConfigController.QueryConfig<OpenVPNGatewayInternalConfig>(instanceId);
@@ -356,8 +365,6 @@ ${taData}
     //Private methods
     private async AutoStartServer(hostId: number, resourceId: number)
     {
-        const config = await this.ReadServerConfig(hostId, resourceId);
-
         const serviceName = this.DeriveSystemDServiceName(resourceId);
 
         await this.systemServicesManager.EnableService(hostId, serviceName);
