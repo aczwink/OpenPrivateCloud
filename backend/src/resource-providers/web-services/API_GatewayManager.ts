@@ -215,6 +215,7 @@ server {
             imageName: "nginx:latest",
             networkName: dockerNetwork.name,
             portMap: [],
+            privileged: false,
             removeOnExit: false,
             restartPolicy: "always",
             volumes: [

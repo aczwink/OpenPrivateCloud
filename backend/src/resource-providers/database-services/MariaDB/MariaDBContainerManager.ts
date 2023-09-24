@@ -112,6 +112,7 @@ export class MariaDBContainerManager implements MariaDBInterface
             macAddress: "TODO",
             networkName: "TODO",
             portMap: [],
+            privileged: false,
             removeOnExit: false,
             restartPolicy: "always",
             volumes: [],

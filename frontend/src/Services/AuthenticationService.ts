@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,13 +20,13 @@ import { Injectable, Router } from "acfrontend";
 import { Duration, Property } from "acts-util-core";
 import { APIService } from "./APIService";
 import { APIServiceInterceptor } from "./APIServiceInterceptor";
+import { PublicUserData } from "../../dist/api";
 
 interface LoginInfo
 {
-    emailAddress: string;
     expiryDateTime: Date;
-    sudo: boolean;
     token: string;
+    user: PublicUserData;
 }
 
 @Injectable
@@ -66,13 +66,14 @@ export class AuthenticationService
         if(response.statusCode === 200)
         {
             const result = response.data;
-            
+
             this.apiService.token = result.token;
+
+            const userResponse = await this.apiService.user.get();
             this._loginInfo.Set({
                 expiryDateTime: result.expiryDateTime,
-                sudo: false,
                 token: result.token,
-                emailAddress
+                user: userResponse.data
             });
 
             this.autoLogOutTimerId = setTimeout(this.Logout.bind(this), this.GetRemainingLoginTime().milliseconds);

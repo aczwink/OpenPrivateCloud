@@ -151,8 +151,9 @@ export class HostUsersManager
         const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
         if(!exists)
         {
-            const privateData = await this.usersController.QueryPrivateData(userId);
-            await this.AddSambaUser(hostId, this.MapUserToLinuxUserName(userId), privateData!.sambaPW);
+            throw new Error("TODO redesign this: create a locked user and create a sync job. When the user logs in, sync the pw and unlock")
+            /*const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
+            await this.AddSambaUser(hostId, this.MapUserToLinuxUserName(userId), sambaPW!);*/
         }
     }
     

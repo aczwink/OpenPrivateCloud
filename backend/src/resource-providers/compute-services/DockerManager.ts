@@ -23,7 +23,7 @@ import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { Dictionary } from "acts-util-core";
 
 
-type DockerCapability = "SYS_ADMIN";
+type DockerCapability = "NET_ADMIN" | "SYS_ADMIN" | "SYS_NICE" | "SYS_TIME";
 
 export interface DockerContainerConfigPortMapping
 {
@@ -66,6 +66,7 @@ export interface DockerContainerConfig
     macAddress?: string;
     networkName: string;
     portMap: DockerContainerConfigPortMapping[];
+    privileged: boolean;
     removeOnExit: boolean;
     restartPolicy: "always" | "no";
     volumes: DockerContainerConfigVolume[];
@@ -235,6 +236,7 @@ export class DockerManager
         const hostNameArgs = (config.hostName === undefined) ? [] : ["-h", config.hostName];
         const macAddressArgs = (config.macAddress === undefined) ? [] : ["--mac-address", config.macAddress];
         const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort + "/" + x.protocol.toLowerCase()].Values()).Flatten().ToArray();
+        const privilegedArgs = config.privileged ? ["--privileged"] : [];
         const removeOnExitArgs = (config.removeOnExit === false) ? [] : ["--rm"];
         const volArgs = config.volumes.Values().Map(x => ["-v", x.hostPath + ":" + x.containerPath + (x.readOnly ? ":ro" : "")].Values()).Flatten().ToArray();
 
@@ -247,6 +249,7 @@ export class DockerManager
             ...envArgs,
             ...hostNameArgs,
             ...portArgs,
+            ...privilegedArgs,
             ...removeOnExitArgs,
             ...volArgs,
             ...macAddressArgs,

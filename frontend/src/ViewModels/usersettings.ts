@@ -28,12 +28,12 @@ const userSettingsViewModel: MultiPageViewModel<{}> = {
             displayName: "",
             entries: [
                 {
-                    key: "secret",
+                    key: "wallet",
                     child: {
                         type: "component",
                         component: UserSecretComponent,
                     },
-                    displayName: "Secret"
+                    displayName: "Wallet"
                 },
                 {
                     key: "pw",

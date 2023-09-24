@@ -23,8 +23,10 @@ import { SSHConnection } from "./SSHService";
 
 interface FirewallDebugConditions
 {
-    protocol: "TCP" | "UDP" | "ICMP";
+    protocol: "Any" | "TCP" | "UDP" | "ICMP";
+    destinationAddressRange?: string;
     destinationPort?: number;
+    sourceAddressRange?: string;
 }
 
 export interface FirewallDebugSettings
@@ -190,6 +192,24 @@ export class HostFirewallTracingManager
         }
     }
 
+    private ParseBracketedVerdict(data: string[])
+    {
+        let verdict = data[data.length - 1].TrimRight(")");
+        data.Remove(data.length - 1);
+
+        if(data[data.length - 1] === "jump")
+        {
+            verdict = "jump " + verdict;
+            data.Remove(data.length - 1);
+        }
+
+        if(data[data.length - 1] !== "(verdict")
+            throw new Error("Syntax error: '" + data.join(" ") + "'");
+        data.Remove(data.length - 1);
+
+        return verdict;
+    }
+
     private ParseEntryMetdata(line: string): PacketCaptureInfo
     {
         const parts = line.split(" ");
@@ -214,8 +234,11 @@ export class HostFirewallTracingManager
             case "verdict":
                 data = { type: "Verdict", info: [], verdict: typeData[0] };
                 break;
+            case "unknown":
+                data = this.ParseUnknownRuleMetadata(typeData);
+                break;
             default:
-                throw new Error("Unknown type: " + entryType);
+                throw new Error("Unknown type: " + entryType + " -> " + line);
         }
 
         return {
@@ -240,23 +263,20 @@ export class HostFirewallTracingManager
 
     private ParseRuleMetadata(data: string[])
     {
-        let verdict = data[data.length - 1].TrimRight(")");
-        data.Remove(data.length - 1);
-
-        if(data[data.length - 1] === "jump")
-        {
-            verdict = "jump " + verdict;
-            data.Remove(data.length - 1);
-        }
-
-        if(data[data.length - 1] !== "(verdict")
-            throw new Error("Syntax error: '" + data.join(" ") + "'");
-        data.Remove(data.length - 1);
-
         return {
             type: "Match rule",
             info: data,
-            verdict: verdict
+            verdict: this.ParseBracketedVerdict(data)
         };
+    }
+
+    private ParseUnknownRuleMetadata(data: string[])
+    {
+
+        return {
+            type: "Unknown rule",
+            info: data,
+            verdict: this.ParseBracketedVerdict(data)
+        }
     }
 }

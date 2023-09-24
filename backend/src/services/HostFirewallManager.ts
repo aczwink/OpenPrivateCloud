@@ -306,16 +306,21 @@ export class HostFirewallManager
             return [];
 
         const conds = this.hostFirewallTracingManager.GetTracingConditions(hostId)!;
-        const rule: FlatFirewallRule = {
+        const rule: FirewallRule = {
             action: "Allow",
-            protocol: conds.protocol,
-            portRange: (conds.destinationPort === undefined) ? undefined : { from: conds.destinationPort, to: conds.destinationPort },
-        };
-        const nftRule = this.ConvertToNetFilterRule(rule);
+            comment: "",
+            priority: 1,
 
-        return [
-            {
-                conditions: nftRule.conditions,
+            destination: (conds.destinationAddressRange === undefined) ? "Any" : conds.destinationAddressRange,
+            destinationPortRanges: (conds.destinationPort === undefined) ? "Any" : conds.destinationPort.toString(),
+            protocol: conds.protocol,
+            source: (conds.sourceAddressRange === undefined) ? "Any" : conds.sourceAddressRange
+        };
+        const flatRules = this.FlattenFirewallRule(rule);
+        const nftRules = flatRules.map(r => this.ConvertToNetFilterRule(r));
+
+        return nftRules.map(rule => ({
+            conditions: rule.conditions,
                 policy: {
                     type: "mangle",
                     key: {
@@ -325,8 +330,7 @@ export class HostFirewallManager
                     },
                     value: 1
                 }
-            }
-        ];
+        }));
     }
 
     private ConvertToNetFilterRule(rule: FlatFirewallRule): NetfilterRuleCreationData

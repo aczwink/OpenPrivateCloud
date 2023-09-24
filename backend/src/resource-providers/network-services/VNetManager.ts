@@ -34,11 +34,7 @@ import { DistroInfoService } from "../../services/DistroInfoService";
 
 interface VNetSettings
 {
-    /**
-     * CIDR-range
-     */
     addressSpace: string;
-
     enableDHCPv4: boolean;
 }
 
@@ -276,6 +272,15 @@ export class VNetManager implements FirewallZoneDataProvider
         await this.hostFirewallManager.ApplyRuleSet(resourceReference.hostId);
     }
 
+    public SubdivideAddressSpace(addressSpace: CIDRRange)
+    {
+        return {
+            gatewayIP: addressSpace.netAddress.Next(), //first address after the netaddress is the gateway IP
+            firstDHCP_Address: addressSpace.netAddress.Next().Next(),
+            lastDHCP_Address: addressSpace.brodcastAddress.Prev(),
+        }
+    }
+
     //Private methods
     private async CreateBridge(resourceReference: LightweightResourceReference)
     {
@@ -308,15 +313,6 @@ export class VNetManager implements FirewallZoneDataProvider
         const dockerNetName = this.DeriveDockerNetworkName(resourceReference);
         const result = await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["sudo", "docker", "network", "inspect", dockerNetName], resourceReference.hostId);
         return result === 0;
-    }
-
-    private SubdivideAddressSpace(addressSpace: CIDRRange)
-    {
-        return {
-            gatewayIP: addressSpace.netAddress.Next(), //first address after the netaddress is the gateway IP
-            firstDHCP_Address: addressSpace.netAddress.Next().Next(),
-            lastDHCP_Address: addressSpace.brodcastAddress.Prev(),
-        }
     }
 
     private async StartDNS_DHCP_Server(resourceReference: LightweightResourceReference)

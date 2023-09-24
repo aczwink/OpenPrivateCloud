@@ -91,6 +91,7 @@ export class StaticWebsitesManager
             macAddress: this.managedDockerContainerManager.CreateMAC_Address(context.resourceReference.id),
             networkName: dockerNetwork.name,
             portMap: [],
+            privileged: false,
             removeOnExit: false,
             restartPolicy: "always",
             volumes: [

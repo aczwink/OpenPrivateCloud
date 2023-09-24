@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,11 +20,12 @@ import { APIController, BodyProp, Get, Header, Post, Unauthorized } from "acts-u
 import { UsersController } from "../data-access/UsersController";
 import { SessionsManager } from "../services/SessionsManager";
 import { UsersManager } from "../services/UsersManager";
+import { UserWalletManager } from "../services/UserWalletManager";
 
 @APIController("user")
 class UserAPIController
 {
-    constructor(private sessionsManager: SessionsManager, private usersController: UsersController, private usersManager: UsersManager)
+    constructor(private sessionsManager: SessionsManager, private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager)
     {
     }
     
@@ -44,14 +45,24 @@ class UserAPIController
             return Unauthorized("wrong password");
     }
 
+    @Get()
+    public async QueryUser(
+        @Header Authorization: string
+    )
+    {
+        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+        const user = await this.usersController.QueryUser(userId);
+        return user!;
+    }
+
     @Get("secret")
     public async QuerySecret(
         @Header Authorization: string
     )
     {
         const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        const privData = await this.usersController.QueryPrivateData(userId);
-        return privData!.sambaPW;
+        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
+        return sambaPW;
     }
 
     @Post("secret")

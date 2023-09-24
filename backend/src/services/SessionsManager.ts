@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../data-access/UsersController";
 import { UsersManager } from "./UsersManager";
+import { UserWalletManager } from "./UserWalletManager";
 
 interface Session
 {
@@ -32,7 +33,7 @@ interface Session
 @Injectable
 export class SessionsManager
 {
-    constructor(private usersController: UsersController, private usersManager: UsersManager)
+    constructor(private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager)
     {
         this.sessions = {};
     }
@@ -52,7 +53,12 @@ export class SessionsManager
 
     public async LogOut(token: string)
     {
+        const session = this.GetSession(token);
+
         delete this.sessions[token];
+
+        if(session !== undefined)
+            this.userWalletManager.Lock(session.userId);
     }
 
     public async TryCreateSession(emailAddress: string, password: string)
@@ -69,6 +75,7 @@ export class SessionsManager
                 expiryDateTime: this.CreateExpiryTime(),
                 userId: userId,
             };
+            await this.userWalletManager.Unlock(userId, password);
             this.SetAutoLogOutTimer(token, session);
             return { expiryDateTime: session.expiryDateTime, token };
         }

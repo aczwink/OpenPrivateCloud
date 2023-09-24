@@ -67,6 +67,7 @@ export class BindContainerManager
                     protocol: "UDP"
                 },
             ],
+            privileged: false,
             removeOnExit: false,
             restartPolicy: "always",
             volumes: [

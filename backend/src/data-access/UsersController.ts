@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,12 +23,14 @@ interface PrivateUserData
 {
     pwHash: string;
     pwSalt: string;
-    sambaPW: string;
+    privateKey: string;
+    publicKey: string;
 }
 
 interface PublicUserData
 {
     id: number;
+    firstName: string;
     emailAddress: string;
 }
 
@@ -49,7 +51,7 @@ export class UsersController
     public async QueryMembersOfGroup(userGroupId: number)
     {
         let query = `
-        SELECT u.id, u.emailAddress
+        SELECT u.id, u.firstName, u.emailAddress
         FROM users u
         INNER JOIN usergroups_members ugm
             ON u.id = ugm.userId
@@ -65,7 +67,7 @@ export class UsersController
     public async QueryPrivateData(id: number)
     {
         let query = `
-        SELECT pwHash, pwSalt, sambaPW
+        SELECT pwHash, pwSalt, privateKey, publicKey
         FROM users
         WHERE id = ?
         `;
@@ -94,7 +96,7 @@ export class UsersController
     public async QueryUser(userId: number)
     {
         let query = `
-        SELECT id, emailAddress
+        SELECT id, firstName, emailAddress
         FROM users
         WHERE id = ?
         `;
@@ -108,7 +110,7 @@ export class UsersController
     public async QueryUsers()
     {
         let query = `
-        SELECT id, emailAddress
+        SELECT id, firstName, emailAddress
         FROM users
         `;
 
@@ -124,9 +126,9 @@ export class UsersController
         await conn.UpdateRows("users", { sambaPW: newPassword }, "id = ?", userId);
     }
 
-    public async UpdateUserPassword(userId: number, pwSalt: string, pwHash: string)
+    public async UpdateUserPassword(userId: number, pwSalt: string, pwHash: string, privateKey: string, publicKey: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.UpdateRows("users", { pwHash, pwSalt }, "id = ?", userId);
+        await conn.UpdateRows("users", { pwHash, pwSalt, privateKey, publicKey }, "id = ?", userId);
     }
 }

@@ -38,6 +38,12 @@ export interface ActiveDirectoryDomainControllerProperties extends BaseResourceP
      * Static IP of the domain controller.
      */
     ipAddress: string;
+
+    /**
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vnetResourceId: string;
 }
 
 export type IntegrationServicesProperties = ActiveDirectoryDomainControllerProperties;

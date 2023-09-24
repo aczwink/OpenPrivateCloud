@@ -26,18 +26,17 @@ import { MySQLClient } from "../database-services/MySQLClient";
 import { DeploymentContext } from "../ResourceProvider";
 import { ApacheManager } from "./ApacheManager";
 import { UsersController } from "../../data-access/UsersController";
-import { VirtualHost } from "./VirtualHost";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { NextcloudProperties } from "./Properties";
-import { LetsEncryptManager } from "./LetsEncryptManager";
 import { LightweightResourceReference } from "../../common/ResourceReference";
+import { UserWalletManager } from "../../services/UserWalletManager";
  
 @Injectable
 export class NextcloudManager
 {
     constructor(private resourcesManager: ResourcesManager, private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager,
-        private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager,
-        private usersController: UsersController, private remoteCommandExecutor: RemoteCommandExecutor, private letsEncryptManager: LetsEncryptManager)
+        private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager, private userWalletManager: UserWalletManager,
+        private usersController: UsersController, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
 
@@ -165,7 +164,7 @@ export class NextcloudManager
         const appDir = path.join(instanceDir, "nextcloud");
         const dataDir = path.join(instanceDir, "data");
         const user = await this.usersController.QueryUser(userId);
-        const priv = await this.usersController.QueryPrivateData(userId);
+        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
 
         const cmd = [
             "sudo", "-u", "www-data", "php", "occ", "maintenance:install",
@@ -175,7 +174,7 @@ export class NextcloudManager
             "--database-user", '"' + dbUser + '"',
             "--database-pass", '"' + dbPw + '"',
             "--admin-user", '"' + user!.emailAddress + '"',
-            "--admin-pass", '"' + priv!.sambaPW + '"',
+            "--admin-pass", '"' + sambaPW + '"',
         ];
 
         await this.remoteCommandExecutor.ExecuteCommand(cmd, hostId, { workingDirectory: appDir });

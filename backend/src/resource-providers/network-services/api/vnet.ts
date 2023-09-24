@@ -17,12 +17,29 @@
  * */
 
 import { c_networkServicesResourceProviderName, c_virtualNetworkResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { APIController, Body, BodyProp, Common, Delete, Get, Path, Put } from "acts-util-apilib";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { ResourceReference } from "../../common/ResourceReference";
-import { VNetManager } from "./VNetManager";
-import { FirewallRule } from "../../services/HostFirewallZonesManager";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { ResourceReference } from "../../../common/ResourceReference";
+import { VNetManager } from "../VNetManager";
+import { FirewallRule } from "../../../services/HostFirewallZonesManager";
+import { CIDRRange } from "../../../common/CIDRRange";
+
+interface VNetInfoDTO
+{
+    /**
+     * CIDR-range
+     */
+    addressSpace: string;
+    isDHCPv4Enabled: boolean;
+
+    netAddress: string;
+    gatewayIPAddress: string;
+    firstUseableIPAddress: string;
+    lastUseableIPAddress: string;
+    broadcastAddress: string;
+    useableIPAddressesCount: number;
+}
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_networkServicesResourceProviderName}/${c_virtualNetworkResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
@@ -41,13 +58,27 @@ class _api_ extends ResourceAPIControllerBase
         return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
-    @Get("settings")
-    public async QuerySettings(
+    @Get("info")
+    public async QueryInfo(
         @Common resourceReference: ResourceReference,
     )
     {
         const config = await this.vnetManager.QueryConfig(resourceReference);
-        return config.settings;
+        const settings = config.settings;
+
+        const range = new CIDRRange(settings.addressSpace);
+        const space = this.vnetManager.SubdivideAddressSpace(range);
+        const result: VNetInfoDTO = {
+            addressSpace: settings.addressSpace,
+            isDHCPv4Enabled: settings.enableDHCPv4,
+            netAddress: range.netAddress.ToString(),
+            gatewayIPAddress: space.gatewayIP.ToString(),
+            broadcastAddress: range.brodcastAddress.ToString(),
+            firstUseableIPAddress: space.firstDHCP_Address.ToString(),
+            lastUseableIPAddress: space.lastDHCP_Address.ToString(),
+            useableIPAddressesCount: (space.lastDHCP_Address.intValue - space.firstDHCP_Address.intValue) + 1
+        };
+        return result;
     }
 
     @Get("firewall/{direction}")

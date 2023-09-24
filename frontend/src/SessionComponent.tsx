@@ -36,6 +36,7 @@ export class SessionComponent extends Component
         const left = this.authService.GetRemainingLoginTime();
 
         return <div className="d-flex align-items-center">
+            Welcome, {li.user.firstName}!
             <Anchor route="/usersettings"><MatIcon>account_circle</MatIcon></Anchor>
             <button className="ms-2 btn btn-danger btn-sm" type="button" onclick={this.OnLogOut.bind(this)}>Sign out ({left.ToStringWithSecondPrecision()})</button>
         </div>;

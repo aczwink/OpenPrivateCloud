@@ -291,6 +291,7 @@ export class LetsEncryptManager
             macAddress: this.dockerManager.CreateMAC_Address(resourceReference.id),
             networkName: dockerNetwork.name,
             portMap: [],
+            privileged: false,
             removeOnExit: true,
             restartPolicy: "no",
             volumes: [

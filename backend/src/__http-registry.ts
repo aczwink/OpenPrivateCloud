@@ -29,7 +29,7 @@ import "./api/RolesAPIController";
 import "./api/RoleAssignmentsAPIController";
 import "./api/SessionsAPIController";
 import "./api/UserGroupsAPIController";
-import "./api/UserAPIController";
+import "./api/user";
 import "./api/UsersAPIController";
 
 import "./resource-providers/backup-services/api/backup-vault";
@@ -41,7 +41,7 @@ import "./resource-providers/integration-services/api/ad-dc";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
 import "./resource-providers/network-services/api/dns-server";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";
-import "./resource-providers/network-services/VNetAPI_Controller";
+import "./resource-providers/network-services/api/vnet";
 import "./resource-providers/security-services/apis/key-vault";
 import "./resource-providers/web-services/apis/API_Gateway";
 import "./resource-providers/web-services/JdownloaderAPIController";

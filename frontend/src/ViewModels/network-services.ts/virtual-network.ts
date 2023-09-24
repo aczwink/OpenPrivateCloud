@@ -19,7 +19,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 import { ListViewModel } from "../../UI/ListViewModel";
-import { FirewallRule, VNetSettings } from "../../../dist/api";
+import { FirewallRule, VNetInfoDTO } from "../../../dist/api";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -28,12 +28,12 @@ function BuildResourceId(resourceGroupName: string, resourceName: string)
     return "/" + resourceGroupName + "/" + resourceProviders.networkServices.name + "/" + resourceProviders.networkServices.virtualNetworkResourceType.name + "/" + resourceName;
 }
 
-const settingsViewModel: ObjectViewModel<VNetSettings, ResourceAndGroupId> = {
+const settingsViewModel: ObjectViewModel<VNetInfoDTO, ResourceAndGroupId> = {
     type: "object",
     actions: [],
     formTitle: _ => "Settings",
-    requestObject: (service, ids) => service.resourceProviders._any_.networkservices.virtualnetwork._any_.settings.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "VNetSettings"
+    requestObject: (service, ids) => service.resourceProviders._any_.networkservices.virtualnetwork._any_.info.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "VNetInfoDTO"
 };
 
 function BuildFirewallViewModel(direction: "Inbound" | "Outbound")

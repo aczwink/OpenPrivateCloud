@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,12 +19,13 @@ import crypto from "crypto";
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../data-access/UsersController";
 import { HostUsersManager } from "./HostUsersManager";
+import { UserWalletManager } from "./UserWalletManager";
 
  
 @Injectable
 export class UsersManager
 {
-    constructor(private usersController: UsersController, private hostUsersManager: HostUsersManager)
+    constructor(private usersController: UsersController, private hostUsersManager: HostUsersManager, private userWalletManager: UserWalletManager)
     {
     }
     
@@ -54,14 +55,39 @@ export class UsersManager
         await this.hostUsersManager.UpdateSambaPasswordOnAllHosts(userId, newPw);
     }
 
-    public async SetUserPassword(userId: number, password: string)
+    public async SetUserPassword(userId: number, newPassword: string)
     {
+        if(!this.userWalletManager.IsUnlocked(userId))
+            throw new Error("Can't change password when user is not logged in");
+
+        const keyPair = this.CreateKeyPair(newPassword);
+
         const pwSalt = this.CreateSalt();
-        const pwHash = this.HashPassword(password, pwSalt);
-        await this.usersController.UpdateUserPassword(userId, pwSalt, pwHash);
+        const pwHash = this.HashPassword(newPassword, pwSalt);
+
+        await this.usersController.UpdateUserPassword(userId, pwSalt, pwHash, keyPair.privateKey, keyPair.publicKey);
+
+        await this.userWalletManager.PrivateKeyChanged(userId, newPassword);
     }
 
     //Private methods
+    private CreateKeyPair(password: string)
+    {
+        return crypto.generateKeyPairSync("rsa", {
+            modulusLength: 4096,
+            publicKeyEncoding: {
+                type: "spki",
+                format: "pem"
+            },
+            privateKeyEncoding: {
+                type: "pkcs8",
+                format: "pem",
+                cipher: "aes-256-cbc",
+                passphrase: password
+            }
+        });
+    }
+
     private CreateSalt()
     {
         return crypto.randomBytes(16).toString("hex");

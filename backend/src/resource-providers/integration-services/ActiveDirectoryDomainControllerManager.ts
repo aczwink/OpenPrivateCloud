@@ -25,6 +25,7 @@ import { DockerContainerConfig } from "../compute-services/DockerManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { DistroInfoService } from "../../services/DistroInfoService";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 
 export interface ADDC_Settings
 {
@@ -36,6 +37,7 @@ export interface ADDC_Settings
 
 interface ADDC_Config
 {
+    vNetId: number;
     settings: ADDC_Settings;
 }
 
@@ -43,7 +45,7 @@ interface ADDC_Config
 export class ActiveDirectoryDomainControllerManager
 {
     constructor(private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController,
-        private distroInfoService: DistroInfoService)
+        private distroInfoService: DistroInfoService, private resourceDependenciesController: ResourceDependenciesController)
     {
     }
     
@@ -57,14 +59,18 @@ export class ActiveDirectoryDomainControllerManager
 
     public async ProvideResource(instanceProperties: ActiveDirectoryDomainControllerProperties, context: DeploymentContext)
     {
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.vnetResourceId);
+
         await this.UpdateConfig(context.resourceReference.id, {
             settings: {
                 domain: instanceProperties.domain.toLowerCase(),
                 dcHostName: instanceProperties.dcHostName,
                 dcIP_Address: instanceProperties.ipAddress,
                 dnsForwarderIP: instanceProperties.dnsForwarderIP
-            }
+            },
+            vNetId: vnetRef!.id
         });
+        await this.resourceDependenciesController.SetResourceDependencies(context.resourceReference.id, [vnetRef!.id]);
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
         
         this.UpdateServer(context.resourceReference);
@@ -99,6 +105,8 @@ export class ActiveDirectoryDomainControllerManager
         const arch = await this.distroInfoService.FetchCPU_Architecture(resourceReference.hostId);
         const imageName = (arch === "arm64") ? "ghcr.io/aczwink/samba-domain:latest" : "nowsci/samba-domain";
 
+        const vNetRef = await this.resourcesManager.CreateResourceReference(config.vNetId);
+        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);
         const containerConfig: DockerContainerConfig = {
             additionalHosts: [
                 {
@@ -106,7 +114,7 @@ export class ActiveDirectoryDomainControllerManager
                     ipAddress: config.settings.dcIP_Address
                 }
             ],
-            capabilities: ["SYS_ADMIN"],
+            capabilities: ["NET_ADMIN", "SYS_NICE", "SYS_TIME"],
             dnsSearchDomains: [config.settings.domain],
             dnsServers: [config.settings.dcIP_Address, config.settings.dnsForwarderIP],
             env: [
@@ -119,6 +127,14 @@ export class ActiveDirectoryDomainControllerManager
                     value: config.settings.domain.toUpperCase()
                 },
                 {
+                    varName: "DOMAIN_DC",
+                    value: config.settings.domain.split(".").map(x => "dc=" + x).join(",")
+                },
+                {
+                    varName: "DOMAIN_EMAIL",
+                    value: config.settings.domain,
+                },
+                {
                     varName: "DOMAINPASS",
                     value: "AdminPW1234!"
                 },
@@ -129,8 +145,10 @@ export class ActiveDirectoryDomainControllerManager
             ],
             hostName: config.settings.dcHostName,
             imageName,
-            networkName: "host",
+            macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
+            networkName: dockerNetwork.name,
             portMap: [],
+            privileged: true,
             removeOnExit: false,
             restartPolicy: "always",
             volumes: [
