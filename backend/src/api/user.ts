@@ -61,8 +61,8 @@ class UserAPIController
     )
     {
         const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
-        return sambaPW;
+        const sambaPW = await this.usersManager.QuerySambaPassword(userId);
+        return sambaPW ?? "";
     }
 
     @Post("secret")

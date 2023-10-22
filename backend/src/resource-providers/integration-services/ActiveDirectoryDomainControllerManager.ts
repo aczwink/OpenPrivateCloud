@@ -25,7 +25,8 @@ import { DockerContainerConfig } from "../compute-services/DockerManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { DistroInfoService } from "../../services/DistroInfoService";
-import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
+import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInterfaceCardsManager";
 
 export interface ADDC_Settings
 {
@@ -37,7 +38,6 @@ export interface ADDC_Settings
 
 interface ADDC_Config
 {
-    vNetId: number;
     settings: ADDC_Settings;
 }
 
@@ -45,7 +45,7 @@ interface ADDC_Config
 export class ActiveDirectoryDomainControllerManager
 {
     constructor(private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController,
-        private distroInfoService: DistroInfoService, private resourceDependenciesController: ResourceDependenciesController)
+        private distroInfoService: DistroInfoService, private remoteCommandExecutor: RemoteCommandExecutor, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager)
     {
     }
     
@@ -53,14 +53,13 @@ export class ActiveDirectoryDomainControllerManager
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         await this.managedDockerContainerManager.DestroyContainer(resourceReference);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "rm", this.DeriveDockerNetworkName(resourceReference)], resourceReference.hostId);
 
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
     public async ProvideResource(instanceProperties: ActiveDirectoryDomainControllerProperties, context: DeploymentContext)
     {
-        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.vnetResourceId);
-
         await this.UpdateConfig(context.resourceReference.id, {
             settings: {
                 domain: instanceProperties.domain.toLowerCase(),
@@ -68,11 +67,10 @@ export class ActiveDirectoryDomainControllerManager
                 dcIP_Address: instanceProperties.ipAddress,
                 dnsForwarderIP: instanceProperties.dnsForwarderIP
             },
-            vNetId: vnetRef!.id
         });
-        await this.resourceDependenciesController.SetResourceDependencies(context.resourceReference.id, [vnetRef!.id]);
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
-        
+
+        await this.CreateDockerNetwork(context.resourceReference);
         this.UpdateServer(context.resourceReference);
     }
 
@@ -92,6 +90,24 @@ export class ActiveDirectoryDomainControllerManager
     }
 
     //Private methods
+    private async CreateDockerNetwork(resourceReference: LightweightResourceReference)
+    {
+        //Unfortunately docker ipvlan networks are by design implemented in such a way, that the host and the container can't communicate. I.e. the container can communicate with the whole network and vice versa except the host itself.
+        //see: https://superuser.com/questions/1736221/why-cant-i-ping-a-docker-container-from-the-host-when-using-ipvlan-in-l3-mode
+        //if this ever becomes a limitation, apparently a new docker network plugin will be necessary :S
+
+        const netInterface = await this.hostNetworkInterfaceCardsManager.FindExternalNetworkInterface(resourceReference.hostId);
+        const subnet = await this.hostNetworkInterfaceCardsManager.FindInterfaceSubnet(resourceReference.hostId, netInterface);
+        const gateway = await this.hostNetworkInterfaceCardsManager.FindDefaultGateway(resourceReference.hostId);
+        const networkName = this.DeriveDockerNetworkName(resourceReference);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "create", "-d", "ipvlan", "--subnet", subnet.ToString(), "--gateway", gateway, "-o", "ipvlan_mode=l2", "-o", "parent=" + netInterface, networkName], resourceReference.hostId);
+    }
+
+    private DeriveDockerNetworkName(resourceReference: LightweightResourceReference)
+    {
+        return "opc-rdsipnet" + resourceReference.id;
+    }
+
     private async ReadConfig(resourceId: number): Promise<ADDC_Config>
     {
         const config = await this.resourceConfigController.QueryConfig<ADDC_Config>(resourceId);
@@ -105,8 +121,7 @@ export class ActiveDirectoryDomainControllerManager
         const arch = await this.distroInfoService.FetchCPU_Architecture(resourceReference.hostId);
         const imageName = (arch === "arm64") ? "ghcr.io/aczwink/samba-domain:latest" : "nowsci/samba-domain";
 
-        const vNetRef = await this.resourcesManager.CreateResourceReference(config.vNetId);
-        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);
+        const dockerNetworkName = this.DeriveDockerNetworkName(resourceReference);
         const containerConfig: DockerContainerConfig = {
             additionalHosts: [
                 {
@@ -145,8 +160,8 @@ export class ActiveDirectoryDomainControllerManager
             ],
             hostName: config.settings.dcHostName,
             imageName,
-            macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
-            networkName: dockerNetwork.name,
+            ipAddress: config.settings.dcIP_Address,
+            networkName: dockerNetworkName,
             portMap: [],
             privileged: true,
             removeOnExit: false,

@@ -70,7 +70,7 @@ export class CIDRRange
             return mask;
         }
 
-        return [this._length, this._length - 8, this._length - 16, this._length - 24].map(GenerateSubnetMaskPart).join(".");
+        return new IPv4([this._length, this._length - 8, this._length - 16, this._length - 24].map(GenerateSubnetMaskPart).join("."));
     }
 
     public Includes(address: IPv4)

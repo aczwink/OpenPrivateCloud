@@ -54,7 +54,7 @@ export class RootComponent extends Component
                 <NavItem route="/resourceGroups"><BootstrapIcon>collection-fill</BootstrapIcon> Resource groups</NavItem>
                 <NavItem route="/hosts"><BootstrapIcon>pc</BootstrapIcon> Hosts</NavItem>
                 <NavItem route="/usersandgroups"><BootstrapIcon>people-fill</BootstrapIcon> IAM</NavItem>
-                <NavItem route="/settings"><BootstrapIcon>gear-fill</BootstrapIcon> Settings</NavItem>
+                <NavItem route="/cluster"><BootstrapIcon>gear-fill</BootstrapIcon> Cluster settings</NavItem>
             </ul>
             <SessionComponent />
         </Navigation>;

@@ -17,7 +17,8 @@
  * */
 
 import { MailerSettings } from "../../dist/api";
-import { MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
+import { ComponentViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
+import { ClusterKeyStoreComponent } from "../Views/cluster/ClusterKeyStoreComponent";
 
 const notificationSettingsViewModel: ObjectViewModel<MailerSettings, {}> = {
     type: "object",
@@ -34,7 +35,12 @@ const notificationSettingsViewModel: ObjectViewModel<MailerSettings, {}> = {
     schemaName: "MailerSettings"
 };
 
-const settingsViewModel: MultiPageViewModel<{}> = {
+const keyStoreViewModel: ComponentViewModel = {
+    type: "component",
+    component: ClusterKeyStoreComponent
+};
+
+const clusterViewModel: MultiPageViewModel<{}> = {
     type: "multiPage",
     actions: [],
     entries: [
@@ -49,19 +55,24 @@ const settingsViewModel: MultiPageViewModel<{}> = {
                         name: "notifications",
                         type: "material"
                     }
+                },
+                {
+                    key: "keystore",
+                    child: keyStoreViewModel,
+                    displayName: "Key store",
                 }
             ]
         }
     ],
-    formTitle: _ => "Settings",
+    formTitle: _ => "Cluster settings",
 };
 
 const root: RoutingViewModel = {
     type: "routing",
     entries: [
         {
-            key: "settings",
-            viewModel: settingsViewModel,
+            key: "cluster",
+            viewModel: clusterViewModel,
         }
     ]
 }

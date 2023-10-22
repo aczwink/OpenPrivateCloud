@@ -18,8 +18,8 @@
 import ssh2 from "ssh2";
 import { Property } from "acts-util-core";
 import { GlobalInjector } from "acts-util-node";
-import { HostsController } from "../data-access/HostsController";
 import { ShellWrapper } from "./ShellWrapper";
+import { HostsManager } from "../services/HostsManager";
 
 const colorCodeRegEx = new RegExp("\x1B\[[0-9;?]*[a-zA-Z]");
 const bashPrompt = new RegExp("[a-z\-]+@[a-z\-]+:~\\$ $");
@@ -68,8 +68,8 @@ export class SSHShellWrapper implements ShellWrapper
             await new Promise( resolve => {
                 setTimeout(resolve, 300);
             }); //wait for sudo prompt
-            const hc = GlobalInjector.Resolve(HostsController);
-            const creds = await hc.RequestHostCredentials(this.hostId);
+            const hm = GlobalInjector.Resolve(HostsManager);
+            const creds = await hm.QueryHostCredentials(this.hostId);
             this.channel.write(creds!.password + "\n");
         }
     }

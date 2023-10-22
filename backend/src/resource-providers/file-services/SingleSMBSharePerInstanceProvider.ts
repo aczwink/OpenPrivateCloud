@@ -49,7 +49,7 @@ export class SingleSMBSharePerInstanceProvider
     
     public async GetSMBConnectionInfo(resourceReference: ResourceReference, userId: number)
     {
-        const host = await this.hostsController.RequestHostCredentials(resourceReference.hostId);
+        const host = await this.hostsController.QueryHost(resourceReference.hostId);
         const userName = this.hostUsersManager.MapUserToLinuxUserName(userId);
         
         return this.sambaSharesManager.GetConnectionInfo(host!.hostName, this.MapExternalIdToSMBShareName(resourceReference.externalId), userName);

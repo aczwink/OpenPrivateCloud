@@ -15,11 +15,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
- import { Dictionary } from "acts-util-core";
- import { Injectable, LockedProperty } from "acts-util-node";
+import { Dictionary } from "acts-util-core";
+import { Injectable, LockedProperty } from "acts-util-node";
 import { opcSpecialUsers } from "../common/UserAndGroupDefinitions";
- import { HostsController } from "../data-access/HostsController";
- import { SSHConnection, SSHService } from "./SSHService";
+import { SSHConnection, SSHService } from "./SSHService";
+import { HostsManager } from "./HostsManager";
  
 interface ConnectionInfo
 {
@@ -29,7 +29,7 @@ interface ConnectionInfo
 @Injectable
 export class RemoteConnectionsManager
 {
-    constructor(private sshService: SSHService, private hostsController: HostsController)
+    constructor(private sshService: SSHService, private hostsManager: HostsManager)
     {
         this.connections = {};
     }
@@ -50,7 +50,7 @@ export class RemoteConnectionsManager
 
     public async AcquireNewSelfManagedConnection(hostId: number)
     {
-        const creds = await this.hostsController.RequestHostCredentials(hostId);
+        const creds = await this.hostsManager.QueryHostCredentials(hostId);
         if(creds === undefined)
             throw new Error("unknown host");
 

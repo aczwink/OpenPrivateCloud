@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,26 +16,57 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Get, Header, Put } from "acts-util-apilib";
+import { APIController, Body, Conflict, Get, Header, Put } from "acts-util-apilib";
 import { MailerSettings } from "../services/EMailService";
 import { NotificationsManager } from "../services/NotificationsManager";
 import { SessionsManager } from "../services/SessionsManager";
+import { ClusterKeyStoreManager } from "../services/ClusterKeyStoreManager";
+import { UserWalletManager } from "../services/UserWalletManager";
 
-@APIController("cluster/config")
+@APIController("cluster/keystore")
+class _api_
+{
+    constructor(private clusterKeyStoreManager: ClusterKeyStoreManager, private sessionsManager: SessionsManager, private userWalletManager: UserWalletManager)
+    {
+    }
+
+    @Get()
+    public QueryMasterKey()
+    {
+        if(this.clusterKeyStoreManager.IsLocked())
+            return Conflict("key store is locked");
+        return this.clusterKeyStoreManager.GetMasterKeyEncoded();
+    }
+
+    @Put()
+    public async RotateMasterKey(
+        @Header Authorization: string
+    )
+    {
+        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+
+        await this.clusterKeyStoreManager.RotateMasterKey();
+
+        const data = this.clusterKeyStoreManager.GetMasterKeyEncoded();
+        await this.userWalletManager.SetStringSecret(userId, "masterKey", data);
+    }
+}
+
+@APIController("cluster/config/notifications")
 class ClusterConfigAPIController
 {
     constructor(private notificationsManager: NotificationsManager, private sessionsManager: SessionsManager)
     {
     }
 
-    @Get("notifications")
+    @Get()
     public async QueryNotificationsConfig()
     {
         const settings = await this.notificationsManager.QuerySettings();
         return settings;
     }
 
-    @Put("notifications")
+    @Put()
     public async UpdateNotificationsConfig(
         @Body config: MailerSettings,
         @Header Authorization: string

@@ -37,10 +37,10 @@ export class HostsController
     }
 
     //Public methods
-    public async AddHost(hostName: string, password: string)
+    public async AddHost(hostName: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const result = await conn.InsertRow("hosts", { hostName, password });
+        const result = await conn.InsertRow("hosts", { hostName });
         return result.insertId;
     }
 
@@ -76,17 +76,6 @@ export class HostsController
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         return conn.SelectOne<Host>(query, hostName);
-    }
-
-    public async RequestHostCredentials(hostId: number)
-    {
-        const query = `
-        SELECT hostName, password
-        FROM hosts
-        WHERE id = ?
-        `;
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return conn.SelectOne<{ hostName: string, password: string }>(query, hostId);
     }
 
     public async RequestHostId(hostName: string)

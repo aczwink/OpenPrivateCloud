@@ -61,6 +61,10 @@ export interface DockerContainerConfig
     hostName?: string;
     imageName: string;
     /**
+     * Only set when using ipvlan network
+     */
+    ipAddress?: string;
+    /**
      * Set to undefined if using host network
      */
     macAddress?: string;
@@ -234,6 +238,7 @@ export class DockerManager
         const dnsServerArgs = config.dnsServers.map(x => "--dns=" + x);
         const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
         const hostNameArgs = (config.hostName === undefined) ? [] : ["-h", config.hostName];
+        const ipAddressArgs = (config.ipAddress === undefined) ? [] : ["--ip", config.ipAddress];
         const macAddressArgs = (config.macAddress === undefined) ? [] : ["--mac-address", config.macAddress];
         const portArgs = config.portMap.Values().Map(x => ["-p", x.hostPost + ":" + x.containerPort + "/" + x.protocol.toLowerCase()].Values()).Flatten().ToArray();
         const privilegedArgs = config.privileged ? ["--privileged"] : [];
@@ -252,6 +257,7 @@ export class DockerManager
             ...privilegedArgs,
             ...removeOnExitArgs,
             ...volArgs,
+            ...ipAddressArgs,
             ...macAddressArgs,
             "--net", config.networkName,
             "--restart", config.restartPolicy,

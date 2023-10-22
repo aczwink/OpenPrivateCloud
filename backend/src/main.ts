@@ -33,11 +33,19 @@ import { OpenVPNGatewayManager } from "./resource-providers/network-services/Ope
 import { ProcessTrackerManager } from "./services/ProcessTrackerManager";
 import { ResourceEventsManager } from "./services/ResourceEventsManager";
 import { HostFirewallManager } from "./services/HostFirewallManager";
+import { ClusterEventType, ClusterEventsManager } from "./services/ClusterEventsManager";
 
 const port = 8078;
 
 async function EnableHealthManagement()
 {
+    await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
+    GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
+}
+
+function EventManagementSetup()
+{
+    //firewall stuff
     const rem = GlobalInjector.Resolve(ResourceEventsManager);
     const ovpnGwMgr = GlobalInjector.Resolve(OpenVPNGatewayManager);
 
@@ -48,16 +56,25 @@ async function EnableHealthManagement()
 
     rem.RegisterListener(ovpnGwMgr);
 
-    await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
-    GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
-
     GlobalInjector.Resolve(HostFirewallManager); //ensure this service exists because it listens to events which have to reset the host firewall
+
+    //health and availability
+    const cem = GlobalInjector.Resolve(ClusterEventsManager);
+    cem.RegisterListener({
+        ReceiveClusterEvent(eventName)
+        {
+            if(eventName === ClusterEventType.KeyStoreUnlocked)
+                EnableHealthManagement();
+        },
+    })
 }
 
-async function SetupServer()
+async function SetupWebServer()
 {
     const openAPIDef: OpenAPI.Root = (await import("../dist/openapi.json")) as any;
     GlobalInjector.RegisterInstance(APISchemaService, new APISchemaService(openAPIDef));
+
+    EventManagementSetup();
 
     await import("./__http-registry");
     await import("./__resource-providers-registry");
@@ -112,4 +129,4 @@ process.on("unhandledRejection", (reason, promise) => {
     console.log("Unhandled rejection: ", reason, promise);
 });
 
-SetupServer();
+SetupWebServer();

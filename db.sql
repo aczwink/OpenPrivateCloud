@@ -56,7 +56,6 @@ DROP TABLE IF EXISTS `hosts`;
 CREATE TABLE `hosts` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `hostName` varchar(200) NOT NULL,
-  `password` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -241,6 +240,22 @@ CREATE TABLE `instances_roleAssignments` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `keystore_hosts`
+--
+
+DROP TABLE IF EXISTS `keystore_hosts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `keystore_hosts` (
+  `hostId` int(10) unsigned NOT NULL,
+  `entryKey` varchar(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `value` blob NOT NULL,
+  PRIMARY KEY (`hostId`,`entryKey`),
+  CONSTRAINT `keystore_hosts_hostId` FOREIGN KEY (`hostId`) REFERENCES `hosts` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `resources_dependencies`
 --
 
@@ -327,10 +342,28 @@ DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `emailAddress` varchar(200) NOT NULL,
+  `firstName` varchar(100) NOT NULL,
   `pwHash` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `pwSalt` char(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `sambaPW` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `privateKey` text CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `publicKey` text CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `users_wallet`
+--
+
+DROP TABLE IF EXISTS `users_wallet`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `users_wallet` (
+  `userId` int(10) unsigned NOT NULL,
+  `entryKey` varchar(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `value` text NOT NULL,
+  PRIMARY KEY (`userId`,`entryKey`),
+  CONSTRAINT `users_wallet_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -343,4 +376,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-08-07  1:33:39
+-- Dump completed on 2023-10-22 22:44:00

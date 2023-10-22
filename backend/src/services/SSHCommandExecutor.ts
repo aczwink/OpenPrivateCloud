@@ -149,6 +149,11 @@ export class SSHCommandExecutor
                 {
                     //TODO: handle case where this includes another unescaped double quote
                 }
+                else if(part.startsWith("'") && part.endsWith("'"))
+                {
+                    //TODO: is this case safe?
+                    return part;
+                }
                 else if(part.includes('"'))
                     return part.ReplaceAll(" ", "\\ ");
                 return '"' + part.ReplaceAll('"', '\\"') + '"';

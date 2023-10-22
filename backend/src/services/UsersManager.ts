@@ -42,16 +42,23 @@ export class UsersManager
 
     public async CreateUser(emailAddress: string, password: string)
     {
-        const pwSalt = this.CreateSalt();
-        const pwHash = this.HashPassword(password, pwSalt);
-        await this.usersController.CreateUser(emailAddress, pwHash, pwSalt, this.CreateSambaPassword());
+        const userId = await this.usersController.CreateUser(emailAddress);
+        await this.SetUserPassword(userId, password);
+        
+        await this.RotateSambaPassword(userId);
+    }
+
+    public async QuerySambaPassword(userId: number)
+    {
+        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
+        return sambaPW;
     }
 
     public async RotateSambaPassword(userId: number)
     {
         const newPw = this.CreateSambaPassword();
 
-        await this.usersController.UpdateSambaPassword(userId, newPw);
+        await this.userWalletManager.SetStringSecret(userId, "sambaPW", newPw);
         await this.hostUsersManager.UpdateSambaPasswordOnAllHosts(userId, newPw);
     }
 
@@ -59,6 +66,9 @@ export class UsersManager
     {
         if(!this.userWalletManager.IsUnlocked(userId))
             throw new Error("Can't change password when user is not logged in");
+
+        //TODO: this should probably be done in a sql transaction
+        throw new Error("TODO: IMPLEMENT THIS SAFELY!");
 
         const keyPair = this.CreateKeyPair(newPassword);
 

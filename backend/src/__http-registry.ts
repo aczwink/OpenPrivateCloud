@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import "./api/ClusterConfigAPIController";
+import "./api/cluster";
 import "./api/health";
 import "./api/hosts";
 import "./api/HostStorageDevicesAPIController";
@@ -27,7 +27,7 @@ import "./api/processes";
 import "./api/ResourceProviderAPIController";
 import "./api/RolesAPIController";
 import "./api/RoleAssignmentsAPIController";
-import "./api/SessionsAPIController";
+import "./api/sessions";
 import "./api/UserGroupsAPIController";
 import "./api/user";
 import "./api/UsersAPIController";

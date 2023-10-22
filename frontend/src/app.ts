@@ -45,7 +45,7 @@ async function LoadViewModels()
     const modules = [
         import("./ViewModels/hosts"),
         import("./ViewModels/resourceGroups"),
-        import("./ViewModels/settings"),
+        import("./ViewModels/cluster"),
         import("./ViewModels/usersandgroups"),
         import("./ViewModels/usersettings"),
     ];

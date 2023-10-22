@@ -20,7 +20,6 @@ import { HostsController } from "../data-access/HostsController";
 import { DistroInfoService } from "../services/DistroInfoService";
 import { HostAvailabilityManager } from "../services/HostAvailabilityManager";
 import { HostPerformanceMeasurementService } from "../services/HostPerformanceMeasurementService";
-import { HostsManager } from "../services/HostsManager";
 import { HostUpdateManager } from "../services/HostUpdateManager";
 import { RemoteCommandExecutor } from "../services/RemoteCommandExecutor";
 import { HostNetworkInterfaceCardsManager } from "../services/HostNetworkInterfaceCardsManager";
@@ -28,6 +27,7 @@ import { FirewallRule, HostFirewallZonesManager, PortForwardingRule } from "../s
 import { HostFirewallSettingsManager } from "../services/HostFirewallSettingsManager";
 import { ProcessTrackerManager } from "../services/ProcessTrackerManager";
 import { FirewallDebugSettings, HostFirewallTracingManager } from "../services/HostFirewallTracingManager";
+import { HostTakeOverService } from "../services/HostTakeOverService";
 
 interface NetworkInterfaceDTO
 {
@@ -60,7 +60,7 @@ interface UpdateInfoDto
 @APIController("hosts")
 class HostsAPIController
 {
-    constructor(private hostsManager: HostsManager, private hostsController: HostsController)
+    constructor(private hostTakeOverService: HostTakeOverService, private hostsController: HostsController)
     {
     }
 
@@ -69,7 +69,7 @@ class HostsAPIController
         @BodyProp hostName: string
     )
     {
-        await this.hostsManager.TakeOverHost(hostName);
+        await this.hostTakeOverService.TakeOverHost(hostName);
     }
 
     @Get()

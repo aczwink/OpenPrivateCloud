@@ -21,6 +21,7 @@ import { HostMetricsService } from "./HostMetricsService";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { IPv4 } from "../common/IPv4";
 import { SystemServicesManager } from "./SystemServicesManager";
+import { CIDRRange } from "../common/CIDRRange";
 
 @Injectable
 export class HostNetworkInterfaceCardsManager
@@ -69,6 +70,12 @@ export class HostNetworkInterfaceCardsManager
         return result === 0;
     }
 
+    public async FindDefaultGateway(hostId: number)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["route", "-n", "|", "grep", "'UG[ \t]'", "|", "awk", "'{print $2}'"], hostId);
+        return result.stdOut.trim();
+    }
+
     public async FindExternalNetworkInterface(hostId: number)
     {
         const stats = await this.hostMetricsService.ReadNetworkStatistics(hostId);
@@ -76,6 +83,17 @@ export class HostNetworkInterfaceCardsManager
         if(filtered.length != 1)
             throw new Error("Method not implemented.");
         return filtered[0].interfaceName;
+    }
+
+    public async FindInterfaceSubnet(hostId: number, interfaceName: string)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["ip", "-o", "-f", "inet", "addr", "show", interfaceName, "|", "awk", "'/scope global/ {print $4}'"], hostId);
+        const ipCidr = new CIDRRange(result.stdOut.trim());
+        const netAddress = ipCidr.netAddress.intValue & ipCidr.GenerateSubnetMask().intValue;
+
+        console.log(ipCidr.netAddress.intValue, ipCidr.GenerateSubnetMask().ToString(), netAddress);
+
+        return new CIDRRange((new IPv4(netAddress).ToString()) + "/" + ipCidr.length);
     }
 
     public async QueryAllNetworkInterfaces(hostId: number)

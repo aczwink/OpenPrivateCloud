@@ -25,7 +25,8 @@ export interface ActiveDirectoryDomainControllerProperties extends BaseResourceP
     domain: string;
 
     /**
-     * Hostname of the domain controller
+     * Hostname of the domain controller. DO NOT use name "LOCALDC", since it is a reserved name.
+     * @default dc1
      */
     dcHostName: string;
 
@@ -35,15 +36,9 @@ export interface ActiveDirectoryDomainControllerProperties extends BaseResourceP
     dnsForwarderIP: string;
 
     /**
-     * Static IP of the domain controller.
+     * Static IP of the domain controller. Should be on your hosts network.
      */
     ipAddress: string;
-
-    /**
-     * @title Virtual network
-     * @format resource-same-host[network-services/virtual-network]
-     */
-    vnetResourceId: string;
 }
 
 export type IntegrationServicesProperties = ActiveDirectoryDomainControllerProperties;

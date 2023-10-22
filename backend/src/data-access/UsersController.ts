@@ -42,10 +42,11 @@ export class UsersController
     }
 
     //Public methods
-    public async CreateUser(emailAddress: string, pwHash: string, pwSalt: string, sambaPW: string)
+    public async CreateUser(emailAddress: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("users", { emailAddress, pwHash, pwSalt, sambaPW });
+        const result = await conn.InsertRow("users", { emailAddress });
+        return result.insertId;
     }
 
     public async QueryMembersOfGroup(userGroupId: number)
@@ -118,12 +119,6 @@ export class UsersController
         const rows = await conn.Select<PublicUserData>(query);
 
         return rows;
-    }
-
-    public async UpdateSambaPassword(userId: number, newPassword: string)
-    {
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.UpdateRows("users", { sambaPW: newPassword }, "id = ?", userId);
     }
 
     public async UpdateUserPassword(userId: number, pwSalt: string, pwHash: string, privateKey: string, publicKey: string)

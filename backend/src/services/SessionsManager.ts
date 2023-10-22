@@ -22,6 +22,7 @@ import { Injectable } from "acts-util-node";
 import { UsersController } from "../data-access/UsersController";
 import { UsersManager } from "./UsersManager";
 import { UserWalletManager } from "./UserWalletManager";
+import { ClusterKeyStoreManager } from "./ClusterKeyStoreManager";
 
 interface Session
 {
@@ -33,7 +34,7 @@ interface Session
 @Injectable
 export class SessionsManager
 {
-    constructor(private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager)
+    constructor(private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager, private clusterKeyStoreManager: ClusterKeyStoreManager)
     {
         this.sessions = {};
     }
@@ -76,6 +77,13 @@ export class SessionsManager
                 userId: userId,
             };
             await this.userWalletManager.Unlock(userId, password);
+            if(this.clusterKeyStoreManager.IsLocked())
+            {
+                const masterKey = await this.userWalletManager.ReadStringSecret(userId, "masterKey");
+                if(masterKey !== undefined)
+                    this.clusterKeyStoreManager.Unlock(masterKey);
+            }
+
             this.SetAutoLogOutTimer(token, session);
             return { expiryDateTime: session.expiryDateTime, token };
         }

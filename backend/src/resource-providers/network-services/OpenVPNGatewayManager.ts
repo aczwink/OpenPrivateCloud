@@ -343,7 +343,7 @@ ${taData}
             port: config.port,
             proto: config.protocol,
             verb: config.verbosity,
-            server: range.netAddress.ToString() + " " + range.GenerateSubnetMask(),
+            server: range.netAddress.ToString() + " " + range.GenerateSubnetMask().ToString(),
         });
 
         class OpenVPNConfigWriter extends ConfigWriter
@@ -411,7 +411,7 @@ tls-auth ${serverDir}/ta.key 0
 status ${serverDir}/openvpn-status.log
 log ${serverDir}/openvpn.log
 
-server ${range.netAddress.ToString()} ${range.GenerateSubnetMask()}
+server ${range.netAddress.ToString()} ${range.GenerateSubnetMask().ToString()}
 port ${data.port}
 proto ${data.protocol}
 cipher ${data.cipher}

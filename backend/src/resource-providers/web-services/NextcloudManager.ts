@@ -29,13 +29,13 @@ import { UsersController } from "../../data-access/UsersController";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { NextcloudProperties } from "./Properties";
 import { LightweightResourceReference } from "../../common/ResourceReference";
-import { UserWalletManager } from "../../services/UserWalletManager";
+import { UsersManager } from "../../services/UsersManager";
  
 @Injectable
 export class NextcloudManager
 {
     constructor(private resourcesManager: ResourcesManager, private apacheManager: ApacheManager, private systemServicesManager: SystemServicesManager,
-        private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager, private userWalletManager: UserWalletManager,
+        private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager, private usersManager: UsersManager,
         private usersController: UsersController, private remoteCommandExecutor: RemoteCommandExecutor)
     {
     }
@@ -164,7 +164,7 @@ export class NextcloudManager
         const appDir = path.join(instanceDir, "nextcloud");
         const dataDir = path.join(instanceDir, "data");
         const user = await this.usersController.QueryUser(userId);
-        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
+        const sambaPW = await this.usersManager.QuerySambaPassword(userId);
 
         const cmd = [
             "sudo", "-u", "www-data", "php", "occ", "maintenance:install",
