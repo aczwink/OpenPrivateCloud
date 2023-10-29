@@ -18,15 +18,21 @@
 
 import { Injectable } from "acts-util-node";
 
-export enum ClusterEventType
+interface NoDataEvent
 {
-    KeyStoreUnlocked
-};
-
-export interface ClusterEventListener
-{
-    ReceiveClusterEvent(eventName: ClusterEventType): void;
+    type: "keyStoreUnlocked";
 }
+
+interface UserLogInEvent
+{
+    type: "userLogIn";
+    userId: number;
+    password: string; //required for managing single sign on scenarios
+}
+
+type ClusterEvent = NoDataEvent | UserLogInEvent;
+
+type EventCallback = (event: ClusterEvent) => void;
   
 @Injectable
 export class ClusterEventsManager
@@ -37,17 +43,17 @@ export class ClusterEventsManager
     }
 
     //Public methods
-    public PublishEvent(eventName: ClusterEventType)
+    public PublishEvent(event: ClusterEvent)
     {
         for (const listener of this.listeners)
-            listener.ReceiveClusterEvent(eventName);
+            listener(event);
     }
 
-    public RegisterListener(listener: ClusterEventListener)
+    public RegisterListener(listener: EventCallback)
     {
         this.listeners.push(listener);
     }
 
     //Private state
-    private listeners: ClusterEventListener[];
+    private listeners: EventCallback[];
 }

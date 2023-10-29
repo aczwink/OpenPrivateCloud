@@ -23,6 +23,7 @@ import { UsersController } from "../data-access/UsersController";
 import { UsersManager } from "./UsersManager";
 import { UserWalletManager } from "./UserWalletManager";
 import { ClusterKeyStoreManager } from "./ClusterKeyStoreManager";
+import { ClusterEventsManager } from "./ClusterEventsManager";
 
 interface Session
 {
@@ -34,7 +35,7 @@ interface Session
 @Injectable
 export class SessionsManager
 {
-    constructor(private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager, private clusterKeyStoreManager: ClusterKeyStoreManager)
+    constructor(private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager, private clusterKeyStoreManager: ClusterKeyStoreManager, private clusterEventsManager: ClusterEventsManager)
     {
         this.sessions = {};
     }
@@ -83,6 +84,12 @@ export class SessionsManager
                 if(masterKey !== undefined)
                     this.clusterKeyStoreManager.Unlock(masterKey);
             }
+
+            this.clusterEventsManager.PublishEvent({
+                type: "userLogIn",
+                userId,
+                password
+            });
 
             this.SetAutoLogOutTimer(token, session);
             return { expiryDateTime: session.expiryDateTime, token };

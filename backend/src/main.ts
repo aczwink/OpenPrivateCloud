@@ -33,7 +33,7 @@ import { OpenVPNGatewayManager } from "./resource-providers/network-services/Ope
 import { ProcessTrackerManager } from "./services/ProcessTrackerManager";
 import { ResourceEventsManager } from "./services/ResourceEventsManager";
 import { HostFirewallManager } from "./services/HostFirewallManager";
-import { ClusterEventType, ClusterEventsManager } from "./services/ClusterEventsManager";
+import { ClusterEventsManager } from "./services/ClusterEventsManager";
 
 const port = 8078;
 
@@ -60,13 +60,10 @@ function EventManagementSetup()
 
     //health and availability
     const cem = GlobalInjector.Resolve(ClusterEventsManager);
-    cem.RegisterListener({
-        ReceiveClusterEvent(eventName)
-        {
-            if(eventName === ClusterEventType.KeyStoreUnlocked)
-                EnableHealthManagement();
-        },
-    })
+    cem.RegisterListener(event => {
+        if(event.type === "keyStoreUnlocked")
+        EnableHealthManagement();
+    });
 }
 
 async function SetupWebServer()

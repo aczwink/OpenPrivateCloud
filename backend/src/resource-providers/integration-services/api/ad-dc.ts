@@ -17,16 +17,30 @@
  * */
 
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
-import { APIController, Common, Get, Path } from "acts-util-apilib";
+import { APIController, Body, Common, Get, Path, Put } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_activeDirectoryDomainControllerResourceTypeName, c_integrationServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { ADDC_Settings, ActiveDirectoryDomainControllerManager } from "../ActiveDirectoryDomainControllerManager";
+import { ADDC_Configuration, ADDC_Settings, ActiveDirectoryDomainControllerManager } from "../ActiveDirectoryDomainControllerManager";
 
 interface ADDC_InfoDTO
 {
     configuration: ADDC_Settings;
     ipAddresses: string[];
+}
+
+interface ADDC_UserDTO
+{
+    /**
+     * @title User
+     * @format user
+     */
+    userId: string;
+
+    mappedName: string;
+    domainName: string;
+    netBiosName: string;
+    state: string;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_integrationServicesResourceProviderName}/${c_activeDirectoryDomainControllerResourceTypeName}/{resourceName}`)
@@ -46,6 +60,24 @@ class _api_ extends ResourceAPIControllerBase
         return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
+    @Get("config")
+    public async QueryConfig(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        const data = await this.activeDirectoryDomainControllerManager.QueryConfig(resourceReference);
+        return data;
+    }
+
+    @Put("config")
+    public async UpdateConfig(
+        @Common resourceReference: ResourceReference,
+        @Body config: ADDC_Configuration
+    )
+    {
+        await this.activeDirectoryDomainControllerManager.UpdateDCConfig(resourceReference, config);
+    }
+
     @Get("info")
     public async QueryInfo(
         @Common resourceReference: ResourceReference,
@@ -53,9 +85,25 @@ class _api_ extends ResourceAPIControllerBase
     {
         const data = await this.activeDirectoryDomainControllerManager.QueryInfo(resourceReference);
         const result: ADDC_InfoDTO = {
-            configuration: data.config.settings,
+            configuration: data.config,
             ipAddresses: data.containerInfo.ipAddresses
         };
         return result;
+    }
+
+    @Get("users")
+    public async QueryUsers(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        const info = await this.activeDirectoryDomainControllerManager.QueryInfo(resourceReference);
+
+        const data = await this.activeDirectoryDomainControllerManager.QueryUsers(resourceReference);
+        return data.Entries().Map<ADDC_UserDTO>(x => ({
+            userId: x.key.toString(), mappedName: x.value!.mappedName,
+            domainName: x.value!.mappedName + "@" + info.config.domain,
+            netBiosName: info.config.domain.split(".")[0].toUpperCase() + "\\" + x.value!.mappedName,
+            state: x.value!.state
+        })).ToArray();
     }
 }

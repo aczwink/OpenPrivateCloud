@@ -27,7 +27,7 @@ interface PrivateUserData
     publicKey: string;
 }
 
-interface PublicUserData
+export interface PublicUserData
 {
     id: number;
     firstName: string;

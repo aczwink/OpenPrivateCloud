@@ -160,6 +160,16 @@ export class DockerManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "rm", containerName], hostId);
     }
 
+    public async ExecuteBufferedCommandInRunningContainer(hostId: number, containerName: string, command: string[])
+    {
+        return await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "docker", "container", "exec", "--interactive", containerName, ...command], hostId);
+    }
+
+    public async ExecuteCommandInRunningContainer(hostId: number, containerName: string, command: string[])
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "container", "exec", "--interactive", containerName, ...command], hostId);
+    }
+
     public async EnsureDockerIsInstalled(hostId: number)
     {
         await this.modulesManager.EnsureModuleIsInstalled(hostId, "docker");

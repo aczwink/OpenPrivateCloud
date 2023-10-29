@@ -57,7 +57,12 @@ export const resourceProviders =
         name: c_integrationServicesResourceProviderName,
 
         activeDirectoryDomainControllerResourceType: {
-            name: c_activeDirectoryDomainControllerResourceTypeName
+            name: c_activeDirectoryDomainControllerResourceTypeName,
+
+            permissions: {
+                manage: "/AD/manage",
+                use: "/AD/use"
+            }
         }
     },
 

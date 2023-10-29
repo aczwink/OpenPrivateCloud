@@ -72,7 +72,7 @@ export class HostNetworkInterfaceCardsManager
 
     public async FindDefaultGateway(hostId: number)
     {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["route", "-n", "|", "grep", "'UG[ \t]'", "|", "awk", "'{print $2}'"], hostId);
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["/usr/sbin/route", "-n", "|", "grep", "'UG[ \t]'", "|", "awk", "'{print $2}'"], hostId);
         return result.stdOut.trim();
     }
 

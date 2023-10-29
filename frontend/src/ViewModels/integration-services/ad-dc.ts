@@ -18,7 +18,8 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { ADDC_InfoDTO } from "../../../dist/api";
+import { ADDC_Configuration, ADDC_InfoDTO, ADDC_UserDTO } from "../../../dist/api";
+import { ListViewModel } from "../../UI/ListViewModel";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -35,6 +36,30 @@ const overviewViewModel: ObjectViewModel<ADDC_InfoDTO, ResourceAndGroupId>  = {
     schemaName: "ADDC_InfoDTO",
 };
 
+const configViewModel: ObjectViewModel<ADDC_Configuration, ResourceAndGroupId> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "ADDC_Configuration",
+            requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, props) => service.resourceProviders._any_.integrationservices.addc._any_.config.put(ids.resourceGroupName, ids.resourceName, props),
+        }
+    ],
+    formTitle: _ => "Configuration",
+    requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.config.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "ADDC_Configuration"
+};
+
+const usersViewModel: ListViewModel<ADDC_UserDTO, ResourceAndGroupId> = {
+    type: "list",
+    actions: [],
+    boundActions: [],
+    displayName: "Users",
+    requestObjects: (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.users.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "ADDC_UserDTO"
+};
+
 export const addcViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         ...BuildCommonResourceActions(BuildResourceId)
@@ -47,6 +72,16 @@ export const addcViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "overview",
                     displayName: "Overview",
                     child: overviewViewModel
+                },
+                {
+                    key: "config",
+                    displayName: "Configuration",
+                    child: configViewModel
+                },
+                {
+                    key: "users",
+                    displayName: "Users",
+                    child: usersViewModel
                 },
             ]
         },

@@ -61,6 +61,18 @@ export class ManagedDockerContainerManager
         await this.dockerManager.CreateContainerInstanceAndStart(resourceReference.hostId, containerName, config);
     }
 
+    public async ExecuteBufferedCommandInContainer(resourceReference: LightweightResourceReference, command: string[])
+    {
+        const containerName = this.DeriveContainerName(resourceReference);
+        return await this.dockerManager.ExecuteBufferedCommandInRunningContainer(resourceReference.hostId, containerName, command);
+    }
+
+    public async ExecuteCommandInContainer(resourceReference: LightweightResourceReference, command: string[])
+    {
+        const containerName = this.DeriveContainerName(resourceReference);
+        await this.dockerManager.ExecuteCommandInRunningContainer(resourceReference.hostId, containerName, command);
+    }
+
     public async ExtractContainerInfo(resourceReference: LightweightResourceReference): Promise<ContainerInfo>
     {
         const containerName = this.DeriveContainerName(resourceReference);
@@ -105,6 +117,12 @@ export class ManagedDockerContainerManager
     {
         const containerName = this.DeriveContainerName(resourceReference);
         await this.dockerManager.RestartContainer(resourceReference.hostId, containerName);
+    }
+
+    public SpawnShell(resourceReference: LightweightResourceReference)
+    {
+        const containerName = this.DeriveContainerName(resourceReference);
+        return this.dockerManager.SpawnShell(resourceReference.hostId, containerName);
     }
 
     //Private methods

@@ -18,7 +18,7 @@
 import crypto from "crypto";
 import { Injectable } from "acts-util-node";
 import { ClusterKeyStoreController } from "../data-access/ClusterKeyStoreController";
-import { ClusterEventType, ClusterEventsManager } from "./ClusterEventsManager";
+import { ClusterEventsManager } from "./ClusterEventsManager";
 
 interface MasterKey
 {
@@ -95,7 +95,7 @@ export class ClusterKeyStoreManager
             authTagLength: parsed.authTagLength,
         };
 
-        this.clusterEventsManager.PublishEvent(ClusterEventType.KeyStoreUnlocked);
+        this.clusterEventsManager.PublishEvent({ type: "keyStoreUnlocked" });
     }
 
     //Private state

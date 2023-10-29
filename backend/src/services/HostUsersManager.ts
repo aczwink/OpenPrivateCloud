@@ -23,6 +23,8 @@ import { PermissionsController } from "../data-access/PermissionsController";
 import { UsersController } from "../data-access/UsersController";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { LinuxUsersManager } from "./LinuxUsersManager";
+import { UserCredentialsProvider } from "./UserCredentialsProvider";
+import { UserWalletManager } from "./UserWalletManager";
 
 interface SambaUser
 {
@@ -33,8 +35,8 @@ interface SambaUser
 @Injectable
 export class HostUsersManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private linuxUsersManager: LinuxUsersManager,
-        private hostsController: HostsController, private permissionsController: PermissionsController)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private linuxUsersManager: LinuxUsersManager, private userWalletManager: UserWalletManager,
+        private hostsController: HostsController, private permissionsController: PermissionsController, private userCredentialsProvider: UserCredentialsProvider)
     {
     }
 
@@ -151,9 +153,8 @@ export class HostUsersManager
         const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
         if(!exists)
         {
-            throw new Error("TODO redesign this: create a locked user and create a sync job. When the user logs in, sync the pw and unlock");
-            /*const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
-            await this.AddSambaUser(hostId, this.MapUserToLinuxUserName(userId), sambaPW!);*/
+            await this.AddDisabledSambaUser(hostId, this.MapUserToLinuxUserName(userId));
+            this.userCredentialsProvider.RegisterForUserCredentialProvisionForHost(userId, hostId, this.OnUserCredentialsProvided.bind(this));
         }
     }
     
@@ -165,21 +166,15 @@ export class HostUsersManager
             const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
             if(exists)
             {
-                await this.AddSambaUser(hostId, this.MapUserToLinuxUserName(userId), newPw);
+                await this.UpdateSambaPassword(hostId, this.MapUserToLinuxUserName(userId), newPw);
             }
         }
     }
 
     //Private methods
-    /**
-     * If the user already exists it is basically "overwritten", i.e. only the password is changed
-     */
-    private async AddSambaUser(hostId: number, userName: string, password: string)
+    private async AddDisabledSambaUser(hostId: number, userName: string)
     {
-        const stdin = (password + "\n") + (password + "\n");
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-a", userName], hostId, {
-            stdin
-        });
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-sad", userName], hostId);
     }
 
     private async CreateHostGroup(hostId: number, linuxGroupName: string)
@@ -224,6 +219,12 @@ export class HostUsersManager
         return user !== undefined;
     }
 
+    private async EnableSambaUser(hostId: number, userId: number)
+    {
+        const linuxUserName = this.MapUserToLinuxUserName(userId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-se", linuxUserName], hostId);
+    }
+
     private async QuerySambaUsers(hostId: number)
     {
         const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "pdbedit", "-L", "-v"], hostId);
@@ -233,7 +234,7 @@ export class HostUsersManager
         for (let index = 0; index < lines.length; index++)
         {
             const line = lines[index].trimEnd();
-            const match = line.match(/^Unix username:[ \t]+([a-z]+)$/);
+            const match = line.match(/^Unix username:[ \t]+([a-z0-9\-]+)$/);
             if(match !== null)
             {
                 const flagsLine = lines[index + 2].substr("Account Flags:".length);
@@ -296,5 +297,25 @@ export class HostUsersManager
         if(result.exitCode === 1)
             return undefined;
         return uid;
+    }
+
+    /**
+     * If the user already exists it is basically "overwritten", i.e. only the password is changed, but otherwise the user is created.
+     */
+    private async UpdateSambaPassword(hostId: number, userName: string, password: string)
+    {
+        const stdin = (password + "\n") + (password + "\n");
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-a", userName], hostId, {
+            stdin
+        });
+    }
+
+    //Event handlers
+    private async OnUserCredentialsProvided(userId: number, _: string, hostId: number)
+    {
+        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
+        await this.UpdateSambaPassword(hostId, this.MapUserToLinuxUserName(userId), sambaPW!);
+
+        await this.EnableSambaUser(hostId, userId);
     }
 }

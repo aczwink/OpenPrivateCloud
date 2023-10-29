@@ -21,12 +21,13 @@ import { PermissionsController } from "../data-access/PermissionsController";
 import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { HostUsersManager } from "./HostUsersManager";
 import { ResourceReference } from "../common/ResourceReference";
+import { UsersController } from "../data-access/UsersController";
   
 @Injectable
 export class PermissionsManager
 {
     constructor(private instancesController: ResourcesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
-        private roleAssignmentsController: RoleAssignmentsController)
+        private roleAssignmentsController: RoleAssignmentsController, private usersController: UsersController)
     {
     }
     
@@ -63,5 +64,18 @@ export class PermissionsManager
 
         const resourceLevel = await this.permissionsController.HasUserResourceLevelPermission(resourceReference.id, userId, permission);
         return resourceLevel;
+    }
+
+    public async QueryUsersWithPermission(resourceId: number, permission: string)
+    {
+        //TODO: cluster level
+        //TODO: RG level
+        const groupIds = await this.permissionsController.QueryGroupsWithPermission(resourceId, permission);
+        const members = await groupIds.Map(groupId => this.usersController.QueryMembersOfGroup(groupId)).PromiseAll();
+        
+        return members.Values()
+            .Map(x => x.Values()).Flatten()
+            .Map(x => x.id)
+            .ToSet();
     }
 }

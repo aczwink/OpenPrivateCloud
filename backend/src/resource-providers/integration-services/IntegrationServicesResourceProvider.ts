@@ -69,6 +69,12 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name:
+                await this.activeDirectoryDomainControllerManager.ResourcePermissionsChanged(resourceReference);
+                break;
+        }
     }
 
     public async ProvideResource(instanceProperties: IntegrationServicesProperties, context: DeploymentContext): Promise<DeploymentResult>
