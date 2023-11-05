@@ -89,6 +89,22 @@ export class ManagedDockerContainerManager
         };
     }
 
+    public async QueryLog(resourceReference: LightweightResourceReference)
+    {
+        const containerName = this.DeriveContainerName(resourceReference);
+
+        const status = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
+        if(status === undefined)
+        {
+            return {
+                stdOut: "",
+                stdErr: ""
+            };
+        }
+
+        return this.dockerManager.QueryContainerLogs(resourceReference.hostId, containerName);
+    }
+
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
         const containerName = this.DeriveContainerName(resourceReference);

@@ -79,6 +79,8 @@ function RenderNumber(value: number, schema: OpenAPI.NumberSchema)
 {
     switch(schema.format)
     {
+        case "byteSize":
+            return value.FormatBinaryPrefixed("B");
         case "permissions":
             return value.toString(8) + " " + RenderPermissions((value >> 6) & 7) + RenderPermissions((value >> 3) & 7) + RenderPermissions(value & 7);
         case "user":

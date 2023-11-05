@@ -18,7 +18,7 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { ADDC_Configuration, ADDC_InfoDTO, ADDC_UserDTO } from "../../../dist/api";
+import { ADDC_Configuration, ADDC_InfoDTO, ADDC_UserDTO, DockerContainerLogDto } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
@@ -60,6 +60,14 @@ const usersViewModel: ListViewModel<ADDC_UserDTO, ResourceAndGroupId> = {
     schemaName: "ADDC_UserDTO"
 };
 
+const logViewModel: ObjectViewModel<DockerContainerLogDto, ResourceAndGroupId> = {
+    actions: [],
+    formTitle: _ => "Logs",
+    requestObject: async (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.log.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "DockerContainerLogDto",
+    type: "object"
+};
+
 export const addcViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         ...BuildCommonResourceActions(BuildResourceId)
@@ -83,6 +91,11 @@ export const addcViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     displayName: "Users",
                     child: usersViewModel
                 },
+                {
+                    key: "logs",
+                    displayName: "Live log",
+                    child: logViewModel,
+                }
             ]
         },
         BuildResourceGeneralPageGroupEntry(BuildResourceId),

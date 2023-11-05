@@ -22,6 +22,7 @@ import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_apiGatewayResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { API_EntryConfig, API_GatewayManager, API_GatewaySettings } from "../API_GatewayManager";
+import { DockerContainerLogDto } from "../../compute-services/api/docker-container-app-service";
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_apiGatewayResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
@@ -38,14 +39,6 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         return this.FetchResourceReference(resourceGroupName, resourceName);
-    }
-
-    @Get("info")
-    public QueryInfo(
-        @Common resourceReference: ResourceReference,
-    )
-    {
-        return this.apiGatewayManager.QueryInfo(resourceReference);
     }
 
     @Post("apis")
@@ -82,6 +75,28 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         await this.apiGatewayManager.UpdateAPI(resourceReference, oldFrontendDomainName, newProps);
+    }
+
+    @Get("info")
+    public QueryInfo(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        return this.apiGatewayManager.QueryInfo(resourceReference);
+    }
+
+    @Get("log")
+    public async QueryLog(
+        @Common resourceReference: ResourceReference
+    )
+    {
+        const log = await this.apiGatewayManager.QueryLog(resourceReference);
+
+        const result: DockerContainerLogDto = {
+            stdErr: log.stdErr,
+            stdOut: log.stdOut
+        };
+        return result;
     }
 
     @Get("settings")

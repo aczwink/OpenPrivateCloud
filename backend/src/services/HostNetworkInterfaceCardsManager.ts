@@ -91,8 +91,6 @@ export class HostNetworkInterfaceCardsManager
         const ipCidr = new CIDRRange(result.stdOut.trim());
         const netAddress = ipCidr.netAddress.intValue & ipCidr.GenerateSubnetMask().intValue;
 
-        console.log(ipCidr.netAddress.intValue, ipCidr.GenerateSubnetMask().ToString(), netAddress);
-
         return new CIDRRange((new IPv4(netAddress).ToString()) + "/" + ipCidr.length);
     }
 

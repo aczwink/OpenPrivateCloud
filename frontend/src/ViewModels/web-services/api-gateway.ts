@@ -18,7 +18,7 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { API_EntryConfig, API_GatewaySettings, ContainerInfo } from "../../../dist/api";
+import { API_EntryConfig, API_GatewaySettings, ContainerInfo, DockerContainerLogDto } from "../../../dist/api";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { ListViewModel } from "../../UI/ListViewModel";
 
@@ -89,6 +89,14 @@ const settingsViewModel: ObjectViewModel<API_GatewaySettings, ResourceAndGroupId
     schemaName: "API_GatewaySettings"
 };
 
+const logViewModel: ObjectViewModel<DockerContainerLogDto, ResourceAndGroupId> = {
+    actions: [],
+    formTitle: _ => "Logs",
+    requestObject: async (service, ids) => service.resourceProviders._any_.webservices.apigateway._any_.log.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "DockerContainerLogDto",
+    type: "object"
+};
+
 export const apiGatewayViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         ...BuildCommonResourceActions(BuildResourceId)
@@ -111,6 +119,11 @@ export const apiGatewayViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "serverSettings",
                     displayName: "Server settings",
                     child: settingsViewModel
+                },
+                {
+                    key: "logs",
+                    displayName: "Live log",
+                    child: logViewModel,
                 }
             ]
         },

@@ -22,6 +22,7 @@ import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_activeDirectoryDomainControllerResourceTypeName, c_integrationServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { ADDC_Configuration, ADDC_Settings, ActiveDirectoryDomainControllerManager } from "../ActiveDirectoryDomainControllerManager";
+import { DockerContainerLogDto } from "../../compute-services/api/docker-container-app-service";
 
 interface ADDC_InfoDTO
 {
@@ -87,6 +88,20 @@ class _api_ extends ResourceAPIControllerBase
         const result: ADDC_InfoDTO = {
             configuration: data.config,
             ipAddresses: data.containerInfo.ipAddresses
+        };
+        return result;
+    }
+
+    @Get("log")
+    public async QueryLog(
+        @Common resourceReference: ResourceReference
+    )
+    {
+        const log = await this.activeDirectoryDomainControllerManager.QueryLog(resourceReference);
+
+        const result: DockerContainerLogDto = {
+            stdErr: log.stdErr,
+            stdOut: log.stdOut
         };
         return result;
     }

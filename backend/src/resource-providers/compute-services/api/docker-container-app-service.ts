@@ -33,7 +33,7 @@ interface DockerContainerInfo
     ipAddresses: string[];
 }
 
-interface DockerContainerLogDto
+export interface DockerContainerLogDto
 {
     /**
      * @format multi-line

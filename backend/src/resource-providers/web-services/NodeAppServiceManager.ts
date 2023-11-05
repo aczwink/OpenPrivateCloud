@@ -85,9 +85,11 @@ export class NodeAppServiceManager
         {
             case "start":
                 await this.systemServicesManager.StartService(resourceReference.hostId, serviceName);
+                await this.systemServicesManager.EnableService(resourceReference.hostId, serviceName);
                 break;
             case "stop":
                 await this.systemServicesManager.StopService(resourceReference.hostId, serviceName);
+                await this.systemServicesManager.DisableService(resourceReference.hostId, serviceName);
                 break;
         }
     }

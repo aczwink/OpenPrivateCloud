@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import os from "os";
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
@@ -35,7 +36,11 @@ import { resourceProviders } from "openprivatecloud-common";
 
 export interface ADDC_Configuration
 {
+    /**
+     * It is recommended to disable the "Administrator" account for security reasons. Its initial password is "AdminPW1234!".
+     */
     enableAdministratorAccount: boolean;
+
     userNamingStrategy: "firstName";
 }
 
@@ -143,6 +148,11 @@ export class ActiveDirectoryDomainControllerManager
             config: config.settings,
             containerInfo
         };
+    }
+
+    public async QueryLog(resourceReference: LightweightResourceReference)
+    {
+        return this.managedDockerContainerManager.QueryLog(resourceReference);
     }
 
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
@@ -274,7 +284,8 @@ export class ActiveDirectoryDomainControllerManager
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
         const arch = await this.distroInfoService.FetchCPU_Architecture(resourceReference.hostId);
-        const imageName = (arch === "arm64") ? "ghcr.io/aczwink/samba-domain:latest" : "nowsci/samba-domain";
+        //const imageName = (arch === "arm64") ? "ghcr.io/aczwink/samba-domain:latest" : "nowsci/samba-domain";
+        const imageName = "ghcr.io/aczwink/samba-domain:latest";
 
         const dockerNetworkName = this.DeriveDockerNetworkName(resourceReference);
         const containerConfig: DockerContainerConfig = {
@@ -285,6 +296,7 @@ export class ActiveDirectoryDomainControllerManager
                 }
             ],
             capabilities: ["NET_ADMIN", "SYS_NICE", "SYS_TIME"],
+            cpuFraction: (os.cpus().length / 2),
             dnsSearchDomains: [config.settings.domain],
             dnsServers: [config.settings.dcIP_Address, config.settings.dnsForwarderIP],
             env: [

@@ -55,6 +55,7 @@ export interface DockerContainerConfig
 {
     additionalHosts: DockerHostEntry[];
     capabilities: DockerCapability[];
+    cpuFraction?: number;
     dnsSearchDomains: string[];
     dnsServers: string[];
     env: DockerEnvironmentVariableMapping[];
@@ -244,6 +245,7 @@ export class DockerManager
     {
         const addHostsArgs = config.additionalHosts.map(x => "--add-host=" + x.domainName + ":" + x.ipAddress);
         const capsArgs = config.capabilities.map(x => "--cap-add=" + x);
+        const cpuArgs = (config.cpuFraction === undefined) ? [] : ['--cpus="' + config.cpuFraction.toFixed(2) +  '"'];
         const dnsSearchDomainArgs = config.dnsSearchDomains.map(x => "--dns-search=" + x);
         const dnsServerArgs = config.dnsServers.map(x => "--dns=" + x);
         const envArgs = config.env.Values().Map(x => ["-e", x.varName + "=" + x.value].Values()).Flatten().ToArray();
@@ -259,6 +261,7 @@ export class DockerManager
             "--name", containerName,
             ...addHostsArgs,
             ...capsArgs,
+            ...cpuArgs,
             ...dnsSearchDomainArgs,
             ...dnsServerArgs,
             ...envArgs,

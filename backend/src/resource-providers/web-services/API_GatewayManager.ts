@@ -17,7 +17,7 @@
  * */
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
+import { LightweightResourceReference } from "../../common/ResourceReference";
 import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
 import { API_GatewayProperties } from "./Properties";
 import { ResourcesManager } from "../../services/ResourcesManager";
@@ -34,11 +34,21 @@ export interface API_EntryConfig
      */
     backendURL: string;
     frontendDomainName: string;
+    /**
+     * @format byteSize
+     * Define only if you want to override the service configuration value.
+     */
+    maxRequestBodySize?: number;
 }
 
 export interface API_GatewaySettings
 {
     frontendPorts: number[];
+
+    /**
+     * @format byteSize
+     */
+    maxRequestBodySize: number;
 
     /**
      * @title Virtual network
@@ -96,6 +106,7 @@ export class API_GatewayManager
             apiEntries: [],
             settings: {
                 frontendPorts: [],
+                maxRequestBodySize: 1 * 1024 * 1024, //1 MiB is default for nginx
                 vnetResourceExternalId: instanceProperties.vnetResourceExternalId
             }
         });
@@ -113,6 +124,11 @@ export class API_GatewayManager
     public async QueryInfo(resourceReference: LightweightResourceReference)
     {
         return await this.managedDockerContainerManager.ExtractContainerInfo(resourceReference);
+    }
+
+    public async QueryLog(resourceReference: LightweightResourceReference)
+    {
+        return this.managedDockerContainerManager.QueryLog(resourceReference);
     }
 
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
@@ -172,10 +188,13 @@ server {
     private GenerateAPI_nginxConfig(settings: API_GatewaySettings, config: API_EntryConfig)
     {
         const frontEndPorts = settings.frontendPorts.map(x => "listen\t" + x + ";").join("\n");
+        const maxBodySizeConfig = (config.maxRequestBodySize === undefined) ? settings.maxRequestBodySize : config.maxRequestBodySize;
+
         return `
 server {
     ${frontEndPorts}
     server_name  ${config.frontendDomainName};
+    client_max_body_size ${maxBodySizeConfig};
 
     location / {
         proxy_pass ${config.backendURL};
