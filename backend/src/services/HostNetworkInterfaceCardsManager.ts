@@ -31,6 +31,12 @@ export class HostNetworkInterfaceCardsManager
     }
 
     //Public methods
+    public async AddIPAddress(hostId: number, interfaceName: string, ip: IPv4, netAddressLength: number)
+    {
+        const addrAssignmentCommand = ["ip", "address", "add", "dev", interfaceName, ip.ToString() + "/" + netAddressLength];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...addrAssignmentCommand], hostId);
+    }
+
     public async CreateBridge(hostId: number, bridgeName: string, ip: IPv4, netAddressLength: number)
     {
         //"stp_state", "0"
@@ -56,12 +62,26 @@ export class HostNetworkInterfaceCardsManager
         await this.systemServicesManager.EnableService(hostId, bridgeName);
     }
 
+    public async CreateVLAN_SubInterface(hostId: number, interfaceName: string, parentInterfaceName: string)
+    {
+        const createCmd = ["ip", "link", "add", interfaceName, "link", parentInterfaceName, "type", "ipvlan", "mode", "l2"];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...createCmd], hostId);
+
+        const upCmd = ["ip", "link", "set", interfaceName, "up"];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...upCmd], hostId);
+    }
+
     public async DeleteBridge(hostId: number, bridgeName: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "link", "delete", bridgeName, "type", "bridge"], hostId);
 
         await this.systemServicesManager.StopService(hostId, bridgeName);
         await this.systemServicesManager.DeleteService(hostId, bridgeName);
+    }
+
+    public async DeleteVLAN_SubInterface(hostId: number, interfaceName: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "link", "del", interfaceName], hostId);
     }
 
     public async DoesInterfaceExist(hostId: number, interfaceName: string)

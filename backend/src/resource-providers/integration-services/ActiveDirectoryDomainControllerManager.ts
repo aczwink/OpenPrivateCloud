@@ -87,6 +87,11 @@ export class ActiveDirectoryDomainControllerManager
         await this.managedDockerContainerManager.DestroyContainer(resourceReference);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "rm", this.DeriveDockerNetworkName(resourceReference)], resourceReference.hostId);
 
+        const vlanInterfaceName = this.DeriveVLAN_SubInterfaceName(resourceReference);
+        const vlanInterfaceName2 = vlanInterfaceName + "-h";
+        await this.hostNetworkInterfaceCardsManager.DeleteVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName2);
+        await this.hostNetworkInterfaceCardsManager.DeleteVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName);
+
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
@@ -203,15 +208,19 @@ export class ActiveDirectoryDomainControllerManager
 
     private async CreateDockerNetwork(resourceReference: LightweightResourceReference)
     {
-        //Unfortunately docker ipvlan networks are by design implemented in such a way, that the host and the container can't communicate. I.e. the container can communicate with the whole network and vice versa except the host itself.
-        //see: https://superuser.com/questions/1736221/why-cant-i-ping-a-docker-container-from-the-host-when-using-ipvlan-in-l3-mode
-        //if this ever becomes a limitation, apparently a new docker network plugin will be necessary :S
-
         const netInterface = await this.hostNetworkInterfaceCardsManager.FindExternalNetworkInterface(resourceReference.hostId);
         const subnet = await this.hostNetworkInterfaceCardsManager.FindInterfaceSubnet(resourceReference.hostId, netInterface);
         const gateway = await this.hostNetworkInterfaceCardsManager.FindDefaultGateway(resourceReference.hostId);
+        const vlanInterfaceName = this.DeriveVLAN_SubInterfaceName(resourceReference);
+        await this.hostNetworkInterfaceCardsManager.CreateVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName, netInterface);
         const networkName = this.DeriveDockerNetworkName(resourceReference);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "create", "-d", "ipvlan", "--subnet", subnet.ToString(), "--gateway", gateway, "-o", "ipvlan_mode=l2", "-o", "parent=" + netInterface, networkName], resourceReference.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "create", "-d", "ipvlan", "--subnet", subnet.ToString(), "--gateway", gateway, "-o", "ipvlan_mode=l2", "-o", "parent=" + vlanInterfaceName, networkName], resourceReference.hostId);
+
+        //ipvlan networks by default forbid host-container access, to enable this we create a second vlan interface that links to the first one. Unfortunately, we need a second ip address from the same subnet for this to work :S
+        //on the long term, a different solution should definitely be found
+        const vlanInterfaceName2 = vlanInterfaceName + "-h";
+        await this.hostNetworkInterfaceCardsManager.CreateVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName2, vlanInterfaceName);
+        await this.hostNetworkInterfaceCardsManager.AddIPAddress(resourceReference.hostId, vlanInterfaceName2, subnet.brodcastAddress.Prev(), 23);
     }
 
     private async DeleteAllUsers(resourceReference: LightweightResourceReference)
@@ -235,6 +244,11 @@ export class ActiveDirectoryDomainControllerManager
     private DeriveDockerNetworkName(resourceReference: LightweightResourceReference)
     {
         return "opc-rdsipnet" + resourceReference.id;
+    }
+
+    private DeriveVLAN_SubInterfaceName(resourceReference: LightweightResourceReference)
+    {
+        return "opcsip-" + resourceReference.id;
     }
 
     private async DoDeltaUserSynchronization(resourceReference: LightweightResourceReference)

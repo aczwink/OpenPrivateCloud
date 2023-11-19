@@ -112,6 +112,8 @@ export class HostFirewallZonesManager
             return "qemu-vm-nic";
         if(nicName.startsWith("dh-"))
             return "docker-container-nic";
+        if(nicName === "docker_gwbridge")
+            return "docker_gwbridge";
 
         if(nicName.startsWith("opc-"))
         {
@@ -122,6 +124,8 @@ export class HostFirewallZonesManager
                     return zoneName;
             }
         }
+        if(nicName.startsWith("opcsip-"))
+            return "container-static-ip";
 
         throw new Error("Unknown NIC type: " + nicName);
     }
