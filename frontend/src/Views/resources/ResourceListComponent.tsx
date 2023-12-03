@@ -87,7 +87,7 @@ export class ResourceListComponent extends Component
                 return <BootstrapIcon>database</BootstrapIcon>;
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return <BootstrapIcon>folder-fill</BootstrapIcon>;
-            case resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name:
+            case resourceProviders.integrationServices.managedActiveDirectoryResourceType.name:
                 return <BootstrapIcon>houses</BootstrapIcon>;
             case resourceProviders.multimediaServices.avTranscoderResourceType.name:
                 return <BootstrapIcon>film</BootstrapIcon>;

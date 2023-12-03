@@ -52,8 +52,11 @@ export class RootComponent extends Component
             <ul className="nav nav-pills">
                 <NavItem route="/"><BootstrapIcon>speedometer2</BootstrapIcon> Dashboard</NavItem>
                 <NavItem route="/resourceGroups"><BootstrapIcon>collection-fill</BootstrapIcon> Resource groups</NavItem>
-                <NavItem route="/hosts"><BootstrapIcon>pc</BootstrapIcon> Hosts</NavItem>
+                <NavItem route="/dataExplorer"><BootstrapIcon>graph-up-arrow</BootstrapIcon> Data Explorer</NavItem>
                 <NavItem route="/usersandgroups"><BootstrapIcon>people-fill</BootstrapIcon> IAM</NavItem>
+            </ul>
+            <ul className="nav nav-pills">
+                <NavItem route="/hosts"><BootstrapIcon>pc</BootstrapIcon> Hosts</NavItem>
                 <NavItem route="/cluster"><BootstrapIcon>gear-fill</BootstrapIcon> Cluster settings</NavItem>
             </ul>
             <SessionComponent />

@@ -89,6 +89,11 @@ interface DockerContainerNetwork
     MacAddress: string;
 }
 
+export interface DockerContainerNetworkJoinOptions
+{
+    ipAddress: string;
+}
+
 export interface DockerContainerInfo
 {
     HostConfig: {
@@ -118,6 +123,11 @@ export class DockerManager
     }
 
     //Public methods
+    public async ConnectContainerToNetwork(hostId: number, containerName: string, dockerNetworkName: string, options: DockerContainerNetworkJoinOptions)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "connect", "--ip", options.ipAddress, dockerNetworkName, containerName], hostId);
+    }
+
     public async CreateContainerInstance(hostId: number, containerName: string, config: DockerContainerConfig)
     {
         await this.EnsureDockerIsInstalled(hostId);

@@ -20,7 +20,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
-import { ActiveDirectoryDomainControllerProperties } from "./properties";
+import { ManagedActiveDirectoryProperties } from "./properties";
 import { ManagedDockerContainerManager } from "../compute-services/ManagedDockerContainerManager";
 import { DockerContainerConfig } from "../compute-services/DockerManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
@@ -33,6 +33,7 @@ import { PublicUserData, UsersController } from "../../data-access/UsersControll
 import { UserCredentialsProvider } from "../../services/UserCredentialsProvider";
 import { PermissionsManager } from "../../services/PermissionsManager";
 import { resourceProviders } from "openprivatecloud-common";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 
 export interface ADDC_Configuration
 {
@@ -47,9 +48,8 @@ export interface ADDC_Configuration
 export interface ADDC_Settings
 {
     domain: string;
-    dcHostName: string;
     dcIP_Address: string;
-    dnsForwarderIP: string;
+    vNetId: number;
 }
 
 interface ADDC_UserState
@@ -73,11 +73,12 @@ interface ADDC_Config
 //GPO documentation for samba: https://wiki.samba.org/index.php/Group_Policy
 
 @Injectable
-export class ActiveDirectoryDomainControllerManager
+export class ManagedActiveDirectoryManager
 {
     constructor(private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController,
         private distroInfoService: DistroInfoService, private remoteCommandExecutor: RemoteCommandExecutor, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager,
-        private usersController: UsersController, private userCredentialsProvider: UserCredentialsProvider, private permissionsManager: PermissionsManager)
+        private usersController: UsersController, private userCredentialsProvider: UserCredentialsProvider, private permissionsManager: PermissionsManager,
+        private resourceDependenciesController: ResourceDependenciesController)
     {
     }
     
@@ -85,18 +86,18 @@ export class ActiveDirectoryDomainControllerManager
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         await this.managedDockerContainerManager.DestroyContainer(resourceReference);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "rm", this.DeriveDockerNetworkName(resourceReference)], resourceReference.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "rm", this.DeriveDockerStaticIPNetworkName(resourceReference)], resourceReference.hostId);
 
         const vlanInterfaceName = this.DeriveVLAN_SubInterfaceName(resourceReference);
-        const vlanInterfaceName2 = vlanInterfaceName + "-h";
-        await this.hostNetworkInterfaceCardsManager.DeleteVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName2);
         await this.hostNetworkInterfaceCardsManager.DeleteVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName);
 
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
-    public async ProvideResource(instanceProperties: ActiveDirectoryDomainControllerProperties, context: DeploymentContext)
+    public async ProvideResource(instanceProperties: ManagedActiveDirectoryProperties, context: DeploymentContext)
     {
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.vnetResourceId);
+
         await this.UpdateConfig(context.resourceReference.id, {
             config: {
                 enableAdministratorAccount: true,
@@ -104,9 +105,8 @@ export class ActiveDirectoryDomainControllerManager
             },
             settings: {
                 domain: instanceProperties.domain.toLowerCase(),
-                dcHostName: instanceProperties.dcHostName,
                 dcIP_Address: instanceProperties.ipAddress,
-                dnsForwarderIP: instanceProperties.dnsForwarderIP
+                vNetId: vnetRef!.id
             },
             state: {
                 userMapping: {}
@@ -114,7 +114,9 @@ export class ActiveDirectoryDomainControllerManager
         });
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
 
-        await this.CreateDockerNetwork(context.resourceReference);
+        await this.resourceDependenciesController.SetResourceDependencies(context.resourceReference.id, [vnetRef!.id]);
+
+        await this.CreateDockerStaticIPNetwork(context.resourceReference);
         this.UpdateServer(context.resourceReference);
     }
 
@@ -206,21 +208,17 @@ export class ActiveDirectoryDomainControllerManager
         return true;
     }
 
-    private async CreateDockerNetwork(resourceReference: LightweightResourceReference)
+    private async CreateDockerStaticIPNetwork(resourceReference: LightweightResourceReference)
     {
+        //unfortunately ipvlan interfaces can't be used to communicate between host and guest. this is by design. therefore we need the vnet integration to use the host as dns forwarder
         const netInterface = await this.hostNetworkInterfaceCardsManager.FindExternalNetworkInterface(resourceReference.hostId);
         const subnet = await this.hostNetworkInterfaceCardsManager.FindInterfaceSubnet(resourceReference.hostId, netInterface);
         const gateway = await this.hostNetworkInterfaceCardsManager.FindDefaultGateway(resourceReference.hostId);
+        
         const vlanInterfaceName = this.DeriveVLAN_SubInterfaceName(resourceReference);
         await this.hostNetworkInterfaceCardsManager.CreateVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName, netInterface);
-        const networkName = this.DeriveDockerNetworkName(resourceReference);
+        const networkName = this.DeriveDockerStaticIPNetworkName(resourceReference);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "docker", "network", "create", "-d", "ipvlan", "--subnet", subnet.ToString(), "--gateway", gateway, "-o", "ipvlan_mode=l2", "-o", "parent=" + vlanInterfaceName, networkName], resourceReference.hostId);
-
-        //ipvlan networks by default forbid host-container access, to enable this we create a second vlan interface that links to the first one. Unfortunately, we need a second ip address from the same subnet for this to work :S
-        //on the long term, a different solution should definitely be found
-        const vlanInterfaceName2 = vlanInterfaceName + "-h";
-        await this.hostNetworkInterfaceCardsManager.CreateVLAN_SubInterface(resourceReference.hostId, vlanInterfaceName2, vlanInterfaceName);
-        await this.hostNetworkInterfaceCardsManager.AddIPAddress(resourceReference.hostId, vlanInterfaceName2, subnet.brodcastAddress.Prev(), 23);
     }
 
     private async DeleteAllUsers(resourceReference: LightweightResourceReference)
@@ -241,7 +239,7 @@ export class ActiveDirectoryDomainControllerManager
         await this.UpdateConfig(resourceReference.id, config);
     }
 
-    private DeriveDockerNetworkName(resourceReference: LightweightResourceReference)
+    private DeriveDockerStaticIPNetworkName(resourceReference: LightweightResourceReference)
     {
         return "opc-rdsipnet" + resourceReference.id;
     }
@@ -255,7 +253,7 @@ export class ActiveDirectoryDomainControllerManager
     {
         const config = await this.ReadConfig(resourceReference.id);
 
-        const desiredUserIds = await this.permissionsManager.QueryUsersWithPermission(resourceReference.id, resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.permissions.use);
+        const desiredUserIds = await this.permissionsManager.QueryUsersWithPermission(resourceReference.id, resourceProviders.integrationServices.managedActiveDirectoryResourceType.permissions.use);
         const currentUserIds = config.state.userMapping.OwnKeys().Map(x => parseInt(x.toString())).ToSet();
         const toDelete = currentUserIds.Without(desiredUserIds);
 
@@ -301,22 +299,28 @@ export class ActiveDirectoryDomainControllerManager
         //const imageName = (arch === "arm64") ? "ghcr.io/aczwink/samba-domain:latest" : "nowsci/samba-domain";
         const imageName = "ghcr.io/aczwink/samba-domain:latest";
 
-        const dockerNetworkName = this.DeriveDockerNetworkName(resourceReference);
+        const vNetRef = await this.resourcesManager.CreateResourceReference(config.settings.vNetId);
+        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);
+
+        const dnsForwarderIP = dockerNetwork.primaryDNS_Server;
+
+        const dcHostName = "dc1"; //hostname of the domain controller. DO NOT use name "LOCALDC", since it is a reserved name.
+
         const containerConfig: DockerContainerConfig = {
             additionalHosts: [
                 {
-                    domainName: config.settings.dcHostName + "." + config.settings.domain,
+                    domainName: dcHostName + "." + config.settings.domain,
                     ipAddress: config.settings.dcIP_Address
                 }
             ],
             capabilities: ["NET_ADMIN", "SYS_NICE", "SYS_TIME"],
             cpuFraction: (os.cpus().length / 2),
             dnsSearchDomains: [config.settings.domain],
-            dnsServers: [config.settings.dcIP_Address, config.settings.dnsForwarderIP],
+            dnsServers: [config.settings.dcIP_Address, dnsForwarderIP],
             env: [
                 {
                     varName: "DNSFORWARDER",
-                    value: config.settings.dnsForwarderIP,
+                    value: dnsForwarderIP,
                 },
                 {
                     varName: "DOMAIN",
@@ -339,10 +343,9 @@ export class ActiveDirectoryDomainControllerManager
                     value: config.settings.dcIP_Address
                 }
             ],
-            hostName: config.settings.dcHostName,
+            hostName: dcHostName,
             imageName,
-            ipAddress: config.settings.dcIP_Address,
-            networkName: dockerNetworkName,
+            networkName: dockerNetwork.name,
             portMap: [],
             privileged: true,
             removeOnExit: false,
@@ -365,7 +368,11 @@ export class ActiveDirectoryDomainControllerManager
                 },
             ]
         };
+
         await this.managedDockerContainerManager.EnsureContainerIsRunning(resourceReference, containerConfig);
+
+        const dockerNetworkSIPName = this.DeriveDockerStaticIPNetworkName(resourceReference);
+        await this.managedDockerContainerManager.ConnectContainerToNetwork(resourceReference, dockerNetworkSIPName, { ipAddress: config.settings.dcIP_Address });
     }
 
     /**
@@ -414,7 +421,7 @@ export class ActiveDirectoryDomainControllerManager
 
     private async SynchronizeDomainAdmins(resourceReference: LightweightResourceReference)
     {
-        const desiredUserIds = await this.permissionsManager.QueryUsersWithPermission(resourceReference.id, resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.permissions.manage);
+        const desiredUserIds = await this.permissionsManager.QueryUsersWithPermission(resourceReference.id, resourceProviders.integrationServices.managedActiveDirectoryResourceType.permissions.manage);
         const config = await this.ReadConfig(resourceReference.id);
 
         const desiredUserNames = desiredUserIds.Values().Map(userId => config.state.userMapping[userId]!.mappedName).ToSet();

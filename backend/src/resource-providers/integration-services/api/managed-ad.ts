@@ -20,8 +20,8 @@ import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { APIController, Body, Common, Get, Path, Put } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
-import { c_activeDirectoryDomainControllerResourceTypeName, c_integrationServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { ADDC_Configuration, ADDC_Settings, ActiveDirectoryDomainControllerManager } from "../ActiveDirectoryDomainControllerManager";
+import { c_integrationServicesResourceProviderName, c_managedActiveDirectoryResourceTypeName } from "openprivatecloud-common/dist/constants";
+import { ADDC_Configuration, ADDC_Settings, ManagedActiveDirectoryManager } from "../ManagedActiveDirectoryManager";
 import { DockerContainerLogDto } from "../../compute-services/api/docker-container-app-service";
 
 interface ADDC_InfoDTO
@@ -44,12 +44,12 @@ interface ADDC_UserDTO
     state: string;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_integrationServicesResourceProviderName}/${c_activeDirectoryDomainControllerResourceTypeName}/{resourceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_integrationServicesResourceProviderName}/${c_managedActiveDirectoryResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
-    constructor(resourcesManager: ResourcesManager, private activeDirectoryDomainControllerManager: ActiveDirectoryDomainControllerManager)
+    constructor(resourcesManager: ResourcesManager, private activeDirectoryDomainControllerManager: ManagedActiveDirectoryManager)
     {
-        super(resourcesManager, c_integrationServicesResourceProviderName, c_activeDirectoryDomainControllerResourceTypeName);
+        super(resourcesManager, c_integrationServicesResourceProviderName, c_managedActiveDirectoryResourceTypeName);
     }
 
     @Common()

@@ -33,7 +33,7 @@ import { dnsServerViewModel } from "./network-services.ts/dns-server";
 import { vnetViewModel } from "./network-services.ts/virtual-network";
 import { keyVaultViewModel } from "./security-services/key-vault";
 import { apiGatewayViewModel } from "./web-services/api-gateway";
-import { addcViewModel } from "./integration-services/ad-dc";
+import { addcViewModel } from "./integration-services/managed-ad";
 
 export const resourcesRoutes: RoutingViewModel = {
     type: "routing",
@@ -59,7 +59,7 @@ export const resourcesRoutes: RoutingViewModel = {
             viewModel: fileStorageViewModel
         },
         {
-            key: `${resourceProviders.integrationServices.name}/${resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name}/:resourceName`,
+            key: `${resourceProviders.integrationServices.name}/${resourceProviders.integrationServices.managedActiveDirectoryResourceType.name}/:resourceName`,
             viewModel: addcViewModel,
         },
         {

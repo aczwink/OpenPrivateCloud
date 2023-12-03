@@ -141,7 +141,7 @@ class DebianPackageManager implements DistroPackageManager
             case "openvpn":
                 return ["openvpn", "easy-rsa"];
             case "samba":
-                return ["samba"];
+                return ["samba", "samba-common-bin"];
             case "webdav":
                 return ["davfs2"];
             /*

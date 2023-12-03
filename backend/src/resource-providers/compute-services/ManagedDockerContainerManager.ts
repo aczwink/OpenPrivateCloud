@@ -17,9 +17,8 @@
  * */
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
-import { DockerContainerConfig, DockerManager } from "./DockerManager";
+import { DockerContainerConfig, DockerContainerNetworkJoinOptions, DockerManager } from "./DockerManager";
 import { ResourceStateResult } from "../ResourceProvider";
-import { ResourcesManager } from "../../services/ResourcesManager";
 import { VNetManager } from "../network-services/VNetManager";
 
 export interface ContainerInfo
@@ -30,11 +29,17 @@ export interface ContainerInfo
 @Injectable
 export class ManagedDockerContainerManager
 {
-    constructor(private dockerManager: DockerManager, private resourcesManager: ResourcesManager, private vnetManager: VNetManager)
+    constructor(private dockerManager: DockerManager, private vnetManager: VNetManager)
     {
     }
     
     //Public methods
+    public async ConnectContainerToNetwork(resourceReference: LightweightResourceReference, dockerNetworkSIPName: string, options: DockerContainerNetworkJoinOptions)
+    {
+        const containerName = this.DeriveContainerName(resourceReference);
+        await this.dockerManager.ConnectContainerToNetwork(resourceReference.hostId, containerName, dockerNetworkSIPName, options);
+    }
+
     public CreateMAC_Address(resourceId: number): string
     {
         return this.dockerManager.CreateMAC_Address(resourceId);

@@ -36,13 +36,6 @@ interface DiskStat
     currentlyInProgress: number;
 }
 
-interface JournalEntry
-{
-    MESSAGE: string;
-    PRIORITY: string;
-    SYSLOG_TIMESTAMP: string;
-}
-
 interface PerformanceStats
 {
     /**
@@ -90,12 +83,6 @@ export class HostPerformanceMeasurementService
     }
 
     //Public methods
-    public async QueryLogs(hostId: number)
-    {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "journalctl", "--utc", "--no-pager", "-o", "json", "-n", "1000"], hostId);
-        return result.stdOut.trimEnd().split("\n").map(x => JSON.parse(x) as JournalEntry);
-    }
-
     public async QueryPerformanceStats(hostId: number): Promise<PerformanceStats>
     {
         const cpuUsage = await this.ComputeCPUUsage(hostId);

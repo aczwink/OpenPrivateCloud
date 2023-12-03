@@ -25,14 +25,14 @@ type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
 function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceGroupName + "/" + resourceProviders.integrationServices.name + "/" + resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name + "/" + resourceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.integrationServices.name + "/" + resourceProviders.integrationServices.managedActiveDirectoryResourceType.name + "/" + resourceName;
 }
 
 const overviewViewModel: ObjectViewModel<ADDC_InfoDTO, ResourceAndGroupId>  = {
     type: "object",
     actions: [],
     formTitle: _ => "Overview",
-    requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.info.get(ids.resourceGroupName, ids.resourceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.managedad._any_.info.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "ADDC_InfoDTO",
 };
 
@@ -42,12 +42,12 @@ const configViewModel: ObjectViewModel<ADDC_Configuration, ResourceAndGroupId> =
         {
             type: "edit",
             propertiesSchemaName: "ADDC_Configuration",
-            requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.config.get(ids.resourceGroupName, ids.resourceName),
-            updateResource: (service, ids, props) => service.resourceProviders._any_.integrationservices.addc._any_.config.put(ids.resourceGroupName, ids.resourceName, props),
+            requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.managedad._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, props) => service.resourceProviders._any_.integrationservices.managedad._any_.config.put(ids.resourceGroupName, ids.resourceName, props),
         }
     ],
     formTitle: _ => "Configuration",
-    requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.config.get(ids.resourceGroupName, ids.resourceName),
+    requestObject: (service, ids) => service.resourceProviders._any_.integrationservices.managedad._any_.config.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "ADDC_Configuration"
 };
 
@@ -56,14 +56,14 @@ const usersViewModel: ListViewModel<ADDC_UserDTO, ResourceAndGroupId> = {
     actions: [],
     boundActions: [],
     displayName: "Users",
-    requestObjects: (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.users.get(ids.resourceGroupName, ids.resourceName),
+    requestObjects: (service, ids) => service.resourceProviders._any_.integrationservices.managedad._any_.users.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "ADDC_UserDTO"
 };
 
 const logViewModel: ObjectViewModel<DockerContainerLogDto, ResourceAndGroupId> = {
     actions: [],
     formTitle: _ => "Logs",
-    requestObject: async (service, ids) => service.resourceProviders._any_.integrationservices.addc._any_.log.get(ids.resourceGroupName, ids.resourceName),
+    requestObject: async (service, ids) => service.resourceProviders._any_.integrationservices.managedad._any_.log.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "DockerContainerLogDto",
     type: "object"
 };

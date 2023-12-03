@@ -20,12 +20,12 @@ import { resourceProviders } from "openprivatecloud-common";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { ResourceReference } from "../../common/ResourceReference";
 import { IntegrationServicesProperties } from "./properties";
-import { ActiveDirectoryDomainControllerManager } from "./ActiveDirectoryDomainControllerManager";
+import { ManagedActiveDirectoryManager } from "./ManagedActiveDirectoryManager";
  
 @Injectable
 export class IntegrationServicesResourceProvider implements ResourceProvider<IntegrationServicesProperties>
 {
-    constructor(private activeDirectoryDomainControllerManager: ActiveDirectoryDomainControllerManager)
+    constructor(private activeDirectoryDomainControllerManager: ManagedActiveDirectoryManager)
     {
     }
 
@@ -41,7 +41,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
             {
                 fileSystemType: "btrfs",
                 healthCheckSchedule: null,
-                schemaName: "ActiveDirectoryDomainControllerProperties"
+                schemaName: "ManagedActiveDirectoryProperties"
             },
         ];
     }
@@ -55,7 +55,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
     {
         switch(resourceReference.resourceTypeName)
         {
-            case resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name:
+            case resourceProviders.integrationServices.managedActiveDirectoryResourceType.name:
                 await this.activeDirectoryDomainControllerManager.DeleteResource(resourceReference);
                 break;
         }
@@ -71,7 +71,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
     {
         switch(resourceReference.resourceTypeName)
         {
-            case resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name:
+            case resourceProviders.integrationServices.managedActiveDirectoryResourceType.name:
                 await this.activeDirectoryDomainControllerManager.ResourcePermissionsChanged(resourceReference);
                 break;
         }
@@ -81,7 +81,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
     {
         switch(instanceProperties.type)
         {
-            case "ad-dc":
+            case "managed-ad":
                 await this.activeDirectoryDomainControllerManager.ProvideResource(instanceProperties, context);
                 return {};
         }
@@ -91,7 +91,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
     {
         switch(resourceReference.resourceTypeName)
         {
-            case resourceProviders.integrationServices.activeDirectoryDomainControllerResourceType.name:
+            case resourceProviders.integrationServices.managedActiveDirectoryResourceType.name:
                 return await this.activeDirectoryDomainControllerManager.QueryResourceState(resourceReference);
         }
         return "corrupt";

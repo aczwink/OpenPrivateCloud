@@ -18,27 +18,23 @@
 
 import { BaseResourceProperties } from "../ResourceProvider";
 
-export interface ActiveDirectoryDomainControllerProperties extends BaseResourceProperties
+export interface ManagedActiveDirectoryProperties extends BaseResourceProperties
 {
-    type: "ad-dc";
+    type: "managed-ad";
 
     domain: string;
 
     /**
-     * Hostname of the domain controller. DO NOT use name "LOCALDC", since it is a reserved name.
-     * @default dc1
-     */
-    dcHostName: string;
-
-    /**
-     * IP address of the DNS server that unresolvable requests are forwarded to.
-     */
-    dnsForwarderIP: string;
-
-    /**
-     * Static IP of the domain controller. Should be on your hosts network.
+     * Static IP of the primary domain controller. Should be on your hosts network i.e. it is not an IP address of the VNet.
      */
     ipAddress: string;
+
+    /**
+     * The VNet serves as the DNS forwarder for the domain controllers.
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vnetResourceId: string;
 }
 
-export type IntegrationServicesProperties = ActiveDirectoryDomainControllerProperties;
+export type IntegrationServicesProperties = ManagedActiveDirectoryProperties;

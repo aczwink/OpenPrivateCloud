@@ -17,6 +17,7 @@
  * */
 
 import "./api/cluster";
+import "./api/data";
 import "./api/health";
 import "./api/hosts";
 import "./api/HostStorageDevicesAPIController";
@@ -37,7 +38,7 @@ import "./resource-providers/compute-services/api/docker-container-app-service";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/database-services/MariaDB/MariaDBAPIController";
 import "./resource-providers/file-services/FileStorageAPIController";
-import "./resource-providers/integration-services/api/ad-dc";
+import "./resource-providers/integration-services/api/managed-ad";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
 import "./resource-providers/network-services/api/dns-server";
 import "./resource-providers/network-services/OpenVPNGatewayAPIController";

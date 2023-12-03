@@ -108,18 +108,6 @@ class HostAPIController
         return host;
     }
 
-    @Get("logs")
-    public async QueryHostLogs(
-        @Path hostName: string
-    )
-    {
-        const hostId = await this.hostsController.RequestHostId(hostName);
-        if(hostId === undefined)
-            return NotFound("host does not exist");
-
-        return await this.hostPerformanceMeasurementService.QueryLogs(hostId);
-    }
-
     @Get("networkInterfaces")
     public async QueryNetworkInterfaces(
         @Path hostName: string

@@ -23,6 +23,7 @@ import { PageNotFoundComponent } from "./PageNotFoundComponent";
 import { RootComponent } from "./RootComponent";
 import { ViewModelsManager } from "./UI/ViewModelsManager";
 import { ViewProcessComponent } from "./Views/activitymonitor/ViewProcessComponent";
+import { DataExplorerComponent } from "./Views/data-explorer/DataExplorerComponent";
 
 function BuildRoutes()
 {
@@ -30,6 +31,7 @@ function BuildRoutes()
     
     const staticRoutes : Routes = [
         { path: "activitymonitor/:processId", guards: [AuthGuard], component: ViewProcessComponent },
+        { path: "dataExplorer", guards: [AuthGuard], component: DataExplorerComponent },
         { path: "login", component: LoginComponent},
         { path: "", component: DashboardComponent, guards: [AuthGuard] },
         { path: "*", component: PageNotFoundComponent},

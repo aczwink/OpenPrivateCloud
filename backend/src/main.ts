@@ -34,6 +34,8 @@ import { ProcessTrackerManager } from "./services/ProcessTrackerManager";
 import { ResourceEventsManager } from "./services/ResourceEventsManager";
 import { HostFirewallManager } from "./services/HostFirewallManager";
 import { ClusterEventsManager } from "./services/ClusterEventsManager";
+import { ClusterDataProvider } from "./services/ClusterDataProvider";
+import { HostLogDataProviderService } from "./services/HostLogDataProviderService";
 
 const port = 8078;
 
@@ -64,6 +66,13 @@ function EventManagementSetup()
         if(event.type === "keyStoreUnlocked")
         EnableHealthManagement();
     });
+}
+
+function SetupDataSources()
+{
+    const cdp = GlobalInjector.Resolve(ClusterDataProvider);
+
+    cdp.RegisterSourceProvider(GlobalInjector.Resolve(HostLogDataProviderService));
 }
 
 async function SetupWebServer()
@@ -98,6 +107,7 @@ async function SetupWebServer()
     server.listen(port, () => {
         console.log("Backend is running...");
         EnableHealthManagement();
+        SetupDataSources();
     });
 
     process.on('SIGINT', function()

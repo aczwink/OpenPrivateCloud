@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { FirewallRule, Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, JournalEntry, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
+import { FirewallRule, Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
@@ -49,15 +49,6 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
 };
 
 //Monitoring
-const logsViewModel: ListViewModel<JournalEntry, HostId> = {
-    type: "list",
-    actions: [],
-    boundActions: [],
-    displayName: "Logs",
-    requestObjects: (service, ids) => service.hosts._any_.logs.get(ids.hostName),
-    schemaName: "JournalEntry"
-};
-
 type StorageDeviceId = Host & { storageDevicePath: string };
 
 const partitionsViewModel: ListViewModel<PartitionDto, StorageDeviceId> =
@@ -265,11 +256,6 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                         type: "bootstrap",
                         name: "activity"
                     }
-                },
-                {
-                    child: logsViewModel,
-                    displayName: "Logs",
-                    key: "logs",
                 },
                 {
                     child: nicsViewModel,
