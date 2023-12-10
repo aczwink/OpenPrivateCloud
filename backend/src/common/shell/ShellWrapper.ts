@@ -25,3 +25,10 @@ export interface ShellWrapper
     WaitForCommandToFinish(): Promise<void>;
     WaitForStandardPrompt(): Promise<void>;
 }
+
+export interface ShellInterface
+{
+    Exit(): Promise<void>;
+    RegisterStdOutListener(callback: (data: string) => void): void;
+    SendInput(data: string): void;
+}

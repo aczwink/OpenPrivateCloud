@@ -139,10 +139,10 @@ export class MariaDBManager
 
     public async ProvideResource(instanceProperties: MariadbProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
-        switch(instanceProperties.deploymentType)
+        switch(instanceProperties.deployment.type)
         {
             case "container":
-                await this.mariaDBContainerManager.ProvideResource(instanceProperties, context);
+                await this.mariaDBContainerManager.ProvideResource(instanceProperties.deployment, context);
                 break;
             case "host":
                 await this.mariaDBHostManager.ProvideResource(instanceProperties, context);
@@ -150,7 +150,7 @@ export class MariaDBManager
         }
 
         const config: MariaDBConfig = {
-            deploymentType: instanceProperties.deploymentType
+            deploymentType: instanceProperties.deployment.type
         };
         return {
             config

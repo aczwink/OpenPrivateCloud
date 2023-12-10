@@ -19,7 +19,7 @@
 import { BackupVaultProperties } from "./backup-services/BackupVaultProperties";
 import { ComputeServicesProperties } from "./compute-services/Properties";
 import { MariadbProperties } from "./database-services/MariaDB/MariadbProperties";
-import { FileStorageProperties } from "./file-services/FileStorageProperties";
+import { FileServicesProperties } from "./file-services/properties";
 import { IntegrationServicesProperties } from "./integration-services/properties";
 import { AVTranscoderProperties } from "./multimedia-services/AVTranscoderProperties";
 import { NetworkServicesProperties } from "./network-services/properties";
@@ -30,7 +30,7 @@ export type AnyResourceProperties =
     AVTranscoderProperties
     | BackupVaultProperties
     | ComputeServicesProperties
-    | FileStorageProperties
+    | FileServicesProperties
     | IntegrationServicesProperties
     | MariadbProperties
     | NetworkServicesProperties

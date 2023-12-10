@@ -22,3 +22,10 @@ export interface FileStorageProperties extends BaseResourceProperties
 {
     type: "file-storage";
 }
+
+export interface ObjectStorageProperties extends BaseResourceProperties
+{
+    type: "object-storage";
+}
+
+export type FileServicesProperties = FileStorageProperties | ObjectStorageProperties;

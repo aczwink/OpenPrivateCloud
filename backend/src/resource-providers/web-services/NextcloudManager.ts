@@ -129,7 +129,7 @@ export class NextcloudManager
 
     private async DownloadNextcloudApp(hostId: number, instanceDir: string)
     {
-        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        const shell = await this.remoteCommandExecutor._LegacySpawnShell(hostId);
         await shell.ChangeDirectory(instanceDir);
 
         const commands = [

@@ -34,6 +34,7 @@ import { vnetViewModel } from "./network-services.ts/virtual-network";
 import { keyVaultViewModel } from "./security-services/key-vault";
 import { apiGatewayViewModel } from "./web-services/api-gateway";
 import { addcViewModel } from "./integration-services/managed-ad";
+import { objectStorageViewModel } from "./file-services/object-storage";
 
 export const resourcesRoutes: RoutingViewModel = {
     type: "routing",
@@ -57,6 +58,10 @@ export const resourcesRoutes: RoutingViewModel = {
         {
             key: `${resourceProviders.fileServices.name}/${resourceProviders.fileServices.fileStorageResourceType.name}/:resourceName`,
             viewModel: fileStorageViewModel
+        },
+        {
+            key: `${resourceProviders.fileServices.name}/${resourceProviders.fileServices.objectStorageResourceType.name}/:resourceName`,
+            viewModel: objectStorageViewModel
         },
         {
             key: `${resourceProviders.integrationServices.name}/${resourceProviders.integrationServices.managedActiveDirectoryResourceType.name}/:resourceName`,

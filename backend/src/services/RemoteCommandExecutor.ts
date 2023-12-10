@@ -19,6 +19,8 @@ import { Injectable } from "acts-util-node";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 import { Command } from "./SSHService";
 import { SSHCommandExecutor } from "./SSHCommandExecutor";
+import { ShellFrontend2, g_PS1 } from "../common/shell/ShellFrontEnd2";
+import { SSHShellInterface } from "../common/shell/SSHShellWrapper";
 
 interface CommandOptions
 {
@@ -90,13 +92,24 @@ export class RemoteCommandExecutor
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
 
-        return this.sshCommandExecutor.SpawnRawShell(conn.value, () => conn.Release(), hostId);
+        const channel = await conn.value.SpawnShell();
+        channel.write('PS1="' + g_PS1 + '"; export PS1\n');
+        channel.on("close", () => conn.Release());
+
+        return new SSHShellInterface(channel);
     }
 
     public async SpawnShell(hostId: number)
     {
+        const shellInterface = await this.SpawnRawShell(hostId);
+
+        return new ShellFrontend2(shellInterface, hostId);
+    }
+
+    public async _LegacySpawnShell(hostId: number)
+    {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
 
-        return this.sshCommandExecutor.SpawnShell(conn.value, () => conn.Release(), hostId);
+        return this.sshCommandExecutor._LegacySpawnShell(conn.value, () => conn.Release(), hostId);
     }
 }

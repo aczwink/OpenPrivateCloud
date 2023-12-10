@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { AutoCompleteSelectBox, BootstrapIcon, CheckBox, Component, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select } from "acfrontend";
+import { AutoCompleteSelectBox, BootstrapIcon, CheckBox, Component, FileSelect, FormField, Injectable, JSX_CreateElement, LineEdit, NumberSpinner, Select } from "acfrontend";
 import { OpenAPI, OpenAPISchemaValidator } from "acts-util-core";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { APIService } from "../../Services/APIService";
@@ -254,6 +254,8 @@ export class ObjectEditorComponent extends Component<ObjectEditorInput>
 
             switch(schema.format as string)
             {
+                case "binary":
+                    return <FileSelect onChanged={valueChanged} />;
                 case "hostName":
                     return <AutoCompleteSelectBox
                         onChanged={newValue => valueChanged(newValue.key)}

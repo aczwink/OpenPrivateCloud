@@ -16,21 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { ModulesManager } from "../../services/ModulesManager";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
-import { FileStorageProperties } from "./FileStorageProperties";
 import { FileStoragesManager } from "./FileStoragesManager";
-import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { ResourceReference } from "../../common/ResourceReference";
+import { FileServicesProperties } from "./properties";
+import { ObjectStoragesManager } from "./ObjectStoragesManager";
 
 @Injectable
-export class FileServicesResourceProvider implements ResourceProvider<FileStorageProperties>
+export class FileServicesResourceProvider implements ResourceProvider<FileServicesProperties>
 {
-    constructor(private resourcesManager: ResourcesManager, private modulesManager: ModulesManager, private fileStoragesManager: FileStoragesManager,
-        private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private fileStoragesManager: FileStoragesManager, private objectStoragesManager: ObjectStoragesManager)
     {
     }
     
@@ -47,6 +43,11 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
                 schemaName: "FileStorageProperties"
+            },
+            {
+                healthCheckSchedule: null,
+                fileSystemType: "btrfs",
+                schemaName: "ObjectStorageProperties"
             }
         ];
     }
@@ -58,39 +59,47 @@ export class FileServicesResourceProvider implements ResourceProvider<FileStorag
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
     {
-        await this.fileStoragesManager.UpdateConfig(resourceReference, {
-            smb: { enabled: false, transportEncryption: false }
-        });
-        await this.fileStoragesManager.DeleteAllSnapshots(resourceReference);
-        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
-
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.fileServices.fileStorageResourceType.name:
+                return await this.fileStoragesManager.DeleteResource(resourceReference);
+            case resourceProviders.fileServices.objectStorageResourceType.name:
+                return await this.objectStoragesManager.DeleteResource(resourceReference);
+        }
         return null;
     }
 
     public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>
     {
-        await this.fileStoragesManager.ExternalResourceIdChanged(resourceReference, oldExternalResourceId);
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.fileServices.fileStorageResourceType.name:
+                await this.fileStoragesManager.ExternalResourceIdChanged(resourceReference, oldExternalResourceId);
+                break;
+        }
     }
 
     public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
-        await this.fileStoragesManager.RefreshPermissions(resourceReference);
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.fileServices.fileStorageResourceType.name:
+                await this.fileStoragesManager.RefreshPermissions(resourceReference);
+                break;
+        }
     }
 
-    public async ProvideResource(instanceProperties: FileStorageProperties, context: DeploymentContext): Promise<DeploymentResult>
+    public async ProvideResource(instanceProperties: FileServicesProperties, context: DeploymentContext): Promise<DeploymentResult>
     {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
-        const resourcePath = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, resourcePath, 0o775);
-
-        const dataPath = this.fileStoragesManager.GetDataPath(context.resourceReference);
-        const snapshotsPath = this.fileStoragesManager.GetSnapshotsPath(context.resourceReference);
-
-        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "create", dataPath], context.hostId);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, dataPath, 0o770);
-
-        await this.remoteFileSystemManager.CreateDirectory(context.hostId, snapshotsPath);
-        await this.remoteFileSystemManager.ChangeMode(context.hostId, snapshotsPath, 0o750);
+        switch(instanceProperties.type)
+        {
+            case resourceProviders.fileServices.fileStorageResourceType.name:
+                await this.fileStoragesManager.ProvideResource(context);
+                break;
+            case resourceProviders.fileServices.objectStorageResourceType.name:
+                await this.objectStoragesManager.ProvideResource(context.resourceReference);
+                break;
+        }
 
         return {};
     }

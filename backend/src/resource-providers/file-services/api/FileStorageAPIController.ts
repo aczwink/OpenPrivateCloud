@@ -18,15 +18,15 @@
 
 import { APIController, Common, Body, Forbidden, Get, Header, Path, Put, Query, Post, BadRequest, NotFound } from "acts-util-apilib";
 import path from "path";
-import { HostUsersManager } from "../../services/HostUsersManager";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+import { HostUsersManager } from "../../../services/HostUsersManager";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { RemoteFileSystemManager } from "../../../services/RemoteFileSystemManager";
 import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { SessionsManager } from "../../services/SessionsManager";
-import { FileStorageConfig, FileStoragesManager } from "./FileStoragesManager";
-import { ResourceReference } from "../../common/ResourceReference";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { PermissionsManager } from "../../services/PermissionsManager";
+import { SessionsManager } from "../../../services/SessionsManager";
+import { FileStorageConfig, FileStoragesManager } from "../FileStoragesManager";
+import { ResourceReference, ResourceReferenceWithSession } from "../../../common/ResourceReference";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { PermissionsManager } from "../../../services/PermissionsManager";
 import { permissions } from "openprivatecloud-common";
 
 interface DeploymentDataDto
@@ -50,12 +50,6 @@ interface FileEntry
 interface SnapshotDto
 {
     date: Date;
-}
-
-interface ResourceReferenceWithSession
-{
-    resourceReference: ResourceReference;
-    userId: number;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{resourceName}`)

@@ -18,8 +18,26 @@
 
 import { BaseResourceProperties } from "../../ResourceProvider";
 
+export interface MariadbContainerProperties
+{
+    type: "container";
+
+    /**
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vnetResourceId: string;
+}
+
+interface MariadbHostProperties
+{
+    type: "host";
+}
+
+type DeploymentProperties = MariadbContainerProperties | MariadbHostProperties;
+
 export interface MariadbProperties extends BaseResourceProperties
 {
     type: "mariadb";
-    deploymentType: "container" | "host";
+    deployment: DeploymentProperties;
 }

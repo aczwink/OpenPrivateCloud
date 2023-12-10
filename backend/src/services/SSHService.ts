@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -37,8 +37,8 @@ export interface SSHConnection
     ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
     MoveFile(sourcePath: string, targetPath: string): Promise<void>;
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
+    ReadFile(remotePath: string): Promise<Buffer>;
     ReadLink(remotePath: string): Promise<string>;
-    ReadTextFile(remotePath: string): Promise<string>;
     RemoveDirectory(remotePath: string): Promise<void>;
     SpawnShell(): Promise<ssh2.ClientChannel>;
     UnlinkFile(remotePath: string): Promise<void>;
@@ -164,6 +164,18 @@ class SSHConnectionImpl implements SSHConnection
         });
     }
 
+    public ReadFile(remotePath: string): Promise<Buffer>
+    {
+        return new Promise<Buffer>( (resolve, reject) => {
+            this.sftp.readFile(remotePath, (err, buffer) => {
+                if(err)
+                    reject(err);
+                else
+                    resolve(buffer);
+            });
+        });
+    }
+
     public ReadLink(remotePath: string): Promise<string>
     {
         return new Promise<string>( (resolve, reject) => {
@@ -172,18 +184,6 @@ class SSHConnectionImpl implements SSHConnection
                     reject(err);
                 else
                     resolve(target);
-            });
-        });
-    }
-
-    public ReadTextFile(remotePath: string): Promise<string>
-    {
-        return new Promise<string>( (resolve, reject) => {
-            this.sftp.readFile(remotePath, (err, buffer) => {
-                if(err)
-                    reject(err);
-                else
-                    resolve(buffer.toString("utf-8"));
             });
         });
     }
@@ -204,9 +204,6 @@ class SSHConnectionImpl implements SSHConnection
     {
         return new Promise<ssh2.ClientChannel>( (resolve, reject) => {
             this.conn.shell({
-                env: {
-                    PS1: "$ "
-                }
             }, (err, channel) => {
                 if(err !== undefined)
                     reject(err);

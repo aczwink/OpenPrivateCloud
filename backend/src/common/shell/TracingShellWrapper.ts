@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { ProcessTracker, ProcessTrackerManager } from "../services/ProcessTrackerManager";
+import { ProcessTracker, ProcessTrackerManager } from "../../services/ProcessTrackerManager";
 import { ShellWrapper } from "./ShellWrapper";
 
 export class TracingShellWrapper implements ShellWrapper

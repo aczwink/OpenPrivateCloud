@@ -24,6 +24,8 @@ import { ResourceConfigController } from "../../data-access/ResourceConfigContro
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
 import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
+import { ModulesManager } from "../../services/ModulesManager";
+import { DeploymentContext } from "../ResourceProvider";
 
 interface SMBConfig
 {
@@ -44,7 +46,7 @@ export interface FileStorageConfig
 export class FileStoragesManager
 {
     constructor(private resourcesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
-        private remoteFileSystemManager: RemoteFileSystemManager,
+        private remoteFileSystemManager: RemoteFileSystemManager, private modulesManager: ModulesManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: ResourceConfigController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
     {
@@ -69,6 +71,17 @@ export class FileStoragesManager
         const snapshots = await this.QuerySnapshotsOrdered(resourceReference);
         for (const snapshot of snapshots)
             await this.DeleteSnapshot(resourceReference, snapshot.snapshotName);
+    }
+
+    public async DeleteResource(resourceReference: ResourceReference)
+    {
+        await this.UpdateConfig(resourceReference, {
+            smb: { enabled: false, transportEncryption: false }
+        });
+        await this.DeleteAllSnapshots(resourceReference);
+        await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
+
+        return null;
     }
 
     public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference: LightweightResourceReference)
@@ -116,6 +129,22 @@ export class FileStoragesManager
     {
         const resourcePath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
         return path.join(resourcePath, "snapshots");
+    }
+
+    public async ProvideResource(context: DeploymentContext)
+    {
+        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
+        const resourcePath = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, resourcePath, 0o775);
+
+        const dataPath = this.GetDataPath(context.resourceReference);
+        const snapshotsPath = this.GetSnapshotsPath(context.resourceReference);
+
+        await this.remoteCommandExecutor.ExecuteCommand(["btrfs", "subvolume", "create", dataPath], context.hostId);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, dataPath, 0o770);
+
+        await this.remoteFileSystemManager.CreateDirectory(context.hostId, snapshotsPath);
+        await this.remoteFileSystemManager.ChangeMode(context.hostId, snapshotsPath, 0o750);
     }
 
     public async QuerySnapshotsOrdered(resourceReference: LightweightResourceReference)

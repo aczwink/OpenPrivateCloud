@@ -83,3 +83,9 @@ export class ResourceReference implements LightweightResourceReference
         return this._props.resourceType;
     }
 }
+
+export interface ResourceReferenceWithSession
+{
+    resourceReference: ResourceReference;
+    userId: number;
+}

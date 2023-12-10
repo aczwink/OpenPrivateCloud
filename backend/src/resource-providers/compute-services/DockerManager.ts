@@ -16,11 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { ShellFrontend } from "../../common/ShellFrontend";
-import { ShellWrapper } from "../../common/ShellWrapper";
+import { ShellInterface } from "../../common/shell/ShellWrapper";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { Dictionary } from "acts-util-core";
+import { ShellFrontend2, g_PS1 } from "../../common/shell/ShellFrontEnd2";
 
 
 type DockerCapability = "NET_ADMIN" | "SYS_ADMIN" | "SYS_NICE" | "SYS_TIME";
@@ -222,22 +222,21 @@ export class DockerManager
             throw new Error("Container is not there. Can't spawn shell."); //TODO: because of the bad shell implementation, we need to track this beforehand :S
 
         const hostShell = await this.remoteCommandExecutor.SpawnRawShell(hostId);
-        const hostShellFrontend = new ShellFrontend(hostShell);
-        await hostShellFrontend.ExecuteCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", 'PS1="$ "', containerName, shellType]);
 
-        const containerShell: ShellWrapper = {
-            Close: async () => {
-                await hostShellFrontend.ExecuteCommand(["exit"]); //exit out of container
-                return hostShell.Close();
+        const containerShell: ShellInterface = { //required because exiting the shell requires exiting out of container first
+            Exit: async () => {
+                await frontEnd.ExecuteCommand(["exit"]); //exit out of container
+                return hostShell.Exit();
             },
-            RegisterForDataEvents: callback => hostShell.RegisterForDataEvents(callback),
+            RegisterStdOutListener: callback => hostShell.RegisterStdOutListener(callback),
             SendInput: data => hostShell.SendInput(data),
-            StartCommand: command => hostShell.StartCommand(command),
-            WaitForCommandToFinish: () => hostShell.WaitForCommandToFinish(),
-            WaitForStandardPrompt: () => hostShell.WaitForStandardPrompt(),
         };
 
-        return new ShellFrontend(containerShell);
+        const frontEnd = new ShellFrontend2(containerShell, hostId);
+        await frontEnd.IssueCommand(["sudo", "docker", "exec", "--interactive", "-t", "-e", 'PS1="' + g_PS1 + '"', containerName, shellType]);
+        await frontEnd.WaitForStandardPrompt();
+
+        return frontEnd;
     }
 
     public async StartExistingContainer(hostId: number, containerName: string)

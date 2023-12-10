@@ -382,21 +382,16 @@ export class ManagedActiveDirectoryManager
     {
         const shell = await this.managedDockerContainerManager.SpawnShell(resourceReference);
 
-        //TODO: avoid password being visible
-        shell.StartCommand(["samba-tool", "user", "setpassword", mappedName]);
-        await new Promise( resolve => {
-            setTimeout(resolve, 1000);
-        }); //wait a little for the password prompt, TODO: implement expect functionality
-        shell.SendInputLine(password);
+        await shell.IssueCommand(["samba-tool", "user", "setpassword", mappedName]);
 
-        await new Promise( resolve => {
-            setTimeout(resolve, 1000);
-        }); //wait a little for the password prompt, TODO: implement expect functionality
+        await shell.Expect("New Password: ");
+        shell.SendInputLine(password);
+        await shell.Expect("Retype Password: ");
         shell.SendInputLine(password);
 
         await shell.WaitForCommandToFinish();
 
-        await shell.Close();
+        await shell.ExitSession();
         
     }
 

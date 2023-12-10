@@ -102,6 +102,24 @@ export class RemoteFileSystemManager
         }
     }
 
+    public async ReadFile(hostId: number, filePath: string)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        try
+        {
+            const result = await conn.value.ReadFile(filePath);
+            return result;
+        }
+        catch(e)
+        {
+            throw new Error("Reading file at path " + filePath + " on host " + hostId + " failed." + e);
+        }
+        finally
+        {
+            conn.Release();
+        }
+    }
+
     public async ReadLink(hostId: number, filePath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
@@ -112,20 +130,8 @@ export class RemoteFileSystemManager
 
     public async ReadTextFile(hostId: number, filePath: string)
     {
-        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        try
-        {
-            const result = await conn.value.ReadTextFile(filePath);
-            return result;
-        }
-        catch(e)
-        {
-            throw new Error("Reading text file at path " + filePath + " on host " + hostId + " failed." + e);
-        }
-        finally
-        {
-            conn.Release();
-        }
+        const buffer = await this.ReadFile(hostId, filePath);
+        return buffer.toString("utf-8");
     }
 
     public async RemoveDirectory(hostId: number, path: string)

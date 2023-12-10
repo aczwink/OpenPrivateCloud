@@ -17,8 +17,8 @@
  * */
 import { GlobalInjector } from "acts-util-node";
 import xmljs from "xml-js";
-import { ShellFrontend } from "../../common/ShellFrontend";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { ShellFrontend2 } from "../../common/shell/ShellFrontEnd2";
 
 interface Field
 {
@@ -50,7 +50,7 @@ export interface MySQLGrant
  
 export class MySQLClient
 {
-    constructor(private spawnShell: () => Promise<ShellFrontend>, private clientProg: "mysql" | "mariadb", private commandPrefix: string[], private rootPassword: string)
+    constructor(private spawnShell: () => Promise<ShellFrontend2>, private clientProg: "mysql" | "mariadb", private commandPrefix: string[], private rootPassword: string)
     {
     }
 
@@ -77,18 +77,13 @@ export class MySQLClient
 
     public async ExecuteSelectQuery(query: string): Promise<any[]>
     {
-        let data = "";
-
         const shell = await this.spawnShell();
-        await shell.StartCommand(this.commandPrefix.concat([this.clientProg, "-u", "root", "-p", "--xml", "-e", '"' + query + '"']));
+        await shell.IssueCommand(this.commandPrefix.concat([this.clientProg, "-u", "root", "-p", "--xml", "-e", '"' + query + '"']));
 
         await this.LogIn(shell);
 
-        shell.RegisterForDataEvents(chunk => data += chunk);
-        await shell.WaitForCommandToFinish();
-        shell.RegisterForDataEvents(undefined);
-
-        await shell.Close();
+        const data = await shell.BufferDataUntilCommandEnds();
+        await shell.ExitSession();
 
         const obj = xmljs.xml2js(data, { compact: true });
         const resultSet = (obj as any).resultset;
@@ -116,19 +111,17 @@ export class MySQLClient
     private async ExecuteMySQLQuery(mysqlQuery: string)
     {
         const shell = await this.spawnShell();
-        await shell.StartCommand(this.commandPrefix.concat([this.clientProg, "-u", "root", "-p", "-e", '"' + mysqlQuery + '"']));
+        await shell.IssueCommand(this.commandPrefix.concat([this.clientProg, "-u", "root", "-p", "-e", '"' + mysqlQuery + '"']));
 
         await this.LogIn(shell);
 
         await shell.WaitForCommandToFinish();
-        await shell.Close();
+        await shell.ExitSession();
     }
 
-    private async LogIn(shell: ShellFrontend)
+    private async LogIn(shell: ShellFrontend2)
     {
-        await new Promise( resolve => {
-            setTimeout(resolve, 1000);
-        }); //wait a little for the password prompt
+        await shell.Expect("Enter password: ");
         shell.SendInputLine(this.rootPassword);
     }
 

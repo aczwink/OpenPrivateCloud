@@ -53,7 +53,7 @@ export class EasyRSAManager
             workingDirectory: caDir
         });
 
-        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        const shell = await this.remoteCommandExecutor._LegacySpawnShell(hostId);
         await shell.ChangeDirectory(caDir);
 
         await shell.ExecuteCommand(["./easyrsa", "--batch", "--keysize=" + caConfig.keySize, "--req-cn=" + caConfig.commonName, "build-ca", "nopass"]);
@@ -98,7 +98,7 @@ export class EasyRSAManager
 
     public async RevokeCertificate(hostId: number, cadir: string, name: string)
     {
-        const shell = await this.remoteCommandExecutor.SpawnShell(hostId);
+        const shell = await this.remoteCommandExecutor._LegacySpawnShell(hostId);
         await shell.ChangeDirectory(cadir);
 
         await shell.ExecuteCommand(["./easyrsa", "--batch", "revoke", name]);

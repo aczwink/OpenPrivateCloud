@@ -81,7 +81,7 @@ export class HostNetworkInterfaceCardsManager
 
     public async DeleteVLAN_SubInterface(hostId: number, interfaceName: string)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "ip", "link", "del", interfaceName], hostId);
+        await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["sudo", "ip", "link", "del", interfaceName], hostId);
     }
 
     public async DoesInterfaceExist(hostId: number, interfaceName: string)

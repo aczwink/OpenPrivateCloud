@@ -28,6 +28,7 @@ export const c_mariadbResourceTypeName = "mariadb";
 
 export const c_fileServicesResourceProviderName = "file-services";
 export const c_fileStorageResourceTypeName = "file-storage";
+export const c_objectStorageResourceTypeName = "object-storage";
 
 export const c_integrationServicesResourceProviderName = "integration-services";
 export const c_managedActiveDirectoryResourceTypeName = "managed-ad";

@@ -18,8 +18,8 @@
 import ssh2 from "ssh2";
 import { Property } from "acts-util-core";
 import { GlobalInjector } from "acts-util-node";
-import { ShellWrapper } from "./ShellWrapper";
-import { HostsManager } from "../services/HostsManager";
+import { ShellInterface, ShellWrapper } from "./ShellWrapper";
+import { HostsManager } from "../../services/HostsManager";
 
 const colorCodeRegEx = new RegExp("\x1B\[[0-9;?]*[a-zA-Z]");
 const bashPrompt = new RegExp("[a-z\-]+@[a-z\-]+:~\\$ $");
@@ -132,5 +132,38 @@ export class SSHShellWrapper implements ShellWrapper
         }
         else
             this.dataCallback?.call(undefined, data);
+    }
+}
+
+
+
+export class SSHShellInterface implements ShellInterface
+{
+    constructor(private channel: ssh2.ClientChannel)
+    {
+        channel.stderr.setEncoding("utf-8");
+        channel.stderr.on("data", chunk => process.stderr.write(chunk));
+    }
+
+    //Public methods
+    public Exit(): Promise<void>
+    {
+        const promise = new Promise<void>( resolve => {
+            this.channel.on("exit", resolve);
+        });
+        this.channel.end("exit\n");
+        
+        return promise;
+    }
+
+    public RegisterStdOutListener(callback: (data: string) => void): void
+    {
+        this.channel.stdout.setEncoding("utf-8");
+        this.channel.stdout.on("data", callback);
+    }
+
+    public SendInput(data: string): void
+    {
+        this.channel.write(data, "utf-8");
     }
 }

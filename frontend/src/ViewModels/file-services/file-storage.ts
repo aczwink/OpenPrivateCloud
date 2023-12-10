@@ -21,7 +21,6 @@ import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { FileManagerComponent } from "../../Views/file-manager/FileManagerComponent";
 import { resourceProviders } from "openprivatecloud-common";
 import { ListViewModel } from "../../UI/ListViewModel";
-import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };

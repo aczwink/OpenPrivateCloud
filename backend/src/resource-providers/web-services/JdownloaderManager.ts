@@ -91,7 +91,7 @@ export class JdownloaderManager
         const downloadsPath = path.join(resourceDir, "Downloads");
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, downloadsPath);
 
-        const shell = await this.remoteCommandExecutor.SpawnShell(context.hostId);
+        const shell = await this.remoteCommandExecutor._LegacySpawnShell(context.hostId);
         await shell.ChangeUser(authority.linuxUserName);
         await shell.ChangeDirectory(resourceDir);
 

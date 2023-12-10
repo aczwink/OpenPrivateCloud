@@ -20,13 +20,15 @@ import { DockerContainerConfig, DockerManager } from "../../compute-services/Doc
 import { DeploymentContext } from "../../ResourceProvider";
 import { MySQLClient, MySQLGrant } from "../MySQLClient";
 import { MariaDBInterface } from "./MariaDBInterface";
-import { MariadbProperties } from "./MariadbProperties";
+import { MariadbContainerProperties } from "./MariadbProperties";
 import { LightweightResourceReference } from "../../../common/ResourceReference";
+import { VNetManager } from "../../network-services/VNetManager";
+import { ResourcesManager } from "../../../services/ResourcesManager";
 
 @Injectable
 export class MariaDBContainerManager implements MariaDBInterface
 {
-    constructor(private dockerManager: DockerManager)
+    constructor(private dockerManager: DockerManager, private vnetManager: VNetManager, private resourcesManager: ResourcesManager)
     {
     }
 
@@ -42,18 +44,12 @@ export class MariaDBContainerManager implements MariaDBInterface
         const containerName = this.DeriveContainerName(resourceReference);
         const shell = await this.dockerManager.SpawnShell(resourceReference.hostId, containerName);
 
-        await shell.StartCommand(["mariadbcheck", "--all-databases", "-u", "root", "-p"]);
-        await new Promise( resolve => {
-            setTimeout(resolve, 1000);
-        }); //wait a little for the password prompt
+        await shell.IssueCommand(["mariadbcheck", "--all-databases", "-u", "root", "-p"]);
+        await shell.Expect("Enter password: ");
         shell.SendInputLine("openprivatecloud" /*TODO: PW*/);
 
-        let data = "";
-        shell.RegisterForDataEvents(chunk => data += chunk);
-        await shell.WaitForCommandToFinish();
-        shell.RegisterForDataEvents(undefined);
-
-        await shell.Close();
+        const data = await shell.BufferDataUntilCommandEnds();
+        await shell.ExitSession();
 
         return data;
     }
@@ -94,14 +90,16 @@ export class MariaDBContainerManager implements MariaDBInterface
         return resultSet;
     }
 
-    public async ProvideResource(instanceProperties: MariadbProperties, context: DeploymentContext)
+    public async ProvideResource(properties: MariadbContainerProperties, context: DeploymentContext)
     {
-        throw new Error("TODO: MISSING vnetResourceExternalId, mac, dnsServers");
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(properties.vnetResourceId);
+        const dockerNetwork = await this.vnetManager.EnsureDockerNetworkExists(vnetRef!);
+
         const config: DockerContainerConfig = {
             additionalHosts: [],
             capabilities: [],
             dnsSearchDomains: [],
-            dnsServers: [], //TODO SET THIS
+            dnsServers: [dockerNetwork.primaryDNS_Server],
             env: [
                 {
                     varName: "MARIADB_ROOT_PASSWORD",
@@ -109,8 +107,8 @@ export class MariaDBContainerManager implements MariaDBInterface
                 }
             ],
             imageName: "mariadb",
-            macAddress: "TODO",
-            networkName: "TODO",
+            macAddress: this.dockerManager.CreateMAC_Address(context.resourceReference.id),
+            networkName: dockerNetwork.name,
             portMap: [],
             privileged: false,
             removeOnExit: false,

@@ -18,10 +18,10 @@
 
 import { Injectable } from "acts-util-node";
 import { ClientChannel } from "ssh2";
-import { ShellFrontend } from "../common/ShellFrontend";
-import { ShellWrapper } from "../common/ShellWrapper";
-import { SSHShellWrapper } from "../common/SSHShellWrapper";
-import { TracingShellWrapper } from "../common/TracingShellWrapper";
+import { ShellFrontend } from "../common/shell/ShellFrontend";
+import { ShellWrapper } from "../common/shell/ShellWrapper";
+import { SSHShellWrapper } from "../common/shell/SSHShellWrapper";
+import { TracingShellWrapper } from "../common/shell/TracingShellWrapper";
 import { ProcessTracker, ProcessTrackerManager } from "./ProcessTrackerManager";
 import { SSHConnection, Command } from "./SSHService";
 
@@ -115,15 +115,15 @@ export class SSHCommandExecutor
         return exitCode;
     }
 
-    public async SpawnRawShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellWrapper>
+    public async _LegacySpawnRawShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellWrapper>
     {
         const channel = await connection.SpawnShell();
 
         channel.stderr.setEncoding("utf-8");
         channel.stdout.setEncoding("utf-8");
 
-        channel.on("close", onClose);
         channel.stderr.on("data", chunk => process.stderr.write(chunk));
+        channel.on("close", onClose);
         //channel.stdout.on("data", (chunk: any) => process.stdout.write(chunk));
 
         let shell: ShellWrapper = new SSHShellWrapper(channel, hostId);
@@ -133,9 +133,9 @@ export class SSHCommandExecutor
         return shell;
     }
 
-    public async SpawnShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellFrontend>
+    public async _LegacySpawnShell(connection: SSHConnection, onClose: Function, hostId: number): Promise<ShellFrontend>
     {
-        return new ShellFrontend(await this.SpawnRawShell(connection, onClose, hostId));
+        return new ShellFrontend(await this._LegacySpawnRawShell(connection, onClose, hostId));
     }
 
     //Private methods
@@ -262,7 +262,7 @@ export class SSHCommandExecutor
 
     private async ExecuteCommandUsingShell(connection: SSHConnection, command: Command, options: CommandOptions)
     {
-        const shell = await this.SpawnShell(connection, () => null, options.hostIdOrHostName as number);
+        const shell = await this._LegacySpawnShell(connection, () => null, options.hostIdOrHostName as number);
         await shell.ChangeDirectory(options.workingDirectory!);
 
         await shell.ExecuteCommand(command as string[]);
