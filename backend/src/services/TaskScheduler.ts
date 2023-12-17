@@ -39,6 +39,13 @@ export class TaskScheduler
     }
 
     //Public methods
+    public ScheduleAfterHours(n: number, task: () => void)
+    {
+        const oneHour = 60 * 60 * 1000;
+        const next = Date.now() + n * oneHour;
+        return this.ScheduleAtTimeOrNow(new Date(next), task);
+    }
+
     public ScheduleWithOverdueProtection(lastScheduleTime: Date, schedule: TimeSchedule, task: () => void)
     {
         //the overdue protection is inspired by anacron. When a task is overdue, it is scheduled immediately

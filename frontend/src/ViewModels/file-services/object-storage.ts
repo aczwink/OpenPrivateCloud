@@ -18,8 +18,8 @@
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { resourceProviders } from "openprivatecloud-common";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { FileCreationData, FileMetaDataOverviewData, StoredFileMetaData } from "../../../dist/api";
 import { FileDownloadService, RootInjector } from "acfrontend";
+import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataRevision } from "../../../dist/api";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -29,7 +29,7 @@ function BuildResourceId(resourceGroupName: string, resourceName: string)
     return "/" + resourceGroupName + "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.objectStorageResourceType.name + "/" + resourceName;
 }
 
-const fileViewModel: ObjectViewModel<StoredFileMetaData, FileId> = {
+const fileViewModel: ObjectViewModel<FileMetaDataDTO, FileId> = {
     type: "object",
     actions: [
         {
@@ -39,7 +39,7 @@ const fileViewModel: ObjectViewModel<StoredFileMetaData, FileId> = {
                 if(response1.statusCode !== 200)
                     throw new Error("TODO: implement me");
 
-                const response2 = await service.resourceProviders._any_.fileservices.objectstorage._any_.blobs._any_.get(ids.resourceGroupName, ids.resourceName, response1.data.blobId);
+                const response2 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId);
                 if(response2.statusCode !== 200)
                     throw new Error("TODO: implement me");
 
@@ -60,16 +60,16 @@ const fileViewModel: ObjectViewModel<StoredFileMetaData, FileId> = {
     ],
     formTitle: (ids, _) => ids.fileId,
     requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
-    schemaName: "StoredFileMetaData"
+    schemaName: "FileMetaDataDTO"
 };
 
-const filesViewModel: CollectionViewModel<FileMetaDataOverviewData, ResourceAndGroupId, FileCreationData> = {
+const filesViewModel: CollectionViewModel<FileMetaDataRevision, ResourceAndGroupId, FileCreationDataDTO> = {
     type: "collection",
     actions: [
         {
             type: "create",
             createResource: (service, ids, data) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.put(ids.resourceGroupName, ids.resourceName, data.fileId, { file: data.fileData }),
-            schemaName: "FileCreationData"
+            schemaName: "FileCreationDataDTO"
         }
     ],
     child: fileViewModel,
@@ -77,7 +77,7 @@ const filesViewModel: CollectionViewModel<FileMetaDataOverviewData, ResourceAndG
     extractId: x => x.id,
     idKey: "fileId",
     requestObjects: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "FileMetaDataOverviewData"
+    schemaName: "FileMetaDataRevision"
 };
 
 export const objectStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {

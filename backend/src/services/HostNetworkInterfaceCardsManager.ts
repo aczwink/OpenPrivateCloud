@@ -49,17 +49,7 @@ export class HostNetworkInterfaceCardsManager
         const bringBridgeUpCommand = ["ip", "link", "set", "dev", bridgeName, "up"];
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...bringBridgeUpCommand], hostId);
 
-        const persistentCommand = [bridgeCreationCommand, bridgeAddrAssignmentCommand, bringBridgeUpCommand].map(x => x.join(" ")).join(" && ");
-        await this.systemServicesManager.CreateOrUpdateService(hostId, {
-            before: ["docker.service"],
-            command: "/bin/bash -c '" + persistentCommand + "'",
-            environment: {},
-            groupName: "root",
-            name: bridgeName,
-            userName: "root"
-        });
-
-        await this.systemServicesManager.EnableService(hostId, bridgeName);
+        await this.PersistantNetInterface(hostId, bridgeName, [bridgeCreationCommand, bridgeAddrAssignmentCommand, bringBridgeUpCommand]);
     }
 
     public async CreateVLAN_SubInterface(hostId: number, interfaceName: string, parentInterfaceName: string)
@@ -69,6 +59,8 @@ export class HostNetworkInterfaceCardsManager
 
         const upCmd = ["ip", "link", "set", interfaceName, "up"];
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", ...upCmd], hostId);
+
+        await this.PersistantNetInterface(hostId, interfaceName, [createCmd, upCmd]);
     }
 
     public async DeleteBridge(hostId: number, bridgeName: string)
@@ -82,6 +74,9 @@ export class HostNetworkInterfaceCardsManager
     public async DeleteVLAN_SubInterface(hostId: number, interfaceName: string)
     {
         await this.remoteCommandExecutor.ExecuteCommandWithExitCode(["sudo", "ip", "link", "del", interfaceName], hostId);
+
+        await this.systemServicesManager.StopService(hostId, interfaceName);
+        await this.systemServicesManager.DeleteService(hostId, interfaceName);
     }
 
     public async DoesInterfaceExist(hostId: number, interfaceName: string)
@@ -118,5 +113,21 @@ export class HostNetworkInterfaceCardsManager
     {
         const stats = await this.hostMetricsService.ReadNetworkStatistics(hostId);
         return stats.map(x => x.interfaceName);
+    }
+
+    //Private methods
+    private async PersistantNetInterface(hostId: number, interfaceName: string, setupCommands: string[][])
+    {
+        const persistentCommand = setupCommands.map(x => x.join(" ")).join(" && ");
+        await this.systemServicesManager.CreateOrUpdateService(hostId, {
+            before: ["docker.service"],
+            command: "/bin/bash -c '" + persistentCommand + "'",
+            environment: {},
+            groupName: "root",
+            name: interfaceName,
+            userName: "root"
+        });
+
+        await this.systemServicesManager.EnableService(hostId, interfaceName);
     }
 }

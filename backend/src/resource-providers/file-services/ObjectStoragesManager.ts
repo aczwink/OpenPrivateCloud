@@ -21,6 +21,8 @@ import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+import { Dictionary, NumberDictionary } from "acts-util-core";
+import { TaskScheduler } from "../../services/TaskScheduler";
 
 interface EncryptionSettings
 {
@@ -29,32 +31,43 @@ interface EncryptionSettings
     authTagLength: number;
 }
 
-interface FileMetaDataOverviewData
-{
-    id: string;
-    mediaType: string;
-    /**
-     * @format byteSize
-     */
-    size: number;
-}
-
-interface StoredFileMetaData
+interface FileMetaDataRevision
 {
     id: string;
     blobId: string;
     blobSize: number;
+    creationTimeStamp: number;
     mediaType: string;
-    lastAccessDate: string;
     fileName: string;
     tags: string[];
 }
 
+interface ObjectStorageFileIndex
+{
+    lastAccessTime: number;
+}
+
+interface ObjectStorageIndex
+{
+    files: Dictionary<ObjectStorageFileIndex>;
+    fileWriteUpdateId?: number;
+}
+
+interface StoredFileMetaData
+{
+    currentRev: FileMetaDataRevision;
+    revisions: FileMetaDataRevision[];
+}
+
+//TODO: snapshots
+//TODO: backup
+
 @Injectable
 export class ObjectStoragesManager
 {
-    constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private taskScheduler: TaskScheduler)
     {
+        this.cachedIndex = {};
     }
 
     //Public methods
@@ -82,11 +95,35 @@ export class ObjectStoragesManager
         await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, this.GetFilesDataPath(resourceReference));
         await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, this.GetFileEncryptionSettingsPath(resourceReference));
         await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, this.GetSnapshotsPath(resourceReference));
+
+        this.cachedIndex[resourceReference.id] = {
+            files: {},
+        };
+        this.WriteIndex(resourceReference.id);
     }
 
-    public async QueryBlob(resourceReference: LightweightResourceReference, blobId: string)
+    public async QueryFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
     {
-        //TODO: update last access date if newer, and this also means that you should not query a blob directly but rather a file
+        if(!(resourceReference.id in this.cachedIndex))
+            this.cachedIndex[resourceReference.id]! = await this.ReadIndex(resourceReference);
+        const index = this.cachedIndex[resourceReference.id]!;
+
+        const file = index.files[fileId];
+        if(file === undefined)
+        {
+            const md = await this.QueryFileMetaData(resourceReference, fileId);
+            return md.currentRev.creationTimeStamp;
+        }
+        return file.lastAccessTime;
+    }
+
+    public async QueryFileBlob(resourceReference: LightweightResourceReference, fileId: string)
+    {
+        const metaData = await this.QueryFileMetaData(resourceReference, fileId);
+        const blobId = metaData.currentRev.blobId;
+
+        await this.UpdateFileAccessTime(resourceReference, fileId);
+
         const blobPath = path.join(this.GetBlobsPath(resourceReference), blobId + ".data");
         const encryptedData = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, blobPath);
 
@@ -108,13 +145,16 @@ export class ObjectStoragesManager
         const blobId = await this.WriteBlob(resourceReference, blob);
 
         const fileMetaData: StoredFileMetaData = {
-            blobId,
-            blobSize: blob.byteLength,
-            fileName: originalName,
-            lastAccessDate: new Date().toISOString().split("T")[0],
-            id: fileId,
-            mediaType,
-            tags: []
+            currentRev: {
+                blobId,
+                blobSize: blob.byteLength,
+                creationTimeStamp: Date.now(),
+                fileName: originalName,
+                id: fileId,
+                mediaType,
+                tags: []
+            },
+            revisions: [],
         };
 
         const encryptedId = this.EncryptFileId(fileId);
@@ -130,23 +170,22 @@ export class ObjectStoragesManager
         await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, fileMetaDataPath, this.EncryptBuffer(encryptionSettings, fileMetaDataBuffer));
     }
 
-    public async SearchFiles(resourceReference: LightweightResourceReference): Promise<FileMetaDataOverviewData[]>
+    public async SearchFiles(resourceReference: LightweightResourceReference)
     {
         const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetFilesDataPath(resourceReference));
 
-        const result: FileMetaDataOverviewData[] = [];
+        const result = [];
         for (const child of children)
         {
             const parts = child.split(".");
             const md = await this.QueryFileMetaDataInternal(resourceReference, parts[0]);
-            result.push({
-                id: md.id,
-                mediaType: md.mediaType,
-                size: md.blobSize
-            });
+            result.push(md.currentRev);
         }
         return result;
     }
+
+    //Private state
+    private cachedIndex: NumberDictionary<ObjectStorageIndex>;
 
     //Private methods
     private DecryptBuffer(encryptionSettings: EncryptionSettings, encrypted: Buffer)
@@ -270,6 +309,35 @@ export class ObjectStoragesManager
         };
     }
 
+    private async ReadIndex(resourceReference: LightweightResourceReference)
+    {
+        const root = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const indexPath = path.join(root, "index.json");
+        const indexEncPath = path.join(root, "index.json.enc");
+
+        const encrypted = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, indexPath);
+        const encryptionSettings = await this.ReadEncryptionSettings(resourceReference.hostId, indexEncPath);
+        const decrypted = this.DecryptBuffer(encryptionSettings, encrypted);
+
+        return JSON.parse(decrypted.toString("utf-8")) as ObjectStorageIndex;
+    }
+
+    private async UpdateFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
+    {
+        if(!(resourceReference.id in this.cachedIndex))
+            this.cachedIndex[resourceReference.id]! = await this.ReadIndex(resourceReference);
+        const index = this.cachedIndex[resourceReference.id]!;
+
+        const files = index.files;
+        if(fileId in files)
+            files[fileId]!.lastAccessTime = Date.now();
+        else
+            files[fileId] = { lastAccessTime: Date.now() };
+
+        if(index.fileWriteUpdateId === undefined)
+            index.fileWriteUpdateId = this.taskScheduler.ScheduleAfterHours(3, this.WriteIndex.bind(this, resourceReference.id));
+    }
+
     private async WriteBlob(resourceReference: LightweightResourceReference, blob: Buffer): Promise<string>
     {
         const blobId = crypto.randomUUID();
@@ -285,6 +353,24 @@ export class ObjectStoragesManager
         await this.WriteEncryptionSettings(resourceReference.hostId, encPath, encryptionSettings);
 
         return blobId;
+    }
+
+    private async WriteIndex(resourceId: number)
+    {
+        this.cachedIndex[resourceId]!.fileWriteUpdateId = undefined;
+        const resourceReference = await this.resourcesManager.CreateResourceReference(resourceId);
+        if(resourceReference === undefined)
+            throw new Error("TODO: implement me");
+
+        const root = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const indexPath = path.join(root, "index.json");
+        const indexEncPath = path.join(root, "index.json.enc");
+
+        const buffer = Buffer.from(JSON.stringify(this.cachedIndex[resourceId]), "utf-8");
+
+        const encryptionSettings = this.GenerateEncryptionSettings();
+        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, indexPath, this.EncryptBuffer(encryptionSettings, buffer));
+        await this.WriteEncryptionSettings(resourceReference.hostId, indexEncPath, encryptionSettings);
     }
 
     private async WriteEncryptionSettings(hostId: number, encPath: string, encryptionSettings: EncryptionSettings)

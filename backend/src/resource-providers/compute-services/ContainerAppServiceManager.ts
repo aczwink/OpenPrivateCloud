@@ -293,7 +293,7 @@ export class ContainerAppServiceManager
             portMap: [],
             privileged: false,
             removeOnExit: false,
-            restartPolicy: "always",
+            restartPolicy: "unless-stopped",
             volumes,
         };
 

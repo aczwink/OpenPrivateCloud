@@ -73,7 +73,7 @@ export interface DockerContainerConfig
     portMap: DockerContainerConfigPortMapping[];
     privileged: boolean;
     removeOnExit: boolean;
-    restartPolicy: "always" | "no";
+    restartPolicy: "always" | "no" | "unless-stopped";
     volumes: DockerContainerConfigVolume[];
 }
 

@@ -25,10 +25,26 @@ import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { ObjectStoragesManager } from "../ObjectStoragesManager";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 
-interface FileCreationData
+interface FileCreationDataDTO
 {
     fileId: string;
     fileData: UploadedFile;
+}
+
+interface FileMetaDataOverviewDataDTO
+{
+    id: string;
+    mediaType: string;
+    /**
+     * @format byteSize
+     */
+    size: number;
+}
+
+interface FileMetaDataDTO
+{
+    fileName: string;
+    lastAccessTime: Date;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_objectStorageResourceTypeName}/{resourceName}`)
@@ -58,15 +74,6 @@ class _api_ extends ResourceAPIControllerBase
     }
 
     //Public methods
-    @Get("blobs/{blobId}")
-    public async DownloadFileBlob(
-        @Common context: ResourceReferenceWithSession,
-        @Path blobId: string
-    )
-    {
-        return await this.objectStoragesManager.QueryBlob(context.resourceReference, blobId)
-    }
-
     @Get("files")
     public async SearchFiles(
         @Common context: ResourceReferenceWithSession,
@@ -94,7 +101,22 @@ class _api_ extends ResourceAPIControllerBase
         const file = await this.objectStoragesManager.QueryFileMetaData(context.resourceReference, fileId);
         if(file === undefined)
             return NotFound("file not found");
-        return file;
+        
+        const atime = await this.objectStoragesManager.QueryFileAccessTime(context.resourceReference, fileId);
+        const dto: FileMetaDataDTO = {
+            fileName: file.currentRev.fileName,
+            lastAccessTime: new Date(atime),
+        };
+        return dto;
+    }
+
+    @Get("files/{fileId}/blob")
+    public async DownloadFileBlob(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string
+    )
+    {
+        return await this.objectStoragesManager.QueryFileBlob(context.resourceReference, fileId)
     }
 
     @Put("files/{fileId}")
@@ -111,7 +133,7 @@ class _api_ extends ResourceAPIControllerBase
     @Get("dummy")
     public dummy(
         @Common context: ResourceReferenceWithSession,
-        @Body data: FileCreationData
+        @Body data: FileCreationDataDTO
     )
     {
         return "dummy";
