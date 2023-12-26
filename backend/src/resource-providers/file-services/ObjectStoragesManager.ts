@@ -31,7 +31,7 @@ interface EncryptionSettings
     authTagLength: number;
 }
 
-interface FileMetaDataRevision
+export interface FileMetaDataRevision
 {
     id: string;
     blobId: string;
@@ -102,7 +102,7 @@ export class ObjectStoragesManager
         this.WriteIndex(resourceReference.id);
     }
 
-    public async QueryFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
+    public async RequestFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
     {
         if(!(resourceReference.id in this.cachedIndex))
             this.cachedIndex[resourceReference.id]! = await this.ReadIndex(resourceReference);
@@ -111,15 +111,15 @@ export class ObjectStoragesManager
         const file = index.files[fileId];
         if(file === undefined)
         {
-            const md = await this.QueryFileMetaData(resourceReference, fileId);
+            const md = await this.RequestFileMetaData(resourceReference, fileId);
             return md.currentRev.creationTimeStamp;
         }
         return file.lastAccessTime;
     }
 
-    public async QueryFileBlob(resourceReference: LightweightResourceReference, fileId: string)
+    public async RequestFileBlob(resourceReference: LightweightResourceReference, fileId: string)
     {
-        const metaData = await this.QueryFileMetaData(resourceReference, fileId);
+        const metaData = await this.RequestFileMetaData(resourceReference, fileId);
         const blobId = metaData.currentRev.blobId;
 
         await this.UpdateFileAccessTime(resourceReference, fileId);
@@ -134,33 +134,44 @@ export class ObjectStoragesManager
         return decryptedData;
     }
 
-    public QueryFileMetaData(resourceReference: LightweightResourceReference, fileId: string)
+    public RequestFileMetaData(resourceReference: LightweightResourceReference, fileId: string)
     {
         const encryptedId = this.EncryptFileId(fileId);
-        return this.QueryFileMetaDataInternal(resourceReference, encryptedId);
+        return this.RequestFileMetaDataInternal(resourceReference, encryptedId);
     }
 
     public async SaveFile(resourceReference: LightweightResourceReference, fileId: string, blob: Buffer, mediaType: string, originalName: string)
     {
         const blobId = await this.WriteBlob(resourceReference, blob);
 
-        const fileMetaData: StoredFileMetaData = {
-            currentRev: {
-                blobId,
+        const newRevision: FileMetaDataRevision = {
+            blobId,
                 blobSize: blob.byteLength,
                 creationTimeStamp: Date.now(),
                 fileName: originalName,
                 id: fileId,
                 mediaType,
                 tags: []
-            },
-            revisions: [],
         };
 
         const encryptedId = this.EncryptFileId(fileId);
-
         const fileMetaDataPath = this.FormFileMetaDataPath(resourceReference, encryptedId);
-        //TODO: handle case where this file already exists. i.e. merge metadata
+
+        const exists = await this.remoteFileSystemManager.Exists(resourceReference.hostId, fileMetaDataPath);
+        let fileMetaData: StoredFileMetaData;
+        if(exists)
+        {
+            fileMetaData = await this.RequestFileMetaDataInternal(resourceReference, encryptedId);
+            fileMetaData.revisions.push(fileMetaData.currentRev);
+            fileMetaData.currentRev = newRevision;
+        }
+        else
+        {
+            fileMetaData = {
+                currentRev: newRevision,
+                revisions: [],
+            };
+        }
 
         const fileMetaDataEncSettingsPath = this.FormFileMetaDataEncryptionSettingsPath(resourceReference, encryptedId);
         const encryptionSettings = this.GenerateEncryptionSettings();
@@ -178,7 +189,7 @@ export class ObjectStoragesManager
         for (const child of children)
         {
             const parts = child.split(".");
-            const md = await this.QueryFileMetaDataInternal(resourceReference, parts[0]);
+            const md = await this.RequestFileMetaDataInternal(resourceReference, parts[0]);
             result.push(md.currentRev);
         }
         return result;
@@ -284,7 +295,7 @@ export class ObjectStoragesManager
         return path.join(root, "snapshots");
     }
 
-    private async QueryFileMetaDataInternal(resourceReference: LightweightResourceReference, encryptedId: string)
+    private async RequestFileMetaDataInternal(resourceReference: LightweightResourceReference, encryptedId: string)
     {
         const fileMetaDataPath = this.FormFileMetaDataPath(resourceReference, encryptedId);
         const encryptedMetaData = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, fileMetaDataPath);

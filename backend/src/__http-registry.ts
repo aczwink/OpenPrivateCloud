@@ -47,7 +47,7 @@ import "./resource-providers/network-services/api/vnet";
 import "./resource-providers/security-services/apis/key-vault";
 import "./resource-providers/web-services/apis/API_Gateway";
 import "./resource-providers/web-services/JdownloaderAPIController";
-import "./resource-providers/web-services/LetsEncryptAPIController";
+import "./resource-providers/web-services/apis/lets-encrypt";
 import "./resource-providers/web-services/apis/node-app-service";
 import "./resource-providers/web-services/apis/static-website";
 

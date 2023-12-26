@@ -17,9 +17,9 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { LetsEncryptCertInfoDto } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
+import { LetsEncryptCertInfoDTO, LetsEncryptLogsDTO } from "../../../dist/api";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -28,12 +28,20 @@ function BuildResourceId(resourceGroupName: string, resourceName: string)
     return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.letsencryptCertResourceType.name + "/" + resourceName;
 }
 
-const overviewViewModel: ObjectViewModel<LetsEncryptCertInfoDto, ResourceAndGroupId> = {
+const overviewViewModel: ObjectViewModel<LetsEncryptCertInfoDTO, ResourceAndGroupId> = {
     type: "object",
     actions: [],
     formTitle: _ => "Overview",
     requestObject: (service, ids) => service.resourceProviders._any_.webservices.letsencryptcert._any_.info.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "LetsEncryptCertInfoDto"
+    schemaName: "LetsEncryptCertInfoDTO"
+};
+
+const logsViewModel: ObjectViewModel<LetsEncryptLogsDTO, ResourceAndGroupId> = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "Logs",
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.letsencryptcert._any_.logs.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "LetsEncryptLogsDTO"
 };
 
 export const letsEncryptViewModel: MultiPageViewModel<ResourceAndGroupId> = {
@@ -48,6 +56,11 @@ export const letsEncryptViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "overview",
                     displayName: "Overview",
                     child: overviewViewModel,
+                },
+                {
+                    child: logsViewModel,
+                    displayName: "Logs",
+                    key: "logs",
                 }
             ]
         },

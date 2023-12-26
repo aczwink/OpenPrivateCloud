@@ -48,6 +48,12 @@ export interface LetsEncryptProperties extends BaseResourceProperties
     keyVaultExternalId: string;
 
     /**
+     * LetsEncrypt will verify certificates by issuing requests on port 80 to the domain. Specify a different port in case you use port mapping.
+     * @default 80
+     */
+    sourcePort: number;
+
+    /**
      * A CIDR-range of the virtual network that is deployed when interacting with LetsEncrypt. A /30 net is sufficient. Smaller is not possible.
      * @default 192.168.255.252/30
      */

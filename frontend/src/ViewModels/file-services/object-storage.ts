@@ -19,7 +19,7 @@ import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../
 import { resourceProviders } from "openprivatecloud-common";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 import { FileDownloadService, RootInjector } from "acfrontend";
-import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataRevision } from "../../../dist/api";
+import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO } from "../../../dist/api";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -29,8 +29,38 @@ function BuildResourceId(resourceGroupName: string, resourceName: string)
     return "/" + resourceGroupName + "/" + resourceProviders.fileServices.name + "/" + resourceProviders.fileServices.objectStorageResourceType.name + "/" + resourceName;
 }
 
-const fileViewModel: ObjectViewModel<FileMetaDataDTO, FileId> = {
+const fileOverviewViewModel: ObjectViewModel<FileMetaDataDTO, FileId> = {
     type: "object",
+    actions: [
+    ],
+    formTitle: _ => "Metadata",
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
+    schemaName: "FileMetaDataDTO"
+};
+
+const fileRevisionViewModel: ObjectViewModel<FileMetaDataDTO, FileId & { revisionNumber: number; }> = {
+    type: "object",
+    actions: [
+    ],
+    formTitle: ids => "Revision " + ids.revisionNumber,
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber),
+    schemaName: "FileMetaDataDTO"
+};
+
+const fileRevisionsViewModel: CollectionViewModel<FileRevisionDTO, FileId> = {
+    type: "collection",
+    actions: [
+    ],
+    child: fileRevisionViewModel,
+    displayName: "Revisions",
+    extractId: x => x.revisionNumber,
+    idKey: "revisionNumber",
+    requestObjects: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
+    schemaName: "FileRevisionDTO"
+};
+
+const fileViewModel: MultiPageViewModel<FileId> = {
+    type: "multiPage",
     actions: [
         {
             type: "activate",
@@ -58,12 +88,27 @@ const fileViewModel: ObjectViewModel<FileMetaDataDTO, FileId> = {
             deleteResource: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.delete(ids.resourceGroupName, ids.resourceName, ids.fileId),
         },
     ],
-    formTitle: (ids, _) => ids.fileId,
-    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
-    schemaName: "FileMetaDataDTO"
+    entries: [
+        {
+            displayName: "",
+            entries: [
+                {
+                    child: fileOverviewViewModel,
+                    displayName: "Overview",
+                    key: "overview"
+                },
+                {
+                    child: fileRevisionsViewModel,
+                    displayName: "Revisions",
+                    key: "revisions"
+                },
+            ]
+        }
+    ],
+    formTitle: ids => ids.fileId,
 };
 
-const filesViewModel: CollectionViewModel<FileMetaDataRevision, ResourceAndGroupId, FileCreationDataDTO> = {
+const filesViewModel: CollectionViewModel<FileMetaDataOverviewDataDTO, ResourceAndGroupId, FileCreationDataDTO> = {
     type: "collection",
     actions: [
         {
@@ -77,7 +122,7 @@ const filesViewModel: CollectionViewModel<FileMetaDataRevision, ResourceAndGroup
     extractId: x => x.id,
     idKey: "fileId",
     requestObjects: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "FileMetaDataRevision"
+    schemaName: "FileMetaDataOverviewDataDTO"
 };
 
 export const objectStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {

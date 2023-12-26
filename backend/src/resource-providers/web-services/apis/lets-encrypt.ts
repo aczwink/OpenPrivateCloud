@@ -18,14 +18,23 @@
 
 import { APIController, Common, Get, Path } from "acts-util-apilib";
 import { c_letsencryptCertResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { LetsEncryptManager } from "./LetsEncryptManager";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { ResourceReference } from "../../common/ResourceReference";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { LetsEncryptManager } from "../LetsEncryptManager";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { ResourceReference } from "../../../common/ResourceReference";
 
-interface LetsEncryptCertInfoDto
+interface LetsEncryptCertInfoDTO
 {
     expiryDate: Date;
+    remainingValidDays: number;
+}
+
+interface LetsEncryptLogsDTO
+{
+    /**
+     * @format multi-line
+     */
+    log: string;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_letsencryptCertResourceTypeName}/{resourceName}`)
@@ -52,9 +61,22 @@ class LetsEncryptAPIController extends ResourceAPIControllerBase
     {
         const expiryDate = await this.letsEncryptManager.ReadExpiryDate(resourceReference);
             
-        const result: LetsEncryptCertInfoDto = {
-            expiryDate: expiryDate ?? new Date(NaN)
+        const result: LetsEncryptCertInfoDTO = {
+            expiryDate: expiryDate ?? new Date(NaN),
+            remainingValidDays: Math.round(await this.letsEncryptManager.RequestNumberOfRemainingValidDays(resourceReference))
         };
         return result;
+    }
+
+    @Get("logs")
+    public async QueryLogs(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        const logs = await this.letsEncryptManager.RequestLogs(resourceReference);
+        const dto: LetsEncryptLogsDTO = {
+            log: logs
+        };
+        return dto;
     }
 }

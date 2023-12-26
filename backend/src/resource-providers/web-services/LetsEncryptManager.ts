@@ -45,6 +45,7 @@ interface LetsEncryptCertBotConfig
     domainName: string;
     isRunning: boolean;
     keyVaultResourceId: number;
+    sourcePort: number;
     userId: number;
     vNetAddressSpace: string;
 }
@@ -79,16 +80,6 @@ export class LetsEncryptManager
         return null;
     }
 
-    public async ReadExpiryDate(resourceReference: LightweightResourceReference)
-    {
-        const config = await this.ReadConfig(resourceReference.id);
-        const kvRef = await this.resourcesManager.CreateResourceReference(config.keyVaultResourceId);
-
-        const cert = await this.keyVaultManager.ReadCertificateInfo(kvRef!, config.domainName);
-
-        return cert?.expiryDate;
-    }
-
     public async ProvideResource(instanceProperties: LetsEncryptProperties, context: DeploymentContext)
     {
         const kvRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.keyVaultExternalId);
@@ -100,6 +91,7 @@ export class LetsEncryptManager
             domainName: instanceProperties.domainName,
             isRunning: false,
             keyVaultResourceId: kvRef.id,
+            sourcePort: instanceProperties.sourcePort,
             userId: context.userId,
             vNetAddressSpace: instanceProperties.vNetAddressSpace
         };
@@ -115,14 +107,6 @@ export class LetsEncryptManager
         await this.OrchestrateCertbotWorkflow(context.resourceReference, command);
     }
 
-    public async RenewCertificateIfRequired(resourceReference: ResourceReference)
-    {
-        const expiryDate = await this.ReadExpiryDate(resourceReference);
-        const leftTimeUntilRenewal = (Date.now() - expiryDate!.valueOf());
-        if(leftTimeUntilRenewal < 30 * 24 * 60 * 60 *1000) //letsencrypt recommends renewing after 60 days. Cert is valid for 90 days.
-            await this.RenewCertificate(resourceReference);
-    }
-
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
         const config = await this.ReadConfig(resourceReference.id);
@@ -131,10 +115,45 @@ export class LetsEncryptManager
         return "waiting";
     }
 
-    //Private methods
-    private async CleanUpCertbotExecution(resourceReference: LightweightResourceReference, vNetRef: ResourceReference, originalPortForwardingRule: PortForwardingRule | undefined)
+    public async ReadExpiryDate(resourceReference: LightweightResourceReference)
     {
-        await this.hostFirewallSettingsManager.DeletePortForwardingRule(vNetRef.hostId, "TCP", httpPort);
+        const config = await this.ReadConfig(resourceReference.id);
+        const kvRef = await this.resourcesManager.CreateResourceReference(config.keyVaultResourceId);
+
+        const cert = await this.keyVaultManager.ReadCertificateInfo(kvRef!, config.domainName);
+
+        return cert?.expiryDate;
+    }
+
+    public async RenewCertificateIfRequired(resourceReference: ResourceReference)
+    {
+        const nDays = await this.RequestNumberOfRemainingValidDays(resourceReference);
+        if(nDays <= 30) //letsencrypt recommends renewing after 60 days. Cert is valid for 90 days.
+            await this.RenewCertificate(resourceReference);
+    }
+
+    public async RequestLogs(resourceReference: LightweightResourceReference)
+    {
+        const baseDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const logPath = path.join(baseDir, "logs", "letsencrypt.log");
+
+        return await this.remoteFileSystemManager.ReadTextFile(resourceReference.hostId, logPath);
+    }
+
+    public async RequestNumberOfRemainingValidDays(resourceReference: LightweightResourceReference)
+    {
+        const expiryDate = await this.ReadExpiryDate(resourceReference);
+        const diff = expiryDate!.valueOf() - Date.now();
+        if(diff < 0)
+            return 0;
+
+        return diff / (24 * 60 * 60 * 1000);
+    }
+
+    //Private methods
+    private async CleanUpCertbotExecution(resourceReference: LightweightResourceReference, vNetRef: ResourceReference, originalPort: number, originalPortForwardingRule: PortForwardingRule | undefined)
+    {
+        await this.hostFirewallSettingsManager.DeletePortForwardingRule(vNetRef.hostId, "TCP", originalPort);
         if(originalPortForwardingRule !== undefined)
             await this.hostFirewallSettingsManager.AddPortForwardingRule(vNetRef.hostId, originalPortForwardingRule);
 
@@ -220,21 +239,21 @@ export class LetsEncryptManager
             action: "Allow",
             comment: "Allow http for certbot verification",
             destination: "Any",
-            destinationPortRanges: httpPort.toString(),
+            destinationPortRanges: config.sourcePort.toString(),
             priority: 1,
             protocol: "TCP",
             source: "Any"
         });
 
         const portForwardingRules = await this.hostFirewallSettingsManager.QueryPortForwardingRules(resourceReference.hostId);
-        const originalPortForwardingRule = portForwardingRules.find(x => (x.port === httpPort) && (x.protocol === "TCP"));
+        const originalPortForwardingRule = portForwardingRules.find(x => (x.port === config.sourcePort) && (x.protocol === "TCP"));
 
         if(originalPortForwardingRule !== undefined)
-            await this.hostFirewallSettingsManager.DeletePortForwardingRule(resourceReference.hostId, "TCP", httpPort);
+            await this.hostFirewallSettingsManager.DeletePortForwardingRule(resourceReference.hostId, "TCP", config.sourcePort);
 
         const containerAddress = new CIDRRange(config.vNetAddressSpace).netAddress.Next().Next();
         await this.hostFirewallSettingsManager.AddPortForwardingRule(resourceReference.hostId, {
-            port: httpPort,
+            port: config.sourcePort,
             protocol: "TCP",
             targetAddress: containerAddress.ToString(),
             targetPort: httpPort
@@ -243,7 +262,8 @@ export class LetsEncryptManager
 
         return {
             vNetRef,
-            originalPortForwardingRule
+            originalPortForwardingRule,
+            sourcePort: config.sourcePort,
         };
     }
 
@@ -270,7 +290,7 @@ export class LetsEncryptManager
         }
         finally
         {
-            await this.CleanUpCertbotExecution(resourceReference, state.vNetRef, state.originalPortForwardingRule);
+            await this.CleanUpCertbotExecution(resourceReference, state.vNetRef, state.sourcePort, state.originalPortForwardingRule);
         }
 
         await this.ImportCertificateIntoKeyVault(resourceReference);

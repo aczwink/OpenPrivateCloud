@@ -22,7 +22,7 @@ import { c_fileServicesResourceProviderName, c_objectStorageResourceTypeName } f
 import { SessionsManager } from "../../../services/SessionsManager";
 import { ResourceReference, ResourceReferenceWithSession } from "../../../common/ResourceReference";
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
-import { ObjectStoragesManager } from "../ObjectStoragesManager";
+import { FileMetaDataRevision, ObjectStoragesManager } from "../ObjectStoragesManager";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 
 interface FileCreationDataDTO
@@ -45,6 +45,17 @@ interface FileMetaDataDTO
 {
     fileName: string;
     lastAccessTime: Date;
+    /**
+     * @format byteSize
+     */
+    size: number;
+}
+
+interface FileRevisionDTO
+{
+    revisionNumber: number;
+    creationTimeStamp: Date;
+    fileName: string;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_objectStorageResourceTypeName}/{resourceName}`)
@@ -80,7 +91,11 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         const files = await this.objectStoragesManager.SearchFiles(context.resourceReference);
-        return files;
+        return files.map<FileMetaDataOverviewDataDTO>(x => ({
+            id: x.id,
+            mediaType: x.mediaType,
+            size: x.blobSize
+        }));
     }
 
     @Delete("files/{fileId}")
@@ -98,25 +113,12 @@ class _api_ extends ResourceAPIControllerBase
         @Path fileId: string
     )
     {
-        const file = await this.objectStoragesManager.QueryFileMetaData(context.resourceReference, fileId);
+        const file = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
         if(file === undefined)
             return NotFound("file not found");
         
-        const atime = await this.objectStoragesManager.QueryFileAccessTime(context.resourceReference, fileId);
-        const dto: FileMetaDataDTO = {
-            fileName: file.currentRev.fileName,
-            lastAccessTime: new Date(atime),
-        };
-        return dto;
-    }
-
-    @Get("files/{fileId}/blob")
-    public async DownloadFileBlob(
-        @Common context: ResourceReferenceWithSession,
-        @Path fileId: string
-    )
-    {
-        return await this.objectStoragesManager.QueryFileBlob(context.resourceReference, fileId)
+        const atime = await this.objectStoragesManager.RequestFileAccessTime(context.resourceReference, fileId);
+        return this.MapRevisionToDTO(file.currentRev, atime);
     }
 
     @Put("files/{fileId}")
@@ -129,6 +131,41 @@ class _api_ extends ResourceAPIControllerBase
         await this.objectStoragesManager.SaveFile(context.resourceReference, fileId, file.buffer, file.mediaType, file.originalName);
     }
 
+    @Get("files/{fileId}/blob")
+    public async DownloadFileBlob(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string
+    )
+    {
+        return await this.objectStoragesManager.RequestFileBlob(context.resourceReference, fileId)
+    }
+
+    @Get("files/{fileId}/revisions/{revisionNumber}")
+    public async QueryFileRevision(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string,
+        @Path revisionNumber: number
+    )
+    {
+        const md = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
+        const x = md.revisions[revisionNumber];
+        return this.MapRevisionToDTO(x, x.creationTimeStamp);
+    }
+
+    @Get("files/{fileId}/revisions")
+    public async QueryFileRevisions(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string
+    )
+    {
+        const md = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
+        return md.revisions.map<FileRevisionDTO>( (x, i) => ({
+            revisionNumber: i,
+            creationTimeStamp: new Date(x.creationTimeStamp),
+            fileName: x.fileName
+        }));
+    }
+
     //TODO: this is only there for getting the FileCreationData type into the openapi.json :S
     @Get("dummy")
     public dummy(
@@ -137,5 +174,15 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         return "dummy";
+    }
+
+    //Private methods
+    private MapRevisionToDTO(revision: FileMetaDataRevision, atime: number): FileMetaDataDTO
+    {
+        return {
+            fileName: revision.fileName,
+            lastAccessTime: new Date(atime),
+            size: revision.blobSize
+        };
     }
 }
