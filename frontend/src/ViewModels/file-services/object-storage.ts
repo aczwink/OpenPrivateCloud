@@ -19,7 +19,8 @@ import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../
 import { resourceProviders } from "openprivatecloud-common";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 import { FileDownloadService, RootInjector } from "acfrontend";
-import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO } from "../../../dist/api";
+import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO, SnapshotDTO } from "../../../dist/api";
+import { ListViewModel } from "../../UI/ListViewModel";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -125,6 +126,20 @@ const filesViewModel: CollectionViewModel<FileMetaDataOverviewDataDTO, ResourceA
     schemaName: "FileMetaDataOverviewDataDTO"
 };
 
+const snapshotsViewModel: ListViewModel<SnapshotDTO, ResourceAndGroupId> = {
+    type: "list",
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, dto) => service.resourceProviders._any_.fileservices.objectstorage._any_.snapshots.post(ids.resourceGroupName, ids.resourceName),
+        }
+    ],
+    boundActions: [],
+    displayName: "Snapshots",
+    requestObjects: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.snapshots.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "SnapshotDTO"
+};
+
 export const objectStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         ...BuildCommonResourceActions(BuildResourceId),
@@ -137,6 +152,11 @@ export const objectStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "file-explorer",
                     child: filesViewModel,
                     displayName: "File explorer"
+                },
+                {
+                    key: "snapshots",
+                    child: snapshotsViewModel,
+                    displayName: "Snapshots"
                 },
             ]
         },

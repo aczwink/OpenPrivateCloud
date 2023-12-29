@@ -53,14 +53,16 @@ interface ObjectStorageIndex
     fileWriteUpdateId?: number;
 }
 
+interface Snapshot
+{
+    files: StoredFileMetaData[];
+}
+
 interface StoredFileMetaData
 {
     currentRev: FileMetaDataRevision;
     revisions: FileMetaDataRevision[];
 }
-
-//TODO: snapshots
-//TODO: backup
 
 @Injectable
 export class ObjectStoragesManager
@@ -71,6 +73,32 @@ export class ObjectStoragesManager
     }
 
     //Public methods
+    public async CreateSnapshot(resourceReference: LightweightResourceReference)
+    {
+        const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetFilesDataPath(resourceReference));
+
+        const snapshot: Snapshot = {
+            files: []
+        };
+
+        for (const child of children)
+        {
+            const parts = child.split(".");
+            const encryptedFileId = parts[0];
+            const md = await this.RequestFileMetaDataInternal(resourceReference, encryptedFileId);
+            snapshot.files.push(md);
+        }
+
+        const snapshotName = new Date().toISOString();
+        const snapshotPath = path.join(this.GetSnapshotsPath(resourceReference), snapshotName);
+
+        const encryptionSettings = this.GenerateEncryptionSettings();
+        await this.WriteEncryptionSettings(resourceReference.hostId, snapshotPath + ".enc", encryptionSettings);
+
+        const dataToWrite = Buffer.from(JSON.stringify(snapshot), "utf-8");
+        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, snapshotPath + ".data", this.EncryptBuffer(encryptionSettings, dataToWrite));
+    }
+
     public async DeleteFile(resourceReference: LightweightResourceReference, fileId: string)
     {
         const encryptedId = this.EncryptFileId(fileId);
@@ -138,6 +166,15 @@ export class ObjectStoragesManager
     {
         const encryptedId = this.EncryptFileId(fileId);
         return this.RequestFileMetaDataInternal(resourceReference, encryptedId);
+    }
+
+    public async RequestSnapshots(resourceReference: LightweightResourceReference)
+    {
+        const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetSnapshotsPath(resourceReference));
+        return children.Values().Filter(x => x.endsWith(".data")).Map(x => {
+            const name = path.parse(x).name;
+            return new Date(name);
+        });
     }
 
     public async SaveFile(resourceReference: LightweightResourceReference, fileId: string, blob: Buffer, mediaType: string, originalName: string)

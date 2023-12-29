@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete } from "acts-util-apilib";
+import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete, Post } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { c_fileServicesResourceProviderName, c_objectStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { SessionsManager } from "../../../services/SessionsManager";
@@ -56,6 +56,11 @@ interface FileRevisionDTO
     revisionNumber: number;
     creationTimeStamp: Date;
     fileName: string;
+}
+
+interface SnapshotDTO
+{
+    creationDate: Date;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_objectStorageResourceTypeName}/{resourceName}`)
@@ -164,6 +169,25 @@ class _api_ extends ResourceAPIControllerBase
             creationTimeStamp: new Date(x.creationTimeStamp),
             fileName: x.fileName
         }));
+    }
+
+    @Get("snapshots")
+    public async QuerySnapshots(
+        @Common context: ResourceReferenceWithSession,
+    )
+    {
+        const snapshots = await this.objectStoragesManager.RequestSnapshots(context.resourceReference);
+        return snapshots.Map<SnapshotDTO>(x => ({
+            creationDate: x
+        })).ToArray();
+    }
+
+    @Post("snapshots")
+    public async CreateSnapshot(
+        @Common context: ResourceReferenceWithSession,
+    )
+    {
+        await this.objectStoragesManager.CreateSnapshot(context.resourceReference);
     }
 
     //TODO: this is only there for getting the FileCreationData type into the openapi.json :S
