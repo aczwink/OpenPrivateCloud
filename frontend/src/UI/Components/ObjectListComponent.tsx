@@ -143,7 +143,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
 
     private RenderObjectProperty(obj: any, key: string)
     {
-        return RenderReadOnlyValue(obj[key], this.input.elementSchema.properties[key]! as any);
+        return RenderReadOnlyValue(obj[key], this.input.elementSchema.properties[key]!);
     }
 
     private RenderObjectPropertyEntry(obj: any, key: string, idx: number, isRequired: boolean)

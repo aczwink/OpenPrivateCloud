@@ -20,6 +20,7 @@ import { Injectable } from "acts-util-node";
 import { UserWalletController } from "../data-access/UserWalletController";
 import { UsersController } from "../data-access/UsersController";
 import { Dictionary } from "acts-util-core";
+import { AsymmetricDecrypt, AsymmetricEncrypt } from "../common/crypto/asymmetric";
 
  
 @Injectable
@@ -72,15 +73,7 @@ export class UserWalletManager
     {
         const privData = await this.usersController.QueryPrivateData(userId);
         
-        const encryptedData = crypto.publicEncrypt(
-            {
-                key: privData!.publicKey,
-                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-                oaepHash: "sha256",
-            },
-            Buffer.from(secretValue)
-        );
-
+        const encryptedData = AsymmetricEncrypt(privData!.publicKey, Buffer.from(secretValue));
         await this.userWalletController.UpdateOrInsertSecretValue(userId, secretName, encryptedData);
     }
 
@@ -97,11 +90,7 @@ export class UserWalletManager
     //Private methods
     private DecryptBuffer(userId: number, secretValue: Buffer)
     {
-        return crypto.privateDecrypt({
-            key: this.privateKeys[userId]!,
-            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-            oaepHash: "sha256"
-        }, secretValue);
+        return AsymmetricDecrypt(this.privateKeys[userId]!, secretValue);
     }
 
     private UnencryptPrivateKey(encryptedPrivateKey: string, password: string)

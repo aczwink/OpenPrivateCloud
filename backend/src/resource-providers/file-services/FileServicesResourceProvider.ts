@@ -96,8 +96,8 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 await this.fileStoragesManager.ProvideResource(context);
                 break;
-            case resourceProviders.fileServices.objectStorageResourceType.name:
-                await this.objectStoragesManager.ProvideResource(context.resourceReference);
+            case "object-storage":
+                await this.objectStoragesManager.ProvideResource(instanceProperties, context.resourceReference);
                 break;
         }
 

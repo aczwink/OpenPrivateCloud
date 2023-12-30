@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,16 @@ export class TempFilesManager
         return tempPath;
     }
 
-    public async CreateSecretFile(hostId: number, secret: string): Promise<string>
+    public async CreateSecretFile(hostId: number, secret: Buffer): Promise<string>
+    {
+        const secretPath = await this.CreateUniqueTempPath(hostId);
+        await this.remoteFileSystemManager.WriteFile(hostId, secretPath, secret);
+        await this.remoteFileSystemManager.ChangeMode(hostId, secretPath, 0o600);
+
+        return secretPath;
+    }
+
+    public async CreateStringSecretFile(hostId: number, secret: string): Promise<string>
     {
         const secretPath = await this.CreateUniqueTempPath(hostId);
         await this.remoteFileSystemManager.WriteTextFile(hostId, secretPath, secret, 0o600);

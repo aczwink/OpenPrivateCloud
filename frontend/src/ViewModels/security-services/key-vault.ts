@@ -31,11 +31,7 @@ const keyViewModel: ObjectViewModel<KeyDTO, ResourceAndGroupId & { keyName: stri
     type: "object",
     actions: [],
     formTitle: (ids, _) => ids.keyName,
-    requestObject: async (_, ids) => ({
-        data: { name: ids.keyName },
-        rawBody: null,
-        statusCode: 200
-    }),
+    requestObject: (service, ids) => service.resourceProviders._any_.securityservices.keyvault._any_.keys._any_.get(ids.resourceGroupName, ids.resourceName, ids.keyName),
     schemaName: "KeyDTO"
 };
 

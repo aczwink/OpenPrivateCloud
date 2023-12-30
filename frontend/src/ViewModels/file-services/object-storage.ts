@@ -42,6 +42,27 @@ const fileOverviewViewModel: ObjectViewModel<FileMetaDataDTO, FileId> = {
 const fileRevisionViewModel: ObjectViewModel<FileMetaDataDTO, FileId & { revisionNumber: number; }> = {
     type: "object",
     actions: [
+        {
+            type: "activate",
+            execute: async (service, ids) => {
+                const response1 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber);
+                if(response1.statusCode !== 200)
+                    throw new Error("TODO: implement me");
+
+                const response2 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber);
+                if(response2.statusCode !== 200)
+                    throw new Error("TODO: implement me");
+
+                RootInjector.Resolve(FileDownloadService).DownloadBlobAsFile(response2.data, response1.data.fileName);
+                return {
+                    data: null,
+                    rawBody: null,
+                    statusCode: 200,
+                };
+            },
+            matIcon: "download",
+            title: "Download"
+        },
     ],
     formTitle: ids => "Revision " + ids.revisionNumber,
     requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber),

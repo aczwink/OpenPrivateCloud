@@ -29,6 +29,17 @@ import { ResourceEventsManager } from "../../services/ResourceEventsManager";
 import { securityServicesEvents } from "./events";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { Command } from "../../services/SSHService";
+import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt, SymmetricKeyToBuffer, UnpackSymmetricKey } from "../../common/crypto/symmetric";
+import { ClusterKeyStoreManager } from "../../services/ClusterKeyStoreManager";
+import { AsymmetricDecrypt, AsymmetricEncrypt, AsymmetricKeyType, CreateRSA4096KeyPairWithoutPassphrase } from "../../common/crypto/asymmetric";
+import { TempFilesManager } from "../../services/TempFilesManager";
+
+export type KeyVaultKeyType = "gpg-4096" | AsymmetricKeyType;
+interface KeyVaultKey
+{
+    type: KeyVaultKeyType;
+    key: Buffer;
+}
 
 interface KeyVaultCertificate
 {
@@ -54,7 +65,7 @@ interface KeyVaultConfig
 export class KeyVaultManager
 {
     constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceConfigController: ResourceConfigController, private easyRSAManager: EasyRSAManager,
-        private resourceEventsManager: ResourceEventsManager, private remoteCommandExecutor: RemoteCommandExecutor)
+        private resourceEventsManager: ResourceEventsManager, private remoteCommandExecutor: RemoteCommandExecutor, private clusterKeyStoreManager: ClusterKeyStoreManager, private tempFilesManager: TempFilesManager)
     {
     }
 
@@ -64,8 +75,11 @@ export class KeyVaultManager
         const result = await this.ResolveKeyVaultReference(encryptionKeyKeyVaultReference);
         if(result.objectType !== "key")
             throw new Error("Invalid key reference: " + encryptionKeyKeyVaultReference);
-        const keyPath = path.join(this.GetKeysDir(result.kvRef), result.objectName);
-        
+        const key = await this.ReadKey(result.kvRef, result.objectName);
+        if(key.type !== "gpg-4096")
+            throw new Error("Invalid key type: " + key.type);
+        const keyPath = await this.tempFilesManager.CreateSecretFile(result.kvRef.hostId, key.key);
+
         return {
             type: "pipe",
             source: input,
@@ -82,12 +96,19 @@ export class KeyVaultManager
         };
     }
 
-    public async CreateKey(resourceReference: LightweightResourceReference, name: string, keySize: number)
+    public async CreateKey(resourceReference: LightweightResourceReference, name: string, type: KeyVaultKeyType)
     {
-        const value = crypto.randomBytes(keySize / 8);
+        const key = this.GenerateKey(type);
+        const json = JSON.stringify({
+            type: key.type,
+            key: key.key.toString("base64")
+        });
+
+        const instanceKey = await this.ReadInstanceKey(resourceReference);
+        const encrypted = OPCFormat_SymmetricEncrypt(instanceKey, Buffer.from(json, "utf-8"));
         
         const keyPath = path.join(this.GetKeysDir(resourceReference), name);
-        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, keyPath, value);
+        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, keyPath, encrypted);
     }
 
     public async CreateKeyVaultReference(keyVaultResourceId: number, objectType: "certificate" | "key" | "secret", objectName: string): Promise<string>
@@ -99,8 +120,28 @@ export class KeyVaultManager
 
     public async CreateSecret(resourceReference: LightweightResourceReference, name: string, value: string)
     {
+        const key = await this.ReadInstanceKey(resourceReference);
+        const encrypted = OPCFormat_SymmetricEncrypt(key, Buffer.from(value, "utf-8"));
+
         const secretPath = path.join(this.GetSecretsDir(resourceReference), name);
-        await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, secretPath, value);
+        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, secretPath, encrypted);
+    }
+
+    public async Decrypt(resourceReference: LightweightResourceReference, keyName: string, encryptedData: Buffer)
+    {
+        const key = await this.ReadKey(resourceReference, keyName);
+        switch(key.type)
+        {
+            case "gpg-4096":
+                throw new Error("Method not implemented.");
+            case "rsa-4096":
+            {
+                const pem = key.key.toString("utf-8");
+                const parts = this.SplitPEM(pem);
+                return AsymmetricDecrypt(parts.privateKey, encryptedData);
+            }
+            break;
+        }
     }
 
     public async DeleteResource(resourceReference: LightweightResourceReference)
@@ -111,6 +152,22 @@ export class KeyVaultManager
     public async DeleteSecret(resourceReference: LightweightResourceReference, name: string)
     {
         return await this.remoteFileSystemManager.UnlinkFile(resourceReference.hostId, path.join(this.GetSecretsDir(resourceReference), name));
+    }
+
+    public async Encrypt(resourceReference: LightweightResourceReference, keyName: string, data: Buffer)
+    {
+        const key = await this.ReadKey(resourceReference, keyName);
+        switch(key.type)
+        {
+            case "gpg-4096":
+                throw new Error("Method not implemented.");
+            case "rsa-4096":
+            {
+                const pem = key.key.toString("utf-8");
+                const parts = this.SplitPEM(pem);
+                return AsymmetricEncrypt(parts.publicKey, data);
+            }
+        }
     }
 
     public async GenerateCertificate(resourceReference: LightweightResourceReference, type: "client" | "server", name: string)
@@ -183,6 +240,11 @@ export class KeyVaultManager
 
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, importDirs.privateDir);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, importDirs.privateDir, 0o700);
+
+        const key = CreateSymmetricKey("aes-256");
+        const keyBuffer = SymmetricKeyToBuffer(key);
+        const encryptedKey = this.clusterKeyStoreManager.Encrypt(keyBuffer);
+        await this.remoteFileSystemManager.WriteFile(context.hostId, this.GetInstanceKeyPath(context.resourceReference), encryptedKey);
     }
 
     public async QueryCertificate(resourceReference: LightweightResourceReference, name: string)
@@ -211,11 +273,6 @@ export class KeyVaultManager
             certPath: path.join(importPaths.certsDir, name + ".pem"),
             keyPath: path.join(importPaths.privateDir, name + ".pem"),
         }
-    }
-
-    public async QueryKeyNames(resourceReference: LightweightResourceReference)
-    {
-        return await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetKeysDir(resourceReference));
     }
 
     public async QueryPKI_Config(resourceReference: LightweightResourceReference)
@@ -265,13 +322,33 @@ export class KeyVaultManager
 
     public async ReadSecret(resourceReference: LightweightResourceReference, name: string)
     {
-        return await this.remoteFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(this.GetSecretsDir(resourceReference), name));
+        const key = await this.ReadInstanceKey(resourceReference);
+        const encrypted = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, path.join(this.GetSecretsDir(resourceReference), name));
+        const decrypted = OPCFormat_SymmetricDecrypt(key, encrypted);
+
+        return decrypted.toString("utf-8");
     }
 
     public async ReadSecretFromReference(keyVaultSecretReference: string)
     {
         const result = await this.ResolveKeyVaultReference(keyVaultSecretReference);
         return this.ReadSecret(result.kvRef, result.objectName);
+    }
+
+    public async RequestKey(resourceReference: LightweightResourceReference, name: string)
+    {
+        const key = await this.ReadKey(resourceReference, name);
+        
+        return {
+            name,
+            type: key.type
+        };
+    }
+
+    public async RequestKeys(resourceReference: LightweightResourceReference)
+    {
+        const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetKeysDir(resourceReference));
+        return children.Values().Map(async x => this.RequestKey(resourceReference, x)).PromiseAll();
     }
 
     public async ResolveKeyVaultReference(keyVaultReference: string)
@@ -323,6 +400,29 @@ export class KeyVaultManager
     }
 
     //Private methods
+    private GenerateKey(type: KeyVaultKeyType): KeyVaultKey
+    {
+        function KeyGen()
+        {
+            switch(type)
+            {
+                case "gpg-4096":
+                    return crypto.randomBytes(4096 / 8);
+                case "rsa-4096":
+                {
+                    const pair = CreateRSA4096KeyPairWithoutPassphrase();
+                    const both = (pair.privateKey + "\n" + pair.publicKey);
+                    return Buffer.from(both, "utf-8");
+                }
+            }
+        }
+
+        return {
+            type,
+            key: KeyGen()
+        };
+    }
+
     private GetCA_Dir(resourceReference: LightweightResourceReference)
     {
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
@@ -345,6 +445,13 @@ export class KeyVaultManager
             certsDir: path.join(importDir, "certs"),
             privateDir: path.join(importDir, "private")
         };
+    }
+
+    private GetInstanceKeyPath(resourceReference: LightweightResourceReference)
+    {
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const keyPath = path.join(resourceDir, "key");
+        return keyPath;
     }
 
     private GetSecretsDir(resourceReference: LightweightResourceReference)
@@ -370,6 +477,39 @@ export class KeyVaultManager
             };
         }
         return config;
+    }
+
+    private async ReadInstanceKey(resourceReference: LightweightResourceReference)
+    {
+        const encryptedKey = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, this.GetInstanceKeyPath(resourceReference));
+        const keyBuffer = this.clusterKeyStoreManager.Decrypt(encryptedKey);
+        const key = UnpackSymmetricKey(keyBuffer);
+        return key;
+    }
+
+    private async ReadKey(resourceReference: LightweightResourceReference, name: string): Promise<KeyVaultKey>
+    {
+        const keyPath = path.join(this.GetKeysDir(resourceReference), name);
+        const encrypted = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, keyPath);
+
+        const instanceKey = await this.ReadInstanceKey(resourceReference);
+        const decrpyted = OPCFormat_SymmetricDecrypt(instanceKey, encrypted);
+        const json = JSON.parse(decrpyted.toString("utf-8"));
+
+        return {
+            type: json.type,
+            key: Buffer.from(json.key, "base64")
+        };
+    }
+
+    private SplitPEM(pem: string)
+    {
+        const parts = pem.split("\n\n");
+
+        return {
+            privateKey: parts[0],
+            publicKey: parts[1]
+        };
     }
 
     private async UpdateConfig(resourceId: number, config: KeyVaultConfig)

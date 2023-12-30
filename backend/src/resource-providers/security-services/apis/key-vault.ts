@@ -21,7 +21,7 @@ import { APIController, Body, Common, Delete, Get, NotFound, Path, Post } from "
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_keyVaultResourceTypeName, c_securityServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { KeyVaultManager } from "../KeyVaultManager";
+import { KeyVaultKeyType, KeyVaultManager } from "../KeyVaultManager";
 import { CA_Config } from "../EasyRSAManager";
 
 interface CertificateDTO
@@ -33,15 +33,13 @@ interface CertificateDTO
 interface KeyDTO
 {
     name: string;
+    type: KeyVaultKeyType;
 }
 
 interface KeyCreationDTO
 {
     name: string;
-    /**
-     * In bits
-     */
-    keySize: 2048 | 4096;
+    type: KeyVaultKeyType;
 }
 
 interface SecretDTO
@@ -119,7 +117,7 @@ class _api_ extends ResourceAPIControllerBase
         @Body data: KeyCreationDTO
     )
     {
-        await this.keyVaultManager.CreateKey(resourceReference, data.name, data.keySize);
+        await this.keyVaultManager.CreateKey(resourceReference, data.name, data.type);
     }
 
     @Get("keys")
@@ -127,10 +125,27 @@ class _api_ extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference,
     )
     {
-        const names = await this.keyVaultManager.QueryKeyNames(resourceReference);
-        return names.map<KeyDTO>(x => ({
-            name: x
+        const keys = await this.keyVaultManager.RequestKeys(resourceReference);
+        return keys.map<KeyDTO>(x => ({
+            name: x.name,
+            type: x.type
         }));
+    }
+
+    @Get("keys/{keyName}")
+    public async QueryKey(
+        @Common resourceReference: ResourceReference,
+        @Path keyName: string
+    )
+    {
+        const x = await this.keyVaultManager.RequestKey(resourceReference, keyName);
+        if(x === undefined)
+            return NotFound("key not found");
+        const dto: KeyDTO = {
+            name: x.name,
+            type: x.type
+        };
+        return dto;
     }
 
     @Get("pkiconfig")

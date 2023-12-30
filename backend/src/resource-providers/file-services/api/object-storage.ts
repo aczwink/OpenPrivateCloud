@@ -157,6 +157,16 @@ class _api_ extends ResourceAPIControllerBase
         return this.MapRevisionToDTO(x, x.creationTimeStamp);
     }
 
+    @Get("files/{fileId}/revisions/{revisionNumber}/blob")
+    public async DownloadFileRevisionBlob(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string,
+        @Path revisionNumber: number
+    )
+    {
+        return await this.objectStoragesManager.RequestFileRevisionBlob(context.resourceReference, fileId, revisionNumber);
+    }
+
     @Get("files/{fileId}/revisions")
     public async QueryFileRevisions(
         @Common context: ResourceReferenceWithSession,

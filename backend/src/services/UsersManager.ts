@@ -20,6 +20,7 @@ import { Injectable } from "acts-util-node";
 import { UsersController } from "../data-access/UsersController";
 import { HostUsersManager } from "./HostUsersManager";
 import { UserWalletManager } from "./UserWalletManager";
+import { CreateRSA4096KeyPair } from "../common/crypto/asymmetric";
 
  
 @Injectable
@@ -70,7 +71,7 @@ export class UsersManager
         //TODO: this should probably be done in a sql transaction
         throw new Error("TODO: IMPLEMENT THIS SAFELY!");
 
-        const keyPair = this.CreateKeyPair(newPassword);
+        const keyPair = CreateRSA4096KeyPair(newPassword);
 
         const pwSalt = this.CreateSalt();
         const pwHash = this.HashPassword(newPassword, pwSalt);
@@ -81,23 +82,6 @@ export class UsersManager
     }
 
     //Private methods
-    private CreateKeyPair(password: string)
-    {
-        return crypto.generateKeyPairSync("rsa", {
-            modulusLength: 4096,
-            publicKeyEncoding: {
-                type: "spki",
-                format: "pem"
-            },
-            privateKeyEncoding: {
-                type: "pkcs8",
-                format: "pem",
-                cipher: "aes-256-cbc",
-                passphrase: password
-            }
-        });
-    }
-
     private CreateSalt()
     {
         return crypto.randomBytes(16).toString("hex");

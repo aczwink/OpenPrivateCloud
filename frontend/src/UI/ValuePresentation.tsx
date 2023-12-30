@@ -91,9 +91,10 @@ function RenderNumber(value: number, schema: OpenAPI.NumberSchema)
     return value;
 }
 
-export function RenderReadOnlyValue(value: any, schema: OpenAPI.Schema): SingleRenderValue
+export function RenderReadOnlyValue(value: any, schemaOrRef: OpenAPI.Schema | OpenAPI.Reference): SingleRenderValue
 {
     const apiSchemaService = RootInjector.Resolve(APISchemaService);
+    const schema = apiSchemaService.ResolveSchemaOrReference(schemaOrRef);
 
     if("anyOf" in schema)
         throw new Error("anyof not implemented");
