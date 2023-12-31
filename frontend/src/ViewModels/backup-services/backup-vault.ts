@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultKeyVaultSourceDTO, BackupVaultRetentionConfig, BackupVaultTargetConfigDTO, BackupVaultTrigger, InstanceLog, ResourceLogOverviewData } from "../../../dist/api";
+import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultKeyVaultSourceDTO, BackupVaultObjectStorageSourceDTO, BackupVaultRetentionConfig, BackupVaultTargetConfigDTO, BackupVaultTrigger, InstanceLog, ResourceLogOverviewData } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
@@ -98,6 +98,46 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, R
     schemaName: "BackupVaultFileStorageConfig",
     type: "list"
 };
+
+const objectStorageSourcesViewModel: ListViewModel<BackupVaultObjectStorageSourceDTO, ResourceAndGroupId> = {
+    actions: [
+        {
+            type: "create",
+            createResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
+            loadContext: async (service, ids) => {
+                const response = await service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
+                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(result.ok === false)
+                    throw new Error("TODO");
+                return result.value;
+            }
+        }
+    ],
+    boundActions: [
+        {
+            type: "delete",
+            deleteResource: (service, ids, config) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, config),
+        }
+    ],
+    displayName: "Object storages to backup",
+    requestObjects: async (service, ids) => 
+    {
+        const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
+        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(data.ok)
+        {
+            return {
+                data: data.value.objectStorages,
+                rawBody: response.rawBody,
+                statusCode: response.statusCode
+            };
+        }
+        return response;
+    },
+    schemaName: "BackupVaultObjectStorageSourceDTO",
+    type: "list"
+};
+
 
 const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, ResourceAndGroupId> = {
     type: "list",
@@ -300,6 +340,11 @@ export const backupVaultViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "fileStorageSources",
                     displayName: "File storages",
                     child: fileStorageSourcesViewModel
+                },
+                {
+                    key: "objectStorageSources",
+                    displayName: "Object storages",
+                    child: objectStorageSourcesViewModel
                 },
                 {
                     key: "databaseSources",

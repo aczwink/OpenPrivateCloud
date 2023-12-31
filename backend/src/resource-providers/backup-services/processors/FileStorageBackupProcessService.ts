@@ -35,7 +35,7 @@ export class FileStorageBackupProcessService
     }
     
     //Public methods
-    public async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionKeyKeyVaultReference: string | undefined, processTracker: ProcessTracker)
+    public async BackupFileStorage(hostId: number, fileStorage: BackupVaultFileStorageConfig, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionKeyKeyVaultReference: string | undefined, retention: BackupVaultRetentionConfig, processTracker: ProcessTracker)
     {
         const sourceRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(fileStorage.externalId);
         if(sourceRef === undefined)
@@ -62,6 +62,12 @@ export class FileStorageBackupProcessService
         const toBeSynced = sourceSnapshots.Values().Filter(x => targetSnapshots.find(y => y.snapshotName === x.snapshotName) === undefined).OrderBy(x => x.snapshotName).ToArray();
         for (const snapshot of toBeSynced)
         {
+            if(this.IsSnapshotTooOldForBackup(snapshot.creationDate, retention))
+            {
+                processTracker.Add("Skipping snapshot", snapshot.snapshotName, "because it is older than the configured retention");
+                continue;
+            }
+
             const snapshotName = snapshot.snapshotName;
             const idx = sourceSnapshots.indexOf(snapshot);
 
@@ -99,13 +105,10 @@ export class FileStorageBackupProcessService
         const targetDir = BuildBackupPath(backupTargetPath, sourceRef.id);
         const targetSnapshots = await this.LoadTargetSnapshots(hostId, targetDir);
 
-        const msToDay = 1000 * 60 * 60 * 24;
-        const currentDay = Date.now() / msToDay;
 
         for (const targetSnapshot of targetSnapshots)
         {
-            const snapshotDay = targetSnapshot.creationDate.valueOf() / msToDay;
-            if((snapshotDay + retention.numberOfDays) < currentDay)
+            if(this.IsSnapshotTooOldForBackup(targetSnapshot.creationDate, retention))
             {
                 processTracker.Add("Deleting old snapshot", targetSnapshot.snapshotName);
                 await this.DeleteSnapshot(hostId, targetFileSystemType, targetDir, targetSnapshot.fileName);
@@ -181,6 +184,16 @@ export class FileStorageBackupProcessService
             }
             break;
         }
+    }
+
+    private IsSnapshotTooOldForBackup(creationDate: Date, retention: BackupVaultRetentionConfig)
+    {
+        const msToDay = 1000 * 60 * 60 * 24;
+
+        const snapshotDay = creationDate.valueOf() / msToDay;
+        const currentDay = Date.now() / msToDay;
+
+        return (snapshotDay + retention.numberOfDays) < currentDay;
     }
 
     private async LoadTargetSnapshots(hostId: number, targetDir: string)

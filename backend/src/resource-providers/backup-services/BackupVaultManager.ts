@@ -20,7 +20,7 @@ import { Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { TaskSchedulingManager } from "../../services/TaskSchedulingManager";
 import { BackupProcessService } from "./BackupProcessService";
-import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger, KeyVaultBackupConfig } from "./models";
+import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger, KeyVaultBackupConfig, ObjectStorageBackupConfig } from "./models";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 
@@ -65,6 +65,13 @@ export class BackupVaultManager
         await this.WriteConfig(resourceReference.id, config);
     }
 
+    public async AddObjectStorageSource(resourceReference: LightweightResourceReference, source: ObjectStorageBackupConfig)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        config.sources.objectStorages.push(source);
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
     public async EnsureBackupTimerIsRunningIfConfigured(resourceId: number)
     {
         const config = await this.ReadConfig(resourceId);
@@ -86,7 +93,8 @@ export class BackupVaultManager
                     databases: [],
                     controllerDB: { enable: false },
                     fileStorages: [],
-                    keyVaults: []
+                    keyVaults: [],
+                    objectStorages: []
                 },
                 target: {
                     type: "storage-device",
@@ -142,10 +150,20 @@ export class BackupVaultManager
         await this.WriteConfig(resourceReference.id, config);
     }
 
+    public async RemoveObjectStorageSource(resourceReference: LightweightResourceReference, resourceId: number)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+
+        const idx = config.sources.objectStorages.findIndex(x => x.resourceId === resourceId);
+        config.sources.objectStorages.Remove(idx);
+
+        await this.WriteConfig(resourceReference.id, config);
+    }
+
     public async StartBackupProcess(instanceId: number)
     {
         const config = await this.ReadConfig(instanceId);
-        await this.backupProcessService.RunBackup(instanceId, config.sources, config.target);
+        await this.backupProcessService.RunBackup(instanceId, config.sources, config.target, config.retention);
         await this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(instanceId, config.sources, config.target, config.retention);
     }
 
@@ -204,6 +222,7 @@ export class BackupVaultManager
 
         //TODO: convert all the other external ids to internal ones when storing data
         dependencies.push(...config.sources.keyVaults.map(x => x.resourceId));
+        dependencies.push(...config.sources.objectStorages.map(x => x.resourceId));
 
         if(config.target.type === "webdav")
         {

@@ -55,12 +55,19 @@ export interface KeyVaultBackupConfig
     resourceId: number;
 }
 
+export interface ObjectStorageBackupConfig
+{
+    resourceId: number;
+    createSnapshotBeforeBackup: boolean;
+}
+
 export interface BackupVaultSourcesConfig
 {
     databases: BackupVaultDatabaseConfig[];
     controllerDB: BackupVaultControllerDatabaseConfig;
     fileStorages: BackupVaultFileStorageConfig[];
     keyVaults: KeyVaultBackupConfig[];
+    objectStorages: ObjectStorageBackupConfig[];
 }
 
 export interface BackupVaultStorageDeviceTargetConfig

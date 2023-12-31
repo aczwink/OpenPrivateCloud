@@ -27,15 +27,30 @@ interface BackupVaultKeyVaultSourceDTO
     id: string;
 }
 
+export interface BackupVaultObjectStorageSourceDTO
+{
+    /**
+     * @title Object storage
+     * @format resource-same-host[file-services/object-storage]
+     */
+    id: string;
+
+    /**
+     * @title Create snapshot right before saving snapshots in this vault
+     */
+    createSnapshotBeforeBackup: boolean;
+}
+
 export interface BackupVaultSourcesDTO
 {
     databases: BackupVaultDatabaseConfig[];
     controllerDB: BackupVaultControllerDatabaseConfig;
     fileStorages: BackupVaultFileStorageConfig[];
     keyVaults: BackupVaultKeyVaultSourceDTO[];
+    objectStorages: BackupVaultObjectStorageSourceDTO[];
 }
 
-export type BackupVaultAnySourceConfigDTO = BackupVaultFileStorageConfig | BackupVaultDatabaseConfig | BackupVaultKeyVaultSourceDTO;
+export type BackupVaultAnySourceConfigDTO = BackupVaultFileStorageConfig | BackupVaultDatabaseConfig | BackupVaultKeyVaultSourceDTO | BackupVaultObjectStorageSourceDTO;
 
 
 interface WebDAVTargetConfigDTO

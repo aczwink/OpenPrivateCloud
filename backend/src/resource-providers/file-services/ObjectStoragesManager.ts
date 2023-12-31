@@ -94,7 +94,7 @@ export class ObjectStoragesManager
             snapshot.files.push(md);
         }
 
-        const snapshotName = new Date().toISOString();
+        const snapshotName = new Date().toISOString().ReplaceAll(":", "_");
         const snapshotPath = path.join(this.GetSnapshotsPath(resourceReference), snapshotName);
 
         const dataToWrite = Buffer.from(JSON.stringify(snapshot), "utf-8");
@@ -189,7 +189,7 @@ export class ObjectStoragesManager
         const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetSnapshotsPath(resourceReference));
         return children.Values().Map(x => {
             const name = path.parse(x).name;
-            return new Date(name);
+            return new Date(name.ReplaceAll("_", ":"));
         });
     }
 
