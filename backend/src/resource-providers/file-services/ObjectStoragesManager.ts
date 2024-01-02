@@ -28,6 +28,7 @@ import { ObjectStorageProperties } from "./properties";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt, SymmetricKeyToBuffer, UnpackSymmetricKey } from "../../common/crypto/symmetric";
+import { GenerateRandomUUID } from "../../common/crypto/randomness";
 
 export interface FileMetaDataRevision
 {
@@ -372,7 +373,7 @@ export class ObjectStoragesManager
 
     private async WriteBlob(resourceReference: LightweightResourceReference, blob: Buffer): Promise<string>
     {
-        const blobId = crypto.randomUUID();
+        const blobId = GenerateRandomUUID();
         const blobPath = path.join(this.GetBlobsPath(resourceReference), blobId);
 
         const exists = await this.remoteFileSystemManager.Exists(resourceReference.hostId, blobPath);
