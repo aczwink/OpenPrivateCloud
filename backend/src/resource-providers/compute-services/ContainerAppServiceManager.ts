@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -208,8 +208,23 @@ export class ContainerAppServiceManager
         if(!this.ArrayEqualsAnyOrder(currentEnv.ToArray(), desiredEnv, "varName"))
             return true;
 
+        if(config.cert !== undefined)
+        {
+            const kvRef = await this.resourcesManager.CreateResourceReference(config.cert.keyVaultId);
+            const paths = await this.keyVaultManager.QueryCertificatePaths(kvRef!, config.cert.certificateName);
+
+            const m1 = containerData.Mounts.find(x => (x.Source === paths.certPath) && (x.Destination === config.cert!.certificateMountPoint));
+            const m2 = containerData.Mounts.find(x => (x.Source === paths.keyPath) && (x.Destination === config.cert!.privateKeyMountPoint));
+
+            if( (m1 === undefined) || (m2 === undefined) )
+                return true;
+        }
+
+        const expectedMountsCount = (config.cert === undefined ? 0 : 2) + (config.secrets.length > 0 ? 1 : 0) + 1; //the 1 at the end is the local volume that is created for every container but is not persisted
         return !(
             (containerData.Config.Image === config.imageName)
+            &&
+            (containerData.Mounts.length === expectedMountsCount)
         );
     }
 
