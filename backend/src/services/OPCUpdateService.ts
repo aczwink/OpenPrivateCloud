@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,20 +15,20 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import { Injectable } from "acts-util-node";
+import { LocalCommandExecutor } from "./LocalCommandExecutor";
 
-export const permissions =
+@Injectable
+export class OPCUpdateService
 {
-    data: {
-        read: "/data/read",
-        write: "/data/write"
-    },
+    constructor(private localCommandExecutor: LocalCommandExecutor)
+    {
+    }
 
-    /**
-     * General read rights, i.e. to read/see an instance
-     */
-    read: "/read",
-
-    roleAssignments: {
-        write: "/roleAssignments/write",
-    },
+    //Public methods
+    public async ExecuteSoftwareUpdate()
+    {
+        //TODO: find real path
+        await this.localCommandExecutor.ExecuteCommand(["./controller_update.sh"], "/srv/opc");
+    }
 }

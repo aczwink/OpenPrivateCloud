@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -35,6 +35,7 @@ import { keyVaultViewModel } from "./security-services/key-vault";
 import { apiGatewayViewModel } from "./web-services/api-gateway";
 import { addcViewModel } from "./integration-services/managed-ad";
 import { objectStorageViewModel } from "./file-services/object-storage";
+import { ResourceListComponent } from "../Views/resources/ResourceListComponent";
 
 export const resourcesRoutes: RoutingViewModel = {
     type: "routing",
@@ -113,3 +114,18 @@ export const resourcesRoutes: RoutingViewModel = {
         }
     ]
 }
+
+const root: RoutingViewModel = {
+    type: "routing",
+    entries: [
+        {
+            key: "resources",
+            viewModel: {
+                type: "component",
+                component: ResourceListComponent,
+            }
+        }
+    ]
+}
+
+export default root;

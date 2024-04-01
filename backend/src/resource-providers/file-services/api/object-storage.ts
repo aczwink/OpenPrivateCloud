@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete, Post } from "acts-util-apilib";
+import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete, Post, Forbidden } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { c_fileServicesResourceProviderName, c_objectStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { SessionsManager } from "../../../services/SessionsManager";
@@ -24,6 +24,8 @@ import { ResourceReference, ResourceReferenceWithSession } from "../../../common
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { FileMetaDataRevision, ObjectStoragesManager } from "../ObjectStoragesManager";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
+import { PermissionsManager } from "../../../services/PermissionsManager";
+import { permissions } from "openprivatecloud-common";
 
 interface FileCreationDataDTO
 {
@@ -66,7 +68,7 @@ interface SnapshotDTO
 @APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_objectStorageResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
-    constructor(resourcesManager: ResourcesManager, private sessionsManager: SessionsManager, private objectStoragesManager: ObjectStoragesManager)
+    constructor(resourcesManager: ResourcesManager, private sessionsManager: SessionsManager, private objectStoragesManager: ObjectStoragesManager, private permissionsManager: PermissionsManager)
     {
         super(resourcesManager, c_fileServicesResourceProviderName, c_objectStorageResourceTypeName);
     }
@@ -95,6 +97,10 @@ class _api_ extends ResourceAPIControllerBase
         @Common context: ResourceReferenceWithSession,
     )
     {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to files denied");
+
         const files = await this.objectStoragesManager.SearchFiles(context.resourceReference);
         return files.map<FileMetaDataOverviewDataDTO>(x => ({
             id: x.id,
@@ -109,6 +115,10 @@ class _api_ extends ResourceAPIControllerBase
         @Path fileId: string
     )
     {
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.write);
+        if(!canWriteData)
+            return Forbidden("delete access denied");
+
         await this.objectStoragesManager.DeleteFile(context.resourceReference, fileId);
     }
 
@@ -118,6 +128,10 @@ class _api_ extends ResourceAPIControllerBase
         @Path fileId: string
     )
     {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to blob denied");
+
         const file = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
         if(file === undefined)
             return NotFound("file not found");
@@ -133,6 +147,10 @@ class _api_ extends ResourceAPIControllerBase
         @FormField file: UploadedFile
     )
     {
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.write);
+        if(!canWriteData)
+            return Forbidden("write access denied");
+
         await this.objectStoragesManager.SaveFile(context.resourceReference, fileId, file.buffer, file.mediaType, file.originalName);
     }
 
@@ -142,6 +160,10 @@ class _api_ extends ResourceAPIControllerBase
         @Path fileId: string
     )
     {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to blob denied");
+
         return await this.objectStoragesManager.RequestFileBlob(context.resourceReference, fileId)
     }
 
@@ -152,6 +174,10 @@ class _api_ extends ResourceAPIControllerBase
         @Path revisionNumber: number
     )
     {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to revision denied");
+
         const md = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
         const x = md.revisions[revisionNumber];
         return this.MapRevisionToDTO(x, x.creationTimeStamp);
@@ -164,6 +190,10 @@ class _api_ extends ResourceAPIControllerBase
         @Path revisionNumber: number
     )
     {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to blob denied");
+
         return await this.objectStoragesManager.RequestFileRevisionBlob(context.resourceReference, fileId, revisionNumber);
     }
 
@@ -173,6 +203,10 @@ class _api_ extends ResourceAPIControllerBase
         @Path fileId: string
     )
     {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to revisions denied");
+
         const md = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
         return md.revisions.map<FileRevisionDTO>( (x, i) => ({
             revisionNumber: i,
@@ -186,6 +220,10 @@ class _api_ extends ResourceAPIControllerBase
         @Common context: ResourceReferenceWithSession,
     )
     {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to snapshots denied");
+
         const snapshots = await this.objectStoragesManager.RequestSnapshots(context.resourceReference);
         return snapshots.Map<SnapshotDTO>(x => ({
             creationDate: x
@@ -197,6 +235,10 @@ class _api_ extends ResourceAPIControllerBase
         @Common context: ResourceReferenceWithSession,
     )
     {
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.write);
+        if(!canWriteData)
+            return Forbidden("write access denied");
+        
         await this.objectStoragesManager.CreateSnapshot(context.resourceReference);
     }
 

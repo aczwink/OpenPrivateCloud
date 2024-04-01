@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -66,7 +66,7 @@ export class KeyVaultObjectReferenceSelectionComponent extends Component<{ objec
             case "certificate":
             {
                 const response = await this.apiService.resourceProviders._any_.securityservices.keyvault._any_.certificates.get(parts[1], parts[4]);
-                const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(data.ok)
                     this.possibleObjectNames = data.value.map(x => x.name);
                 else
@@ -76,7 +76,7 @@ export class KeyVaultObjectReferenceSelectionComponent extends Component<{ objec
             case "key":
             {
                 const response = await this.apiService.resourceProviders._any_.securityservices.keyvault._any_.keys.get(parts[1], parts[4]);
-                const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(data.ok)
                     this.possibleObjectNames = data.value.map(x => x.name);
                 else
@@ -86,7 +86,7 @@ export class KeyVaultObjectReferenceSelectionComponent extends Component<{ objec
             case "secret":
             {
                 const response = await this.apiService.resourceProviders._any_.securityservices.keyvault._any_.secrets.get(parts[1], parts[4]);
-                const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(data.ok)
                     this.possibleObjectNames = data.value.map(x => x.name);
                 else

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@
 import { MailerSettings } from "../../dist/api";
 import { ComponentViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ClusterKeyStoreComponent } from "../Views/cluster/ClusterKeyStoreComponent";
+import { SoftwareUpdateComponent } from "../Views/cluster/SoftwareUpdateComponent";
 
 const notificationSettingsViewModel: ObjectViewModel<MailerSettings, {}> = {
     type: "object",
@@ -38,6 +39,11 @@ const notificationSettingsViewModel: ObjectViewModel<MailerSettings, {}> = {
 const keyStoreViewModel: ComponentViewModel = {
     type: "component",
     component: ClusterKeyStoreComponent
+};
+
+const softwareUpdateViewModel: ComponentViewModel = {
+    type: "component",
+    component: SoftwareUpdateComponent
 };
 
 const clusterViewModel: MultiPageViewModel<{}> = {
@@ -60,7 +66,16 @@ const clusterViewModel: MultiPageViewModel<{}> = {
                     key: "keystore",
                     child: keyStoreViewModel,
                     displayName: "Key store",
-                }
+                },
+                {
+                    key: "softwareUpdate",
+                    child: softwareUpdateViewModel,
+                    displayName: "Software update",
+                    icon: {
+                        name: "arrow-clockwise",
+                        type: "bootstrap"
+                    }
+                },
             ]
         }
     ],

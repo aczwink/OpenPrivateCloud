@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,14 @@ export type Result<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
 
-function ExtractDataOrErrorFromResponse<ObjectType>(response: ResponseData<number, number, ObjectType>): Result<ObjectType>
+async function ExtractErrorMessageFromRawBody(rawBody: any)
+{
+    if(rawBody instanceof Blob)
+        return await rawBody.text();
+    return rawBody;
+}
+
+async function ExtractDataOrErrorFromResponse<ObjectType>(response: ResponseData<number, number, ObjectType>): Promise<Result<ObjectType>>
 {
     switch(response.statusCode)
     {
@@ -32,19 +39,20 @@ function ExtractDataOrErrorFromResponse<ObjectType>(response: ResponseData<numbe
         case 204:
             return { ok: true, value: undefined as any };
         case 400:
+        case 403:
         case 404:
         case 409:
         case 500:
-            return { ok: false, error: response.rawBody };
+            return { ok: false, error: await ExtractErrorMessageFromRawBody(response.rawBody) };
         default:
             alert("unhandled status code: " + response.statusCode);
             throw new Error("unhandled status code: " + response.statusCode);
     }
 }
 
-export function ExtractDataFromResponseOrShowErrorMessageOnError<ObjectType>(response: ResponseData<number, number, ObjectType>): Result<ObjectType>
+export async function ExtractDataFromResponseOrShowErrorMessageOnError<ObjectType>(response: ResponseData<number, number, ObjectType>): Promise<Result<ObjectType>>
 {
-    const result = ExtractDataOrErrorFromResponse(response);
+    const result = await ExtractDataOrErrorFromResponse(response);
 
     if(!result.ok)
     {

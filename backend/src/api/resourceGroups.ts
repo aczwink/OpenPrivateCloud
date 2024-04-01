@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Body, BodyProp, Common, Conflict, Delete, Get, Header, NotFound, Patch, Path, Post } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Conflict, Delete, Forbidden, Get, Header, NotFound, Patch, Path, Post } from "acts-util-apilib";
 import { ResourceGroup, ResourceGroupsController } from "../data-access/ResourceGroupsController";
 import { SessionsManager } from "../services/SessionsManager";
 import { PermissionsController } from "../data-access/PermissionsController";
@@ -24,13 +24,11 @@ import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAs
 import { AnyResourceProperties } from "../resource-providers/ResourceProperties";
 import { HostsController } from "../data-access/HostsController";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
-import { ResourcesController } from "../data-access/ResourcesController";
-import { ResourceReference } from "../common/ResourceReference";
 import { ResourcesManager } from "../services/ResourcesManager";
 import { ResourceDeploymentService } from "../services/ResourceDeploymentService";
 import { ResourceGroupsManager } from "../services/ResourceGroupsManager";
-import { HealthStatus } from "../data-access/HealthController";
-import { ResourceState } from "../resource-providers/ResourceProvider";
+import { ResourceQueryService } from "../services/ResourceQueryService";
+import { PermissionsManager } from "../services/PermissionsManager";
 
 interface ResourceGroupDTO
 {
@@ -41,15 +39,6 @@ interface ResourceGroupWithSession
 {
     resourceGroup: ResourceGroup;
     userId: number;
-}
-
-interface ResourceOverviewDataDTO
-{
-    id: string;
-    name: string;
-    resourceProviderName: string;
-    instanceType: string;
-    state: ResourceState;
 }
 
 function ToDTO(input: ResourceGroup | undefined): ResourceGroupDTO | undefined
@@ -146,7 +135,8 @@ class _api4_
 class _api3_
 {
     constructor(private resourceGroupsController: ResourceGroupsController, private hostsController: HostsController, private resourceProviderManager: ResourceProviderManager, private sessionsManager: SessionsManager,
-        private permissionsController: PermissionsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private resourceDeploymentService: ResourceDeploymentService)
+        private permissionsController: PermissionsController, private resourcesManager: ResourcesManager, private resourceDeploymentService: ResourceDeploymentService,
+        private resourceQueryService: ResourceQueryService)
     {
     }
 
@@ -239,85 +229,71 @@ class _api3_
     )
     {
         const resourceIds = await this.permissionsController.QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(common.userId, common.resourceGroup.id);
-
-        const instances = await resourceIds.Map(async resourceId => {
-            const row = await this.resourcesController.QueryOverviewInstanceData(resourceId);
-            const ref = await this.resourcesManager.CreateResourceReference(resourceId);
-
-            const res: ResourceOverviewDataDTO = {
-                id: ref!.externalId,
-                instanceType: row!.instanceType,
-                name: row!.name,
-                resourceProviderName: row!.resourceProviderName,
-                state: await this.GetResourceState(ref!, row!.status)
-            };
-            return res;
-        }).PromiseAll();
-        return instances.Values().ToArray();
+        return this.resourceQueryService.QueryOverviewData(resourceIds);
     }
+}
 
-    //Private methods
-    private async GetResourceState(resourceReference: ResourceReference, healthStatus: HealthStatus): Promise<ResourceState>
-    {
-        switch(healthStatus)
-        {
-            case HealthStatus.Corrupt:
-                return "corrupt";
-            case HealthStatus.Down:
-                return "down";
-            case HealthStatus.InDeployment:
-                return "in deployment";
-            case HealthStatus.Up:
-            {
-                const rp = this.resourceProviderManager.FindResourceProviderByResource(resourceReference);
-                const result = await rp.QueryResourceState(resourceReference);
-                return (typeof result === "string") ? result : result.state;
-            }
-        }
-    }
+interface ResourceGroupAndUserId
+{
+    resourceGroupId: number;
+    userId: number;
 }
 
 @APIController("resourceGroups/{resourceGroupName}/roleAssignments")
 class _api2_
 {
-    constructor(private roleAssignmentsController: RoleAssignmentsController, private resourceGroupsController: ResourceGroupsController)
+    constructor(private roleAssignmentsController: RoleAssignmentsController, private resourceGroupsController: ResourceGroupsController, private sessionsManager: SessionsManager, private permissionsManager: PermissionsManager)
     {
     }
 
     @Common()
     public async Common(
-        @Path resourceGroupName: string
+        @Path resourceGroupName: string,
+        @Header Authorization: string
     )
     {
         const group = await this.resourceGroupsController.QueryGroupByName(resourceGroupName);
         if(group === undefined)
             return NotFound("resource group not found");
-        return group;
+
+        const res: ResourceGroupAndUserId = {
+            resourceGroupId: group.id,
+            userId: this.sessionsManager.GetUserIdFromAuthHeader(Authorization)
+        }
+        return res;
     }
 
     @Post()
     public async Add(
-        @Common resourceGroup: ResourceGroup,
+        @Common context: ResourceGroupAndUserId,
         @Body roleAssignment: RoleAssignment
     )
     {
-        await this.roleAssignmentsController.AddInstanceGroupRoleAssignment(resourceGroup.id, roleAssignment);
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceGroupScope(context.resourceGroupId, context.userId, permissions.roleAssignments.write);
+        if(!canWriteData)
+            return Forbidden("write access to role assignments denied");
+
+        await this.roleAssignmentsController.AddInstanceGroupRoleAssignment(context.resourceGroupId, roleAssignment);
     }
 
     @Delete()
     public async Delete(
-        @Common resourceGroup: ResourceGroup,
+        @Common context: ResourceGroupAndUserId,
         @Body roleAssignment: RoleAssignment
     )
     {
-        await this.roleAssignmentsController.DeleteResourceGroupRoleAssignment(resourceGroup.id, roleAssignment);
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceGroupScope(context.resourceGroupId, context.userId, permissions.roleAssignments.write);
+        if(!canWriteData)
+            return Forbidden("delete access to role assignments denied");
+
+        await this.roleAssignmentsController.DeleteResourceGroupRoleAssignment(context.resourceGroupId, roleAssignment);
     }
 
     @Get()
     public async RequestInstanceGroupRoleAssignments(
-        @Common resourceGroup: ResourceGroup,
+        @Common context: ResourceGroupAndUserId,
     )
     {
-        return await this.roleAssignmentsController.QueryResourceGroupRoleAssignments(resourceGroup.id);
+        return await this.roleAssignmentsController.QueryResourceGroupRoleAssignments(context.resourceGroupId);
     }
 }

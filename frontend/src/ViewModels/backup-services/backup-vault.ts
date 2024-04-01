@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -67,7 +67,7 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, R
             createResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
             loadContext: async (service, ids) => {
                 const response = await service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
-                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok === false)
                     throw new Error("TODO");
                 return result.value;
@@ -84,7 +84,7 @@ const fileStorageSourcesViewModel: ListViewModel<BackupVaultFileStorageConfig, R
     requestObjects: async (service, ids) => 
     {
         const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
-        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
             return {
@@ -106,7 +106,7 @@ const objectStorageSourcesViewModel: ListViewModel<BackupVaultObjectStorageSourc
             createResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
             loadContext: async (service, ids) => {
                 const response = await service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
-                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok === false)
                     throw new Error("TODO");
                 return result.value;
@@ -123,7 +123,7 @@ const objectStorageSourcesViewModel: ListViewModel<BackupVaultObjectStorageSourc
     requestObjects: async (service, ids) => 
     {
         const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
-        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
             return {
@@ -147,7 +147,7 @@ const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, Resourc
             createResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
             loadContext: async (service, ids) => {
                 const response = await service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
-                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok === false)
                     throw new Error("TODO");
                 return result.value;
@@ -164,7 +164,7 @@ const databaseSourcesViewModel: ListViewModel<BackupVaultDatabaseConfig, Resourc
     requestObjects: async (service, ids) => 
     {
         const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
-        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
             return {
@@ -185,7 +185,7 @@ const keyVaultSourcesViewModel: ListViewModel<BackupVaultKeyVaultSourceDTO, Reso
             createResource: (service, ids, newValue) => service.resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
             loadContext: async (service, ids) => {
                 const response = await service.resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
-                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok === false)
                     throw new Error("TODO");
                 return result.value;
@@ -202,7 +202,7 @@ const keyVaultSourcesViewModel: ListViewModel<BackupVaultKeyVaultSourceDTO, Reso
     requestObjects: async (service, ids) => 
     {
         const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
-        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
             return {
@@ -227,7 +227,7 @@ const controllerDBSourceViewModel: ObjectViewModel<BackupVaultControllerDatabase
             requestObject: async (service, ids) => 
             {
                 const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
-                const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(data.ok)
                 {
                     return {
@@ -244,7 +244,7 @@ const controllerDBSourceViewModel: ObjectViewModel<BackupVaultControllerDatabase
     requestObject: async (service, ids) => 
     {
         const response = await service.resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
-        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
             return {

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -52,5 +52,13 @@ class RoleAPIController
         if(role === undefined)
             return NotFound("role does not exist");
         return role;
+    }
+
+    @Get("permissions")
+    public QueryPermissions(
+        @Path roleId: string
+    )
+    {
+        return this.rolesController.RequestRolePermissions(roleId);
     }
 }

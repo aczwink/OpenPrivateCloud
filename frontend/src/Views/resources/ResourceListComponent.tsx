@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -30,7 +30,7 @@ export class ResourceListComponent extends Component
         super();
 
         this.resources = null;
-        this.resourceGroupName = routerState.routeParams.resourceGroupName!;
+        this.resourceGroupName = routerState.routeParams.resourceGroupName || null;
     }
 
     protected Render(): RenderValue
@@ -53,12 +53,12 @@ export class ResourceListComponent extends Component
                     {this.resources.map(this.RenderInstance.bind(this))}
                 </tbody>
             </table>
-            <RouterButton className="btn btn-primary" route={"/resourceGroups/" + this.resourceGroupName + "/add"}><BootstrapIcon>plus</BootstrapIcon></RouterButton>
+            {this.resourceGroupName === null ? null : <RouterButton className="btn btn-primary" route={"/resourceGroups/" + this.resourceGroupName + "/add"}><BootstrapIcon>plus</BootstrapIcon></RouterButton>}
         </fragment>;
     }
 
     //Private variables
-    private resourceGroupName: string;
+    private resourceGroupName: string | null;
     private resources: ResourceOverviewDataDTO[] | null;
 
     //Private methods
@@ -66,7 +66,7 @@ export class ResourceListComponent extends Component
     {
         const urlPart = resource.id.substring(resource.id.indexOf("/", 1));
         return <tr>
-            <td>{this.RenderResourceIcon(resource.instanceType)} <Anchor route={"/resourceGroups/" + this.resourceGroupName + "/resources" + urlPart}>{resource.name}</Anchor></td>
+            <td>{this.RenderResourceIcon(resource.instanceType)} <Anchor route={"/resourceGroups/" + resource.resourceGroupName + "/resources" + urlPart}>{resource.name}</Anchor></td>
             <td>{resource.instanceType}</td>
             <td>{this.RenderState(resource.state)}</td>
             <td>{resource.resourceProviderName}</td>
@@ -143,15 +143,25 @@ export class ResourceListComponent extends Component
     //Event handlers
     override async OnInitiated(): Promise<void>
     {
-        const response = await this.apiService.resourceGroups._any_.resources.get(this.resourceGroupName);
-        if(response.statusCode === 404)
+        let data;
+        if(this.resourceGroupName === null)
         {
-            alert("Resource group not found");
-            this.router.RouteTo("/resourceGroups");
-            return;
+            const response = await this.apiService.resources.get();
+            data = response.data;
+        }
+        else
+        {
+            const response = await this.apiService.resourceGroups._any_.resources.get(this.resourceGroupName);
+            if(response.statusCode === 404)
+            {
+                alert("Resource group not found");
+                this.router.RouteTo("/resourceGroups");
+                return;
+            }
+            data = response.data;
         }
 
-        response.data.SortBy(x => x.name);
-        this.resources = response.data;
+        data.SortBy(x => x.name);
+        this.resources = data;
     }
 }

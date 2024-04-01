@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -51,6 +51,7 @@ export class RootComponent extends Component
         return <Navigation>
             <ul className="nav nav-pills">
                 <NavItem route="/"><BootstrapIcon>speedometer2</BootstrapIcon> Dashboard</NavItem>
+                <NavItem route="/resources"><BootstrapIcon>collection</BootstrapIcon> Resources</NavItem>
                 <NavItem route="/resourceGroups"><BootstrapIcon>collection-fill</BootstrapIcon> Resource groups</NavItem>
                 <NavItem route="/dataExplorer"><BootstrapIcon>graph-up-arrow</BootstrapIcon> Data Explorer</NavItem>
                 <NavItem route="/usersandgroups"><BootstrapIcon>people-fill</BootstrapIcon> IAM</NavItem>

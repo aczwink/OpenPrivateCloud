@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Get, NotFound, Path, Query } from "acts-util-apilib";
+import { APIController, Get, Header, NotFound, Path, Query } from "acts-util-apilib";
 import { ResourceLogsController } from "../data-access/ResourceLogsController";
 import { ResourcesController } from "../data-access/ResourcesController";
 import { ResourcesManager } from "../services/ResourcesManager";
+import { PermissionsController } from "../data-access/PermissionsController";
+import { ResourceQueryService } from "../services/ResourceQueryService";
+import { SessionsManager } from "../services/SessionsManager";
+import { PermissionsManager } from "../services/PermissionsManager";
+import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
 
 @APIController("resources")
 class _api_
 {
-    constructor(private resourceLogsController: ResourceLogsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager)
+    constructor(private resourceLogsController: ResourceLogsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private permissionsController: PermissionsController,
+        private resourceQueryService: ResourceQueryService, private sessionsManager: SessionsManager, private permissionsManager: PermissionsManager, private resourceGroupsController: ResourceGroupsController)
     {
     }
 
@@ -50,6 +56,14 @@ class _api_
 
         const logs = await this.resourceLogsController.QueryResourceLogs(ref.id);
         return logs;
+    }
+
+    @Get()
+    public async QueryResources(@Header Authorization: string)
+    {
+        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+        const resourceIds = await this.resourceQueryService.QueryResourceIds(userId);
+        return this.resourceQueryService.QueryOverviewData(resourceIds);
     }
 
     @Get("search")

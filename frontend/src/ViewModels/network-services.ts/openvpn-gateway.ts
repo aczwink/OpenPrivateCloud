@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -66,7 +66,7 @@ const clientsViewModel: ListViewModel<OpenVPNGatewayClient, ResourceAndGroupId> 
             type: "custom",
             action: async (service, ids, client) => {
                 const response = await service.resourceProviders._any_.networkservices.openvpngateway._any_.clientconfig.get(ids.resourceGroupName, ids.resourceName, { clientName: client.name });
-                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok)
                 {
                     const fds = RootInjector.Resolve(FileDownloadService);

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -32,6 +32,7 @@ export interface Resource
 interface OverviewInstanceData
 {
     name: string;
+    resourceGroupName: string;
     resourceProviderName: string;
     instanceType: string;
     status: number;
@@ -129,8 +130,10 @@ export class ResourcesController
     public async QueryOverviewInstanceData(instanceId: number)
     {
         const query = `
-        SELECT i.name, i.resourceProviderName, i.instanceType, ih.status
+        SELECT i.name, i.resourceProviderName, ig.name AS resourceGroupName, i.instanceType, ih.status
         FROM instances i
+        INNER JOIN instancegroups ig
+            ON ig.id = i.instanceGroupId
         INNER JOIN instances_health ih
             ON ih.instanceId = i.id
         WHERE i.id = ?

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { MembershipDataDto, PublicUserData, RoleAssignment, UserCreationData, UserGroup, UserGroupCreationData } from "../../dist/api";
+import { MembershipDataDto, PublicUserData, RoleAssignment, RoleDefinition, RolePermission, UserCreationData, UserGroup, UserGroupCreationData } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 
@@ -127,6 +127,60 @@ const userGroupsViewModel: CollectionViewModel<UserGroup, {}, UserGroupCreationD
     type: "collection",
 };
 
+//RolePermission
+type RoleIdRouteParams = { roleId: string };
+
+const roleOverviewViewModel: ObjectViewModel<RoleDefinition, RoleIdRouteParams> = {
+    actions: [],
+    formTitle: (_, role) => role.name,
+    requestObject: (service, ids) =>  service.roles._any_.get(ids.roleId),
+    schemaName: "RoleDefinition",
+    type: "object"
+};
+
+const permissionsViewModel: ListViewModel<RolePermission, RoleIdRouteParams> = {
+    actions: [],
+    boundActions: [],
+    displayName: "Permissions",
+    requestObjects: (service, ids) => service.roles._any_.permissions.get(ids.roleId),
+    schemaName: "RolePermission",
+    type: "list"
+};
+
+const roleViewModel: MultiPageViewModel<RoleIdRouteParams> = {
+    actions: [],
+    entries: [
+        {
+            displayName: "",
+            entries: [
+                {
+                    child: roleOverviewViewModel,
+                    displayName: "Overview",
+                    key: "overview",
+                },
+                {
+                    child: permissionsViewModel,
+                    displayName: "Permissions",
+                    key: "permissions"
+                }
+            ]
+        }
+    ],
+    formTitle: x => "Role: " + x.roleId,
+    type: "multiPage"
+};
+
+const rolesViewModel: CollectionViewModel<RoleDefinition, {}> = {
+    actions: [],
+    child: roleViewModel,
+    displayName: "Roles",
+    extractId: x => x.id,
+    idKey: "roleId",
+    requestObjects: (service, _) => service.roles.get({filter: ""}),
+    schemaName: "RoleDefinition",
+    type: "collection"
+};
+
 const clusterRoleAssignmentsViewModel: ListViewModel<RoleAssignment, {}> = {
     type: "list",
     actions: [
@@ -169,6 +223,15 @@ const usersAndGroupsViewModel: MultiPageViewModel<{}> = {
                     icon: {
                         type: "bootstrap",
                         name: "people"
+                    }
+                },
+                {
+                    child: rolesViewModel,
+                    displayName: "Roles",
+                    key: "roles",
+                    icon: {
+                        name: "person-rolodex",
+                        type: "bootstrap"
                     }
                 },
                 {

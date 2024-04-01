@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -29,9 +29,9 @@ interface CommandExecutionResult
 export class LocalCommandExecutor
 {
     //Public methods
-    public async ExecuteCommand(command: string[], expectedExitCode: number = 0)
+    public async ExecuteCommand(command: string[], workingDirectory?: string, expectedExitCode: number = 0)
     {
-        const result = await this.ExecuteCommandWithExitCode(command);
+        const result = await this.ExecuteCommandWithExitCode(command, workingDirectory);
         if(result.exitCode !== expectedExitCode)
             throw new Error("Command '" + command.join(" ") + "' failed. stderr: " + result.stderr);
 
@@ -64,11 +64,11 @@ export class LocalCommandExecutor
         });
     }
 
-    private CreateChildProcess(command: string[])
+    private CreateChildProcess(command: string[], workingDirectory?: string)
     {
         const commandLine = command.join(" ");
         const childProcess = child_process.spawn(commandLine, [], {
-            //cwd: options.workingDirectory,
+            cwd: workingDirectory,
             //env: options.environmentVariables,
             //gid: auth.gid,
             shell: true,
@@ -91,9 +91,9 @@ export class LocalCommandExecutor
         return childProcess;
     }
 
-    private async ExecuteCommandWithExitCode(command: string[]): Promise<CommandExecutionResult>
+    private async ExecuteCommandWithExitCode(command: string[], workingDirectory?: string): Promise<CommandExecutionResult>
     {
-        const childProcess = this.CreateChildProcess(command);
+        const childProcess = this.CreateChildProcess(command, workingDirectory);
 
         let stdOut = "";
         childProcess.stdout.on("data", chunk => stdOut += chunk);

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ import { ResponseData } from "../../../dist/api";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { ReplaceRouteParams } from "../Shared";
 import { ObjectEditorComponent, ObjectEditorContext } from "./ObjectEditorComponent";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
 
 interface AddObjectInput
 {
@@ -94,8 +95,14 @@ export class AddObjectComponent<ObjectType> extends Component<AddObjectInput>
         event.preventDefault();
         this.loading = true;
 
-        await this.input.createResource(this.routerState.routeParams, this.data);
-        const route = ReplaceRouteParams(this.input.postUpdateUrl, this.routerState.routeParams);
-        this.router.RouteTo(route);
+        const response = await this.input.createResource(this.routerState.routeParams, this.data);
+        const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
+        {
+            const route = ReplaceRouteParams(this.input.postUpdateUrl, this.routerState.routeParams);
+            this.router.RouteTo(route);
+        }
+        else
+            this.loading = false;
     }
 }

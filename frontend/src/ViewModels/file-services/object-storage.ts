@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "
 import { FileDownloadService, RootInjector } from "acfrontend";
 import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO, SnapshotDTO } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -46,19 +47,15 @@ const fileRevisionViewModel: ObjectViewModel<FileMetaDataDTO, FileId & { revisio
             type: "activate",
             execute: async (service, ids) => {
                 const response1 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber);
-                if(response1.statusCode !== 200)
-                    throw new Error("TODO: implement me");
+                const result1 = await ExtractDataFromResponseOrShowErrorMessageOnError(response1);
+                if(!result1.ok)
+                    return response1;
 
                 const response2 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber);
-                if(response2.statusCode !== 200)
-                    throw new Error("TODO: implement me");
-
-                RootInjector.Resolve(FileDownloadService).DownloadBlobAsFile(response2.data, response1.data.fileName);
-                return {
-                    data: null,
-                    rawBody: null,
-                    statusCode: 200,
-                };
+                const result2 = await ExtractDataFromResponseOrShowErrorMessageOnError(response2);
+                if(result2.ok)
+                    RootInjector.Resolve(FileDownloadService).DownloadBlobAsFile(result2.value, result1.value.fileName);
+                return response2;
             },
             matIcon: "download",
             title: "Download"
@@ -88,19 +85,15 @@ const fileViewModel: MultiPageViewModel<FileId> = {
             type: "activate",
             execute: async (service, ids) => {
                 const response1 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId);
-                if(response1.statusCode !== 200)
-                    throw new Error("TODO: implement me");
+                const result1 = await ExtractDataFromResponseOrShowErrorMessageOnError(response1);
+                if(!result1.ok)
+                    return response1;
 
                 const response2 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId);
-                if(response2.statusCode !== 200)
-                    throw new Error("TODO: implement me");
-
-                RootInjector.Resolve(FileDownloadService).DownloadBlobAsFile(response2.data, response1.data.fileName);
-                return {
-                    data: null,
-                    rawBody: null,
-                    statusCode: 200,
-                };
+                const result2 = await ExtractDataFromResponseOrShowErrorMessageOnError(response2);
+                if(result2.ok)
+                    RootInjector.Resolve(FileDownloadService).DownloadBlobAsFile(result2.value, result1.value.fileName);
+                return response2;
             },
             matIcon: "download",
             title: "Download"

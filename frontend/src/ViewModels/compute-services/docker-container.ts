@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -63,7 +63,7 @@ const configViewModel: ObjectViewModel<ContainerAppServiceConfigDTO, ResourceAnd
             propertiesSchemaName: "ContainerAppServiceConfigDTO",
             loadContext: async (service, ids) => {
                 const response = await service.resourceProviders._any_.computeservices.dockercontainer._any_.info.get(ids.resourceGroupName, ids.resourceName);
-                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok)
                     return result.value;
                 return {

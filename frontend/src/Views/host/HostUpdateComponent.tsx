@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -61,7 +61,7 @@ export class HostUpdateComponent extends Component
     private async QueryData()
     {
         const response = await this.apiService.hosts._any_.update.get(this.hostName);
-        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)
             this.data = result.value;
     }

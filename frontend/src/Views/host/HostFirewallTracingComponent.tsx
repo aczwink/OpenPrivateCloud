@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -145,7 +145,7 @@ export class HostFirewallTracingComponent extends Component
         this.loadingPackets = true;
 
         const response = await this.apiService.hosts._any_.firewallTracing.data.get(this.hostName);
-        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
             this.packets = data.value;
@@ -164,7 +164,7 @@ export class HostFirewallTracingComponent extends Component
     override async OnInitiated(): Promise<void>
     {
         const response = await this.apiService.hosts._any_.firewallTracing.get(this.hostName);
-        const data = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const data = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(data.ok)
         {
             this.settings = data.value;

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,11 @@ export interface RoleDefinition
 {
     id: string;
     name: string;
+}
+
+export interface RolePermission
+{
+    permission: string;
 }
 
 @Injectable
@@ -57,6 +62,20 @@ export class RolesController
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         const row = await conn.SelectOne<RoleDefinition>(query, roleId);
+
+        return row;
+    }
+
+    public async RequestRolePermissions(roleId: string)
+    {
+        const query = `
+        SELECT permission
+        FROM roles_permissions
+        WHERE roleId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.Select<RolePermission>(query, roleId);
 
         return row;
     }

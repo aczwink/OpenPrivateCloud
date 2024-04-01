@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -69,7 +69,7 @@ const settingsViewModel: ObjectViewModel<API_GatewaySettings, ResourceAndGroupId
             propertiesSchemaName: "API_GatewaySettings",
             loadContext: async (service, ids) => {
                 const response = await service.health.resource.get({ id: BuildResourceId(ids.resourceGroupName, ids.resourceName) });
-                const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
                 if(result.ok)
                 {
                     return {

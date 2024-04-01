@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ import { ResponseData } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
 import { IdBoundResourceAction } from "../IdBoundActions";
 import { DeleteAction, EditAction, ObjectBoundAction } from "../ObjectBoundActions";
-import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../ResponseHandler";
+import { ExtractDataFromResponseOrShowErrorMessageOnError, ShowErrorMessageOnErrorFromResponse } from "../ResponseHandler";
 import { ReplaceRouteParams } from "../Shared";
 import { UnboundResourceAction } from "../UnboundActions";
 import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
@@ -91,11 +91,13 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
     private async QueryData()
     {
         const response = await this.input.requestObjects(this.routerState.routeParams);
-        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)
+        {
             this.data = result.value;
-        const firstColumnKey = this.input.elementSchema.required[0];
-        this.Sort(firstColumnKey, true);
+            const firstColumnKey = this.input.elementSchema.required[0];
+            this.Sort(firstColumnKey, true);
+        }
     }
 
     private RenderColumnsNames()
@@ -199,7 +201,8 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         if(confirm("Are you sure that you want to delete this?"))
         {
             this.data = null;
-            await action.deleteResource(this.apiService, this.routerState.routeParams, object);
+            const response = await action.deleteResource(this.apiService, this.routerState.routeParams, object);
+            ShowErrorMessageOnErrorFromResponse(response);
             this.QueryData();
         }
     }

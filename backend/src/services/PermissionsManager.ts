@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ import { UsersController } from "../data-access/UsersController";
 @Injectable
 export class PermissionsManager
 {
-    constructor(private instancesController: ResourcesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
+    constructor(private resourcesController: ResourcesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
         private roleAssignmentsController: RoleAssignmentsController, private usersController: UsersController)
     {
     }
@@ -34,7 +34,7 @@ export class PermissionsManager
     //Public methods
     public async AddInstanceRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
     {
-        const hostId = await this.instancesController.QueryHostIdOfInstance(instanceId);
+        const hostId = await this.resourcesController.QueryHostIdOfInstance(instanceId);
         const userGroupIds = await this.permissionsController.QueryGroupsAssociatedWithHost(hostId!);
 
         await this.roleAssignmentsController.AddInstanceRoleAssignment(instanceId, roleAssignment);
@@ -47,23 +47,38 @@ export class PermissionsManager
     {        
         await this.roleAssignmentsController.DeleteInstanceRoleAssignment(instanceId, roleAssignment);
 
-        const hostId = await this.instancesController.QueryHostIdOfInstance(instanceId);
+        const hostId = await this.resourcesController.QueryHostIdOfInstance(instanceId);
         const userGroupIds = await this.permissionsController.QueryGroupsAssociatedWithHost(hostId!);
 
         if(!userGroupIds.has(roleAssignment.userGroupId))
             await this.hostUsersManager.RemoveGroupFromHost(hostId!, roleAssignment.userGroupId);
     }
 
+    public async HasUserClusterWidePermission(userId: number, permission: string)
+    {
+        return await this.permissionsController.HasUserClusterWidePermission(userId, permission);
+    }
+
+    public async HasUserPermissionOnResourceGroupScope(resourceGroupId: number, userId: number, permission: string)
+    {
+        const rgLevel = await this.permissionsController.HasUserResourceGroupLevelPermission(resourceGroupId, userId, permission);
+        if(rgLevel)
+            return true;
+        
+        return this.HasUserClusterWidePermission(userId, permission);
+    }
+
     public async HasUserPermissionOnResourceScope(resourceReference: ResourceReference, userId: number, permission: string)
     {
-        const clusterWide = await this.permissionsController.HasUserClusterWidePermission(userId, permission);
-        if(clusterWide)
+        const resourceLevel = await this.permissionsController.HasUserResourceLevelPermission(resourceReference.id, userId, permission);
+        if(resourceLevel)
             return true;
 
-        //TODO: RG level
+        const resource = await this.resourcesController.QueryResource(resourceReference.id);
+        if(resource === undefined)
+            throw new Error("TODO: implement me");
 
-        const resourceLevel = await this.permissionsController.HasUserResourceLevelPermission(resourceReference.id, userId, permission);
-        return resourceLevel;
+        return this.HasUserPermissionOnResourceGroupScope(resource.instanceGroupId, userId, permission);
     }
 
     public async QueryUsersWithPermission(resourceId: number, permission: string)

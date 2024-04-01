@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@
 
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
+import { permissions } from "openprivatecloud-common";
 
 @Injectable
 export class PermissionsController
@@ -41,6 +42,24 @@ export class PermissionsController
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         const row = await conn.SelectOne(query, userId, permission);
+
+        return row !== undefined;
+    }
+
+    public async HasUserResourceGroupLevelPermission(resourceGroupId: number, userId: number, permission: string)
+    {
+        const query = `
+        SELECT TRUE
+        FROM instancegroups_roleAssignments igra
+        INNER JOIN usergroups_members ugm
+            ON ugm.groupId = igra.userGroupId
+        INNER JOIN roles_permissions rp
+            ON igra.roleId = rp.roleId
+        WHERE igra.instanceGroupId = ? AND ugm.userId = ? AND rp.permission = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne(query, resourceGroupId, userId, permission);
 
         return row !== undefined;
     }
@@ -181,6 +200,7 @@ export class PermissionsController
         INNER JOIN roles_permissions rp
             ON rp.roleId = igra.roleId AND rp.permission = '/read'
         WHERE ugm.userId = ?
+        GROUP BY ig.id
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
@@ -234,5 +254,23 @@ export class PermissionsController
         const rows = await conn.Select(query, userId, resourceGroupId, userId, resourceGroupId, userId, resourceGroupId);
 
         return rows.Values().Map(x => x.id as number);
+    }
+
+    public async QueryResourceIdsThatUserHasDirectlyAccessTo(userId: number)
+    {
+        const query = `
+        SELECT ira.instanceId
+        FROM instances_roleAssignments ira
+        INNER JOIN roles_permissions rp
+            ON rp.roleId = ira.roleId
+        INNER JOIN usergroups_members ugm
+            ON ugm.groupId = ira.userGroupId
+        WHERE ugm.userId = ? AND rp.permission = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, userId, permissions.read);
+
+        return rows.Values().Map(x => x.instanceId as number);
     }
 }

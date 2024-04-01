@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,21 @@ import { NotificationsManager } from "../services/NotificationsManager";
 import { SessionsManager } from "../services/SessionsManager";
 import { ClusterKeyStoreManager } from "../services/ClusterKeyStoreManager";
 import { UserWalletManager } from "../services/UserWalletManager";
+import { OPCUpdateService } from "../services/OPCUpdateService";
+
+@APIController("cluster/update")
+class _api1_
+{
+    constructor(private opcUpdateService: OPCUpdateService)
+    {
+    }
+
+    @Put()
+    public async ExecuteSoftwareUpdate()
+    {
+        await this.opcUpdateService.ExecuteSoftwareUpdate();
+    }
+}
 
 @APIController("cluster/keystore")
 class _api_

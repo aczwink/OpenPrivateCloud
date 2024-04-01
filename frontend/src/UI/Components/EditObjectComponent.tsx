@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -70,7 +70,7 @@ export class EditObjectComponent<ObjectType> extends Component<ObjectInput<Objec
         this.context = await this.input.loadContext?.call(undefined, this.routerState.routeParams);
 
         const response = await this.input.requestObject(this.routerState.routeParams);
-        const result = ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)
             this.data = result.value;
         this.heading = this.input.formTitle(this.routerState.routeParams, this.data);
