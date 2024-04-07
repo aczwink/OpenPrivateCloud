@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,12 @@ export enum HealthStatus
     Down = 2,
     Corrupt = 3,
     InDeployment = 4
+}
+
+interface HostHealthData
+{
+    status: HealthStatus;
+    log: string;
 }
 
 interface ResourceHealthData
@@ -64,6 +70,25 @@ export class HealthController
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         return await conn.Select<HealthStats>(query);
+    }
+
+    public async QueryHostHealthData(hostId: number): Promise<HostHealthData | undefined>
+    {
+        const query = `
+        SELECT status, log
+        FROM hosts_health
+        WHERE hostId = ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne(query, hostId);
+        if(row === undefined)
+            return undefined;
+
+
+        return {
+            status: row.status,
+            log: row.log
+        };
     }
 
     public async QueryResourceHealthData(instanceId: number): Promise<ResourceHealthData | undefined>

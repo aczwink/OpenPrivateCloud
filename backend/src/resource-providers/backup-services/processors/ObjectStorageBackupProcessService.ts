@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -52,7 +52,7 @@ export class ObjectStorageBackupProcessService
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetDir);
 
         const sourceDirPath = this.resourcesManager.BuildResourceStoragePath(sourceRef) + "/";
-        const cmd = ["sudo", "rsync", "--archive", "--delete", "--quiet", sourceDirPath, targetDir];
+        const cmd = ["sudo", "rsync", "--archive", "--size-only", "--delete", "--quiet", sourceDirPath, targetDir];
         await this.remoteCommandExecutor.ExecuteCommand(cmd, hostId);
 
         processTracker.Add("Finished backing up ObjectStorage", sourceRef.externalId);

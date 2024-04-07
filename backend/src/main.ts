@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -43,6 +43,7 @@ async function EnableHealthManagement()
 {
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
     GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
+    await GlobalInjector.Resolve(HostAvailabilityManager).CheckHostsHealth();
 }
 
 function EventManagementSetup()
@@ -64,7 +65,11 @@ function EventManagementSetup()
     const cem = GlobalInjector.Resolve(ClusterEventsManager);
     cem.RegisterListener(event => {
         if(event.type === "keyStoreUnlocked")
-        EnableHealthManagement();
+        {
+            console.log("Key store unlocked");
+            EnableHealthManagement();
+            SetupDataSources();
+        }
     });
 }
 
@@ -106,8 +111,6 @@ async function SetupWebServer()
 
     server.listen(port, () => {
         console.log("Backend is running...");
-        EnableHealthManagement();
-        SetupDataSources();
     });
 
     process.on('SIGINT', function()

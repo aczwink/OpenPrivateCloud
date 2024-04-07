@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,14 +24,17 @@ import { ModulesManager } from "./ModulesManager";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
 import { ResourceHealthManager } from "./ResourceHealthManager";
 import { ErrorService } from "./ErrorService";
+import { NumberDictionary } from "acts-util-core";
+import { HostUpdateManager } from "./HostUpdateManager";
+import { HostStorageDevicesManager, SMART_Result } from "./HostStorageDevicesManager";
 
  
 @Injectable
 export class HostAvailabilityManager
 {
     constructor(private modulesManager: ModulesManager, private hostsController: HostsController, private instancesController: ResourcesController, private healthController: HealthController,
-        private remoteConnectionsManager: RemoteConnectionsManager, private errorService: ErrorService,
-        private resourceHealthManager: ResourceHealthManager)
+        private remoteConnectionsManager: RemoteConnectionsManager, private errorService: ErrorService, private hostUpdateManager: HostUpdateManager,
+        private resourceHealthManager: ResourceHealthManager, private hostStorageDevicesManager: HostStorageDevicesManager)
     {
     }
 
@@ -39,9 +42,47 @@ export class HostAvailabilityManager
     public async CheckAvailabilityOfHostsAndItsInstances()
     {
         const hostIds = await this.hostsController.RequestHostIds();
+
+        const available: NumberDictionary<boolean> = {};
+        for (const hostId of hostIds)
+            available[hostId] = await this.CheckHostAvailability(hostId);
         for (const hostId of hostIds)
         {
-            await this.CheckAvailabilityOfHostAndItsInstances(hostId);
+            const resourceIds = await this.instancesController.QueryInstanceIdsAssociatedWithHost(hostId);
+            if(available[hostId])
+            {
+                for (const resourceId of resourceIds)
+                    await this.resourceHealthManager.CheckResourceAvailability(resourceId);
+            }
+            else
+            {
+                for (const resourceId of resourceIds)
+                    await this.resourceHealthManager.UpdateResourceAvailability(resourceId, HealthStatus.Down, "host is not available");
+            }
+        }
+    }
+
+    public async CheckHostsHealth()
+    {
+        const hostIds = await this.hostsController.RequestHostIds();
+        for (const hostId of hostIds)
+        {
+            const updateInfo = await this.hostUpdateManager.QueryUpdateInfo(hostId);
+            if(updateInfo.updatablePackagesCount > 10)
+                await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "host hasn't been updated in a while");
+            else
+            {
+                const storageDevices = await this.hostStorageDevicesManager.QueryStorageDevices(hostId);
+                for (const storageDevice of storageDevices)
+                {
+                    const smart = await this.hostStorageDevicesManager.QuerySMARTInfo(hostId, storageDevice.path);
+                    if(!this.VerifySMARTData(smart))
+                    {
+                        await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "storage device problem");
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -51,24 +92,6 @@ export class HostAvailabilityManager
     }
 
     //Private methods
-    private async CheckAvailabilityOfHostAndItsInstances(hostId: number)
-    {
-        const resourceIds = await this.instancesController.QueryInstanceIdsAssociatedWithHost(hostId);
-
-        const available = await this.CheckHostAvailability(hostId);
-        if(!available)
-        {
-            for (const resourceId of resourceIds)
-                await this.resourceHealthManager.UpdateResourceAvailability(resourceId, HealthStatus.Down, "host is not available");
-            return;
-        }
-
-        for (const resourceId of resourceIds)
-        {
-            await this.resourceHealthManager.CheckResourceAvailability(resourceId);
-        }
-    }
-
     private async CheckHostAvailability(hostId: number)
     {
         try
@@ -82,6 +105,34 @@ export class HostAvailabilityManager
             return false;
         }
         await this.UpdateHostHealth(hostId, HealthStatus.Up);
+        return true;
+    }
+
+    private VerifySMARTData(smartData: SMART_Result)
+    {
+        if(smartData.smartctl.exit_status != 0)
+            return false;
+        for (const attr of smartData.ata_smart_attributes.table)
+        {
+            switch(attr.id)
+            {
+                case 5: //Reallocated Sectors Count
+                case 10: //Spin Retry Count
+                case 187: //Reported Uncorrectable Errors
+                case 196: //Reallocation Event Count
+                case 197: //Current Pending Sector Count
+                case 198: //(Offline) Uncorrectable Sector Count
+                    if(attr.raw.value !== 0)
+                        return false;
+                    break;
+                case 184: //End-to-End error / IOEDC
+                    throw new Error("184 NOT IMPLEMENTED");
+                case 188: //Command Timeout
+                    throw new Error("188 NOT IMPLEMENTED");
+                case 201: //Soft Read Error Rate / TA Counter Detected
+                    throw new Error("201 NOT IMPLEMENTED");
+            }
+        }
         return true;
     }
 

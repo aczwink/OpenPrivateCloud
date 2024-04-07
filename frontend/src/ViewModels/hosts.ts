@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { FirewallRule, Host, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
+import { FirewallRule, Host, HostHealthData, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
@@ -25,7 +25,7 @@ import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
 
-const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
+const hostOverviewViewModel: ObjectViewModel<HostHealthData, HostId> = {
     type: "object",
     actions: [
         {
@@ -45,7 +45,7 @@ const hostOverviewViewModel: ObjectViewModel<Host, HostId> = {
     ],
     formTitle: host => host.hostName,
     requestObject: async (service, ids) => service.hosts._any_.get(ids.hostName),
-    schemaName: "Host",
+    schemaName: "HostHealthData",
 };
 
 //Monitoring

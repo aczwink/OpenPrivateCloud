@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,6 +28,7 @@ import { HostFirewallSettingsManager } from "../services/HostFirewallSettingsMan
 import { ProcessTrackerManager } from "../services/ProcessTrackerManager";
 import { FirewallDebugSettings, HostFirewallTracingManager } from "../services/HostFirewallTracingManager";
 import { HostTakeOverService } from "../services/HostTakeOverService";
+import { HealthController } from "../data-access/HealthController";
 
 interface NetworkInterfaceDTO
 {
@@ -83,7 +84,7 @@ class HostsAPIController
 class HostAPIController
 {
     constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor, private hostPerformanceMeasurementService: HostPerformanceMeasurementService,
-        private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private hostFirewallZonesManager: HostFirewallZonesManager,
+        private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private hostFirewallZonesManager: HostFirewallZonesManager, private healthController: HealthController,
         private processTrackerManager: ProcessTrackerManager)
     {
     }
@@ -101,11 +102,10 @@ class HostAPIController
         @Path hostName: string
     )
     {
-        const host = await this.hostsController.QueryHostByName(hostName);
-        if(host === undefined)
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
             return NotFound("host does not exist");
-            
-        return host;
+        return await this.healthController.QueryHostHealthData(hostId);
     }
 
     @Get("networkInterfaces")
