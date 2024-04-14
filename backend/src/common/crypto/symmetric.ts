@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import crypto from "crypto";
+import { Readable, Transform } from "stream";
 
 type SymmetricCipherType = "aes-256";
 interface SymmetricKey
@@ -24,21 +25,36 @@ interface SymmetricKey
     key: Buffer;
 }
 
-//TODO: make this method internal i.e. not export it
-export function AES256GCM_Decrypt(key: Buffer, iv: Buffer, authTagLength: number, encryptedData: Buffer)
+function OPCFormat_ReadHeaderAndCreateDecipher(key: Buffer, opcFormatData: Buffer)
 {
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, {
-        authTagLength,
-    });
+    const signature = opcFormatData.toString("utf-8", 0, 3);
+    if(signature !== "OPC")
+        throw new Error("encoding error. invalid signature");
+    const encFormatType = opcFormatData.readUInt8(3);
 
-    const authTag = encryptedData.subarray(0, authTagLength);
-    decipher.setAuthTag(authTag);
+    switch(encFormatType)
+    {
+        case 0:
+        {
+            const iv = opcFormatData.subarray(4, 4+16);
+            const authTag = opcFormatData.subarray(20, 20+16);
 
-    const data = encryptedData.subarray(authTagLength);
-
-    const decrypted = decipher.update(data);
-    return Buffer.concat([decrypted, decipher.final()]);
+            const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, {
+                authTagLength: authTag.length,
+            });
+            decipher.setAuthTag(authTag);
+        
+            return {
+                decipher,
+                headerLength: 4 + 16 + 16
+            };
+        }
+        break;
+        default:
+            throw new Error("encoding error. invalid format");
+    }
 }
+
 //TODO: make this method internal i.e. not export it
 export function AES256GCM_Encrypt(key: Buffer, iv: Buffer, authTagLength: number, data: Buffer)
 {
@@ -62,22 +78,48 @@ export function CreateSymmetricKey(cipherType: SymmetricCipherType): SymmetricKe
 
 export function OPCFormat_SymmetricDecrypt(key: SymmetricKey, opcFormatData: Buffer)
 {
-    const signature = opcFormatData.toString("utf-8", 0, 3);
-    if(signature !== "OPC")
-        throw new Error("encoding error. invalid signature");
-    const encFormatType = opcFormatData.readUInt8(3);
+    const result = OPCFormat_ReadHeaderAndCreateDecipher(key.key, opcFormatData);
+    const data = opcFormatData.subarray(result.headerLength);
+    const decipher = result.decipher;
 
-    switch(encFormatType)
-    {
-        case 0:
+    const decrypted = decipher.update(data);
+    return Buffer.concat([decrypted, decipher.final()]);
+}
+
+export function OPCFormat_SymmetricDecryptStream(key: SymmetricKey, opcFormattedStream: Readable): Readable
+{
+    const headerLength = 4 + 16 + 16;
+    let decipher: crypto.DecipherGCM | null = null;
+    let buffered = Buffer.alloc(0);
+    const transform = new Transform({
+        flush(callback)
         {
-            const iv = opcFormatData.subarray(4, 4+16);
-            return AES256GCM_Decrypt(key.key, iv, 16, opcFormatData.subarray(20));
-        }
-        break;
-        default:
-            throw new Error("encoding error. invalid format");
-    }
+            const buffer = decipher!.final();
+            callback(null, buffer);
+        },
+
+        transform(chunk, encoding, callback)
+        {
+            if(decipher === null)
+            {
+                buffered = Buffer.concat([buffered, chunk]);
+                if(buffered.length >= headerLength)
+                {
+                    const result = OPCFormat_ReadHeaderAndCreateDecipher(key.key, buffered);
+                    decipher = result.decipher;
+                    const buffer = decipher.update(buffered.subarray(result.headerLength));
+                    callback(null, buffer);
+                }
+            }
+            else
+            {
+                const buffer = decipher.update(chunk);
+                callback(null, buffer);
+            }
+        },
+    });
+
+    return opcFormattedStream.pipe(transform);
 }
 
 export function OPCFormat_SymmetricEncrypt(key: SymmetricKey, payload: Buffer)

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -27,8 +27,9 @@ import { ResourceConfigController } from "../../data-access/ResourceConfigContro
 import { ObjectStorageProperties } from "./properties";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
-import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt, SymmetricKeyToBuffer, UnpackSymmetricKey } from "../../common/crypto/symmetric";
+import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricDecryptStream, OPCFormat_SymmetricEncrypt, SymmetricKeyToBuffer, UnpackSymmetricKey } from "../../common/crypto/symmetric";
 import { GenerateRandomUUID } from "../../common/crypto/randomness";
+import { Readable } from "stream";
 
 export interface FileMetaDataRevision
 {
@@ -168,7 +169,10 @@ export class ObjectStoragesManager
 
         await this.UpdateFileAccessTime(resourceReference, fileId);
 
-        return this.ReadBlob(resourceReference, blobId);
+        return {
+            size: metaData.currentRev.blobSize,
+            stream: await this.ReadBlob(resourceReference, blobId)
+        };
     }
 
     public async RequestFileMetaData(resourceReference: LightweightResourceReference, fileId: string)
@@ -180,9 +184,13 @@ export class ObjectStoragesManager
     public async RequestFileRevisionBlob(resourceReference: LightweightResourceReference, fileId: string, revisionNumber: number)
     {
         const metaData = await this.RequestFileMetaData(resourceReference, fileId);
-        const blobId = metaData.revisions[revisionNumber].blobId;
+        const rev = metaData.revisions[revisionNumber];
+        const blobId = rev.blobId;
 
-        return this.ReadBlob(resourceReference, blobId);
+        return {
+            size: rev.blobSize,
+            stream: await this.ReadBlob(resourceReference, blobId)
+        };
     }
 
     public async RequestSnapshots(resourceReference: LightweightResourceReference)
@@ -254,6 +262,12 @@ export class ObjectStoragesManager
         return OPCFormat_SymmetricDecrypt(dek, encrypted);
     }
 
+    private async DecryptStream(resourceReference: LightweightResourceReference, encryptedStream: Readable)
+    {
+        const dek = await this.DeriveDataEncryptionKey(resourceReference);
+        return OPCFormat_SymmetricDecryptStream(dek, encryptedStream);
+    }
+
     private async DeriveDataEncryptionKey(resourceReference: LightweightResourceReference)
     {
         const config = await this.RequestConfig(resourceReference.id);
@@ -321,11 +335,10 @@ export class ObjectStoragesManager
     private async ReadBlob(resourceReference: LightweightResourceReference, blobId: string)
     {
         const blobPath = path.join(this.GetBlobsPath(resourceReference), blobId);
-        const encryptedData = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, blobPath);
+        const encryptedDataStream = await this.remoteFileSystemManager.StreamFile(resourceReference.hostId, blobPath);
 
-        const decryptedData = await this.DecryptBuffer(resourceReference, encryptedData);
-
-        return decryptedData;
+        const decryptedStream = await this.DecryptStream(resourceReference, encryptedDataStream);
+        return decryptedStream;
     }
 
     private async ReadIndex(resourceReference: LightweightResourceReference)

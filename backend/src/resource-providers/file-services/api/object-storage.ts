@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete, Post, Forbidden } from "acts-util-apilib";
+import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete, Post, Forbidden, Ok } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { c_fileServicesResourceProviderName, c_objectStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { SessionsManager } from "../../../services/SessionsManager";
@@ -164,7 +164,10 @@ class _api_ extends ResourceAPIControllerBase
         if(!canReadData)
             return Forbidden("access to blob denied");
 
-        return await this.objectStoragesManager.RequestFileBlob(context.resourceReference, fileId)
+        const result = await this.objectStoragesManager.RequestFileBlob(context.resourceReference, fileId)
+        return Ok(result.stream, {
+            "Content-Length": result.size
+        });
     }
 
     @Get("files/{fileId}/revisions/{revisionNumber}")
@@ -194,7 +197,10 @@ class _api_ extends ResourceAPIControllerBase
         if(!canReadData)
             return Forbidden("access to blob denied");
 
-        return await this.objectStoragesManager.RequestFileRevisionBlob(context.resourceReference, fileId, revisionNumber);
+        const result = await this.objectStoragesManager.RequestFileRevisionBlob(context.resourceReference, fileId, revisionNumber);
+        return Ok(result.stream, {
+            "Content-Length": result.size
+        });
     }
 
     @Get("files/{fileId}/revisions")

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -38,6 +38,8 @@ export class HTTPAuthHandler implements RequestHandler
             if(session !== undefined)
                 return null;
         }
+        if((request.routePath === "/cluster/config/settings") && (request.httpMethod === "GET"))
+            return null;
         if((request.routePath === "/sessions") && (request.httpMethod === "POST"))
             return null;
         

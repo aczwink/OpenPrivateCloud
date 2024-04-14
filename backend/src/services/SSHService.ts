@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -41,6 +41,7 @@ export interface SSHConnection
     ReadLink(remotePath: string): Promise<string>;
     RemoveDirectory(remotePath: string): Promise<void>;
     SpawnShell(): Promise<ssh2.ClientChannel>;
+    StreamFile(filePath: string): ssh2.ReadStream;
     UnlinkFile(remotePath: string): Promise<void>;
     WriteFile(remotePath: string, content: Buffer, mode?: number): Promise<void>;
 }
@@ -211,6 +212,11 @@ class SSHConnectionImpl implements SSHConnection
                     resolve(channel);
             });
         });
+    }
+
+    public StreamFile(remotePath: string): ssh2.ReadStream
+    {
+        return this.sftp.createReadStream(remotePath);
     }
 
     public UnlinkFile(remotePath: string): Promise<void>

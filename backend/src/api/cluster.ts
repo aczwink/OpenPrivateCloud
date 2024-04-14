@@ -16,13 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Conflict, Get, Header, Put } from "acts-util-apilib";
+import { APIController, Body, Conflict, Get, Header, Put, Security } from "acts-util-apilib";
 import { MailerSettings } from "../services/EMailService";
 import { NotificationsManager } from "../services/NotificationsManager";
 import { SessionsManager } from "../services/SessionsManager";
 import { ClusterKeyStoreManager } from "../services/ClusterKeyStoreManager";
 import { UserWalletManager } from "../services/UserWalletManager";
 import { OPCUpdateService } from "../services/OPCUpdateService";
+import { ClusterConfigManager, PublicClusterSettings } from "../services/ClusterConfigManager";
 
 @APIController("cluster/update")
 class _api1_
@@ -89,5 +90,29 @@ class ClusterConfigAPIController
     {
         const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
         await this.notificationsManager.SetMailerSettings(config, userId);
+    }
+}
+
+@APIController("cluster/config/settings")
+class _api2_
+{
+    constructor(private clusterConfigManager: ClusterConfigManager)
+    {
+    }
+
+    @Security()
+    @Get()
+    public async QueryConfig()
+    {
+        const settings = await this.clusterConfigManager.QueryPublicSettings();
+        return settings;
+    }
+
+    @Put()
+    public async UpdateConfig(
+        @Body config: PublicClusterSettings,
+    )
+    {
+        await this.clusterConfigManager.SetPublicSettings(config);
     }
 }

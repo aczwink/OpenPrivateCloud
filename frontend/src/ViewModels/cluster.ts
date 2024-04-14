@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { MailerSettings } from "../../dist/api";
+import { MailerSettings, PublicClusterSettings } from "../../dist/api";
 import { ComponentViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ClusterKeyStoreComponent } from "../Views/cluster/ClusterKeyStoreComponent";
 import { SoftwareUpdateComponent } from "../Views/cluster/SoftwareUpdateComponent";
@@ -39,6 +39,21 @@ const notificationSettingsViewModel: ObjectViewModel<MailerSettings, {}> = {
 const keyStoreViewModel: ComponentViewModel = {
     type: "component",
     component: ClusterKeyStoreComponent
+};
+
+const publicSettingsViewModel: ObjectViewModel<PublicClusterSettings, {}> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "PublicClusterSettings",
+            requestObject: (service, _) => service.cluster.config.settings.get(),
+            updateResource: (service, _, newValue) => service.cluster.config.settings.put(newValue)
+        }
+    ],
+    formTitle: _ => "",
+    requestObject: (service, _) => service.cluster.config.settings.get(),
+    schemaName: "PublicClusterSettings"
 };
 
 const softwareUpdateViewModel: ComponentViewModel = {
@@ -66,6 +81,11 @@ const clusterViewModel: MultiPageViewModel<{}> = {
                     key: "keystore",
                     child: keyStoreViewModel,
                     displayName: "Key store",
+                },
+                {
+                    key: "publicsettings",
+                    child: publicSettingsViewModel,
+                    displayName: "Public settings",
                 },
                 {
                     key: "softwareUpdate",

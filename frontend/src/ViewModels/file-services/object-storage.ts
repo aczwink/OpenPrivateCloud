@@ -18,10 +18,10 @@
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { resourceProviders } from "openprivatecloud-common";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { FileDownloadService, RootInjector } from "acfrontend";
 import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO, SnapshotDTO } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
+import { DownloadFileUsingProgressPopup } from "../../Views/DownloadProgressPopup";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -46,16 +46,12 @@ const fileRevisionViewModel: ObjectViewModel<FileMetaDataDTO, FileId & { revisio
         {
             type: "activate",
             execute: async (service, ids) => {
-                const response1 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber);
-                const result1 = await ExtractDataFromResponseOrShowErrorMessageOnError(response1);
-                if(!result1.ok)
-                    return response1;
+                const response = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(!result.ok)
+                    return response;
 
-                const response2 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber);
-                const result2 = await ExtractDataFromResponseOrShowErrorMessageOnError(response2);
-                if(result2.ok)
-                    RootInjector.Resolve(FileDownloadService).DownloadBlobAsFile(result2.value, result1.value.fileName);
-                return response2;
+                return DownloadFileUsingProgressPopup(result.value.fileName, progressTracker => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.revisions._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId, ids.revisionNumber, { progressTracker }));
             },
             matIcon: "download",
             title: "Download"
@@ -84,16 +80,12 @@ const fileViewModel: MultiPageViewModel<FileId> = {
         {
             type: "activate",
             execute: async (service, ids) => {
-                const response1 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId);
-                const result1 = await ExtractDataFromResponseOrShowErrorMessageOnError(response1);
-                if(!result1.ok)
-                    return response1;
+                const response = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId);
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(!result.ok)
+                    return response;
 
-                const response2 = await service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId);
-                const result2 = await ExtractDataFromResponseOrShowErrorMessageOnError(response2);
-                if(result2.ok)
-                    RootInjector.Resolve(FileDownloadService).DownloadBlobAsFile(result2.value, result1.value.fileName);
-                return response2;
+                return DownloadFileUsingProgressPopup(result.value.fileName, progressTracker => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.blob.get(ids.resourceGroupName, ids.resourceName, ids.fileId, { progressTracker }));
             },
             matIcon: "download",
             title: "Download"

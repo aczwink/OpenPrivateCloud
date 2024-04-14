@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable, Router } from "acfrontend";
-import { Duration, Property } from "acts-util-core";
+import { CookieService, Injectable, Router } from "acfrontend";
+import { Dictionary, Duration, Property } from "acts-util-core";
 import { APIService } from "./APIService";
 import { APIServiceInterceptor } from "./APIServiceInterceptor";
 import { PublicUserData } from "../../dist/api";
@@ -29,10 +29,16 @@ interface LoginInfo
     user: PublicUserData;
 }
 
+interface SessionCookieEntry
+{
+    expiryDateTime: number;
+    token: string;
+}
+
 @Injectable
 export class AuthenticationService
 {
-    constructor(private apiService: APIService, private router: Router)
+    constructor(private apiService: APIService, private router: Router, private cookieService: CookieService)
     {
         this._loginInfo = new Property<LoginInfo | undefined>(undefined);
 
@@ -66,17 +72,7 @@ export class AuthenticationService
         if(response.statusCode === 200)
         {
             const result = response.data;
-
-            this.apiService.token = result.token;
-
-            const userResponse = await this.apiService.user.get();
-            this._loginInfo.Set({
-                expiryDateTime: result.expiryDateTime,
-                token: result.token,
-                user: userResponse.data
-            });
-
-            this.autoLogOutTimerId = setTimeout(this.Logout.bind(this), this.GetRemainingLoginTime().milliseconds);
+            await this.SetSession(result.token, result.expiryDateTime)
 
             return true;
         }
@@ -88,9 +84,11 @@ export class AuthenticationService
     {
         if(this.IsLoggedIn())
         {
+            const session = this._loginInfo.Get();
             // to prevent loops, do this first
             this._loginInfo.Set(undefined);
             this.router.RouteTo("/");
+            this.RemoveSession(session!.user.emailAddress);
 
             clearTimeout(this.autoLogOutTimerId);
             this.autoLogOutTimerId = undefined;
@@ -99,7 +97,59 @@ export class AuthenticationService
         }
     }
 
+    public QuerySavedSessions()
+    {
+        const sessions = this.ReadSessionCookie();
+        return sessions;
+    }
+
+    public async SetSession(token: string, expiryDateTime: Date)
+    {
+        this.apiService.token = token;
+
+        const userResponse = await this.apiService.user.get();
+        this._loginInfo.Set({
+            expiryDateTime: expiryDateTime,
+            token: token,
+            user: userResponse.data
+        });
+        this.SaveSession(userResponse.data.emailAddress, token, expiryDateTime);
+
+        this.autoLogOutTimerId = setTimeout(this.Logout.bind(this), this.GetRemainingLoginTime().milliseconds);
+    }
+
     //Private variables
     private _loginInfo: Property<LoginInfo | undefined>;
     private autoLogOutTimerId?: any;
+
+    //Private methods
+    private ReadSessionCookie()
+    {
+        const sessionsString = this.cookieService.Get("sessions");
+        const sessions = (sessionsString === undefined) ? {} : JSON.parse(sessionsString) as Dictionary<SessionCookieEntry>;
+        return sessions;
+    }
+
+    private RemoveSession(emailAddress: string)
+    {
+        const sessions = this.ReadSessionCookie();
+        const session = sessions[emailAddress];
+        if(session !== undefined)
+        {
+            session.expiryDateTime = 0;
+            this.WriteSessionCookie(sessions);
+        }
+    }
+
+    private SaveSession(emailAddress: string, token: string, expiryDateTime: Date)
+    {
+        const sessions = this.ReadSessionCookie();
+        sessions[emailAddress] = { expiryDateTime: expiryDateTime.valueOf(), token };
+        this.WriteSessionCookie(sessions);
+    }
+
+    private WriteSessionCookie(sessions: Dictionary<SessionCookieEntry>)
+    {
+        this.cookieService.Set("sessions", JSON.stringify(sessions));
+    }
 }

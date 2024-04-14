@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ import crypto from "crypto";
 import { Injectable } from "acts-util-node";
 import { ClusterKeyStoreController } from "../data-access/ClusterKeyStoreController";
 import { ClusterEventsManager } from "./ClusterEventsManager";
-import { AES256GCM_Decrypt, AES256GCM_Encrypt, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt } from "../common/crypto/symmetric";
+import { AES256GCM_Encrypt, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt } from "../common/crypto/symmetric";
 
 interface MasterKey
 {
@@ -27,7 +27,23 @@ interface MasterKey
     iv: Buffer;
     authTagLength: number;
 }
- 
+
+//TODO: masterkey should really only be the key and not the iv, use OPCFormat_SymmetricEncrypt instead
+function AES256GCM_Decrypt(key: Buffer, iv: Buffer, authTagLength: number, encryptedData: Buffer)
+{
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, {
+        authTagLength,
+    });
+
+    const authTag = encryptedData.subarray(0, authTagLength);
+    decipher.setAuthTag(authTag);
+
+    const data = encryptedData.subarray(authTagLength);
+
+    const decrypted = decipher.update(data);
+    return Buffer.concat([decrypted, decipher.final()]);
+}
+
 @Injectable
 export class ClusterKeyStoreManager
 {
