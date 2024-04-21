@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Conflict, Get, Header, Put, Security } from "acts-util-apilib";
+import { APIController, Body, Conflict, Get, Header, Put } from "acts-util-apilib";
 import { MailerSettings } from "../services/EMailService";
 import { NotificationsManager } from "../services/NotificationsManager";
 import { SessionsManager } from "../services/SessionsManager";
@@ -98,14 +98,6 @@ class _api2_
 {
     constructor(private clusterConfigManager: ClusterConfigManager)
     {
-    }
-
-    @Security()
-    @Get()
-    public async QueryConfig()
-    {
-        const settings = await this.clusterConfigManager.QueryPublicSettings();
-        return settings;
     }
 
     @Put()

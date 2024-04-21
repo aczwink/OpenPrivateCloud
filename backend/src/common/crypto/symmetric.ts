@@ -25,6 +25,18 @@ interface SymmetricKey
     key: Buffer;
 }
 
+function AES256GCM_Encrypt(key: Buffer, iv: Buffer, authTagLength: number, data: Buffer)
+{
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv, {
+        authTagLength,
+    });
+
+    const encryptedBlocks = cipher.update(data);
+    const lastBlock = cipher.final();
+    const payload = Buffer.concat([cipher.getAuthTag(), encryptedBlocks, lastBlock]);
+    return payload;
+}
+
 function OPCFormat_ReadHeaderAndCreateDecipher(key: Buffer, opcFormatData: Buffer)
 {
     const signature = opcFormatData.toString("utf-8", 0, 3);
@@ -53,19 +65,6 @@ function OPCFormat_ReadHeaderAndCreateDecipher(key: Buffer, opcFormatData: Buffe
         default:
             throw new Error("encoding error. invalid format");
     }
-}
-
-//TODO: make this method internal i.e. not export it
-export function AES256GCM_Encrypt(key: Buffer, iv: Buffer, authTagLength: number, data: Buffer)
-{
-    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv, {
-        authTagLength,
-    });
-
-    const encryptedBlocks = cipher.update(data);
-    const lastBlock = cipher.final();
-    const payload = Buffer.concat([cipher.getAuthTag(), encryptedBlocks, lastBlock]);
-    return payload;
 }
 
 export function CreateSymmetricKey(cipherType: SymmetricCipherType): SymmetricKey

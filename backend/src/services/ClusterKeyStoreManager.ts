@@ -19,7 +19,7 @@ import crypto from "crypto";
 import { Injectable } from "acts-util-node";
 import { ClusterKeyStoreController } from "../data-access/ClusterKeyStoreController";
 import { ClusterEventsManager } from "./ClusterEventsManager";
-import { AES256GCM_Encrypt, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt } from "../common/crypto/symmetric";
+import { OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt } from "../common/crypto/symmetric";
 
 interface MasterKey
 {
@@ -98,7 +98,17 @@ export class ClusterKeyStoreManager
         if(encryptedBuffer === undefined)
             return undefined;
 
-        return this._DecryptLegacy(encryptedBuffer).toString("utf-8");
+        if(encryptedBuffer.toString("utf-8", 0, 3) === "OPC")
+        {
+            console.log("NEW host secret", hostId, secretName, this.Decrypt(encryptedBuffer).toString("utf-8"));
+            return this.Decrypt(encryptedBuffer).toString("utf-8");
+        }        
+
+        const decrypted = this._DecryptLegacy(encryptedBuffer).toString("utf-8");
+        console.log("MIGRATED host secret", hostId, secretName, decrypted);
+        await this.SetHostSecret(hostId, secretName, decrypted);
+
+        return decrypted;
     }
 
     public async RotateMasterKey()
@@ -120,8 +130,7 @@ export class ClusterKeyStoreManager
 
     public async SetHostSecret(hostId: number, secretName: string, secretValue: string)
     {
-        const encryptedData = this._EncryptLegacy(Buffer.from(secretValue, "utf-8"));
-
+        const encryptedData = this.Encrypt(Buffer.from(secretValue, "utf-8"));
         await this.clusterKeyStoreController.UpdateOrInsertHostSecretValue(hostId, secretName, encryptedData);
     }
 
@@ -148,14 +157,5 @@ export class ClusterKeyStoreManager
 
         //TODO: masterkey should really only be the key and not the iv, use OPCFormat_SymmetricEncrypt instead
         return AES256GCM_Decrypt(this.masterKey.key, this.masterKey.iv, this.masterKey.authTagLength, encryptedData);
-    }
-
-    private _EncryptLegacy(decrypted: Buffer)
-    {
-        if(this.masterKey === undefined)
-            throw new Error("Cluster key store is locked");
-
-        //TODO: masterkey should really only be the key and not the iv, use OPCFormat_SymmetricEncrypt instead
-        return AES256GCM_Encrypt(this.masterKey.key, this.masterKey.iv, this.masterKey.authTagLength, decrypted);
     }
 }

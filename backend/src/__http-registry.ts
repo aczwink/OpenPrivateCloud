@@ -25,13 +25,14 @@ import "./api/HostStoragesAPIController";
 import "./api/resourceGroups";
 import "./api/resources";
 import "./api/processes";
+import "./api/public";
 import "./api/ResourceProviderAPIController";
 import "./api/RolesAPIController";
 import "./api/roleAssignments";
 import "./api/sessions";
 import "./api/UserGroupsAPIController";
 import "./api/user";
-import "./api/UsersAPIController";
+import "./api/users";
 
 import "./resource-providers/backup-services/api/backup-vault";
 import "./resource-providers/compute-services/api/docker-container-app-service";

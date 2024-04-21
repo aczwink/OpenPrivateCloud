@@ -20,7 +20,7 @@ import { CookieService, Injectable, Router } from "acfrontend";
 import { Dictionary, Duration, Property } from "acts-util-core";
 import { APIService } from "./APIService";
 import { APIServiceInterceptor } from "./APIServiceInterceptor";
-import { PublicUserData } from "../../dist/api";
+import { AuthMethod, PublicUserData } from "../../dist/api";
 
 interface LoginInfo
 {
@@ -66,9 +66,14 @@ export class AuthenticationService
         return this._loginInfo.Get() !== undefined;
     }
 
-    public async Login(emailAddress: string, password: string)
+    public IsSessionExpired(expiryDateTime: number | Date)
     {
-        const response = await this.apiService.sessions.post({ emailAddress, password });
+        return expiryDateTime.valueOf() < Date.now();
+    }
+
+    public async Login(emailAddress: string, method: AuthMethod, password: string)
+    {
+        const response = await this.apiService.public.auth.post({ emailAddress, password, method });
         if(response.statusCode === 200)
         {
             const result = response.data;
@@ -103,6 +108,24 @@ export class AuthenticationService
         return sessions;
     }
 
+    public RemoveSession(emailAddress: string)
+    {
+        const sessions = this.ReadSessionCookie();
+        const session = sessions[emailAddress];
+        if(session !== undefined)
+        {
+            session.expiryDateTime = 0;
+            this.WriteSessionCookie(sessions);
+        }
+    }
+
+    public RemoveUser(emailAddress: string)
+    {
+        const sessions = this.ReadSessionCookie();
+        delete sessions[emailAddress];
+        this.WriteSessionCookie(sessions);
+    }
+
     public async SetSession(token: string, expiryDateTime: Date)
     {
         this.apiService.token = token;
@@ -116,6 +139,16 @@ export class AuthenticationService
         this.SaveSession(userResponse.data.emailAddress, token, expiryDateTime);
 
         this.autoLogOutTimerId = setTimeout(this.Logout.bind(this), this.GetRemainingLoginTime().milliseconds);
+
+        const returnUrl = this.router.state.Get().queryParams.returnUrl || "/";
+        this.router.RouteTo(returnUrl);
+    }
+
+    public async TryAutoLogin()
+    {
+        const sessions = this.QuerySavedSessions().Values().NotUndefined().Filter(x => !this.IsSessionExpired(x.expiryDateTime)).ToArray();
+        if(sessions.length === 1)
+            await this.SetSession(sessions[0].token, new Date(sessions[0].expiryDateTime));
     }
 
     //Private variables
@@ -130,17 +163,6 @@ export class AuthenticationService
         return sessions;
     }
 
-    private RemoveSession(emailAddress: string)
-    {
-        const sessions = this.ReadSessionCookie();
-        const session = sessions[emailAddress];
-        if(session !== undefined)
-        {
-            session.expiryDateTime = 0;
-            this.WriteSessionCookie(sessions);
-        }
-    }
-
     private SaveSession(emailAddress: string, token: string, expiryDateTime: Date)
     {
         const sessions = this.ReadSessionCookie();
@@ -150,6 +172,6 @@ export class AuthenticationService
 
     private WriteSessionCookie(sessions: Dictionary<SessionCookieEntry>)
     {
-        this.cookieService.Set("sessions", JSON.stringify(sessions));
+        this.cookieService.Set("sessions", JSON.stringify(sessions), Duration.OneAvgMonth());
     }
 }

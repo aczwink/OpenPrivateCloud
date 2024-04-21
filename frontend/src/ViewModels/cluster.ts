@@ -47,12 +47,12 @@ const publicSettingsViewModel: ObjectViewModel<PublicClusterSettings, {}> = {
         {
             type: "edit",
             propertiesSchemaName: "PublicClusterSettings",
-            requestObject: (service, _) => service.cluster.config.settings.get(),
+            requestObject: (service, _) => service.public.clusterSettings.get(),
             updateResource: (service, _, newValue) => service.cluster.config.settings.put(newValue)
         }
     ],
     formTitle: _ => "",
-    requestObject: (service, _) => service.cluster.config.settings.get(),
+    requestObject: (service, _) => service.public.clusterSettings.get(),
     schemaName: "PublicClusterSettings"
 };
 

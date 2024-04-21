@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,6 @@ import crypto from "crypto";
 
 import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
-import { UsersController } from "../data-access/UsersController";
-import { UsersManager } from "./UsersManager";
 import { UserWalletManager } from "./UserWalletManager";
 import { ClusterKeyStoreManager } from "./ClusterKeyStoreManager";
 import { ClusterEventsManager } from "./ClusterEventsManager";
@@ -35,12 +33,24 @@ interface Session
 @Injectable
 export class SessionsManager
 {
-    constructor(private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager, private clusterKeyStoreManager: ClusterKeyStoreManager, private clusterEventsManager: ClusterEventsManager)
+    constructor(private userWalletManager: UserWalletManager, private clusterKeyStoreManager: ClusterKeyStoreManager, private clusterEventsManager: ClusterEventsManager)
     {
         this.sessions = {};
     }
 
     //Public methods
+    public async CreateSession(userId: number)
+    {
+        const token = await this.CreateToken();
+        const session = this.sessions[token] = {
+            expiryDateTime: this.CreateExpiryTime(),
+            userId: userId,
+        };
+
+        this.SetAutoLogOutTimer(token, session);
+        return { expiryDateTime: session.expiryDateTime, token };
+    }
+
     public GetSession(token: string)
     {
         const session = this.sessions[token];
@@ -63,38 +73,21 @@ export class SessionsManager
             this.userWalletManager.Lock(session.userId);
     }
 
-    public async TryCreateSession(emailAddress: string, password: string)
+    public async PasswordBasedLogin(userId: number, password: string)
     {
-        const userId = await this.usersController.QueryUserId(emailAddress);
-        if(userId === undefined)
-            return null;
-
-        const ok = await this.usersManager.Authenticate(userId, password);
-        if(ok)
+        await this.userWalletManager.Unlock(userId, password);
+        if(this.clusterKeyStoreManager.IsLocked())
         {
-            const token = await this.CreateToken();
-            const session = this.sessions[token] = {
-                expiryDateTime: this.CreateExpiryTime(),
-                userId: userId,
-            };
-            await this.userWalletManager.Unlock(userId, password);
-            if(this.clusterKeyStoreManager.IsLocked())
-            {
-                const masterKey = await this.userWalletManager.ReadStringSecret(userId, "masterKey");
-                if(masterKey !== undefined)
-                    this.clusterKeyStoreManager.Unlock(masterKey);
-            }
-
-            this.clusterEventsManager.PublishEvent({
-                type: "userLogIn",
-                userId,
-                password
-            });
-
-            this.SetAutoLogOutTimer(token, session);
-            return { expiryDateTime: session.expiryDateTime, token };
+            const masterKey = await this.userWalletManager.ReadStringSecret(userId, "masterKey");
+            if(masterKey !== undefined)
+                this.clusterKeyStoreManager.Unlock(masterKey);
         }
-        return null;
+
+        this.clusterEventsManager.PublishEvent({
+            type: "userLogIn",
+            userId,
+            password
+        });
     }
 
     //Private variables

@@ -68,5 +68,6 @@ export class RootComponent extends Component
     override OnInitiated(): void
     {
         this.authenticationService.loginInfo.Subscribe(newValue => this.isLoggedIn = (newValue !== undefined));
+        this.authenticationService.TryAutoLogin();
     }
 }

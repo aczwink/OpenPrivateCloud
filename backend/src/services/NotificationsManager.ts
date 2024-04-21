@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -33,6 +33,12 @@ export class NotificationsManager
     }
 
     //Public methods
+    public async IsMailerConfigured()
+    {
+        const settings = await this.QuerySettings();
+        return (settings.host.trim().length > 0);
+    }
+    
     public async QuerySettings(): Promise<MailerSettings>
     {
         let settings = await this.clusterConfigController.RequestConfig<MailerSettings>(mailerSettingsConfigKey);
@@ -61,9 +67,9 @@ export class NotificationsManager
 
     public async SendNotification(recipientEMailAddress: string, subject: string, text: string)
     {
-        const settings = await this.QuerySettings();
-        if( (settings.host.trim().length > 0) )
+        if( await this.IsMailerConfigured() )
         {
+            const settings = await this.QuerySettings();
             await this.eMailService.SendMail({
                 from: settings.userName,
                 subject: "[OpenPrivateCloud Notification]: " + subject,

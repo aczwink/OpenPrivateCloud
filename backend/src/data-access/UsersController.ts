@@ -19,18 +19,26 @@
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
-interface PrivateUserData
+interface ClientSecretData
 {
     pwHash: string;
     pwSalt: string;
+}
+
+interface PrivateUserData
+{
     privateKey: string;
     publicKey: string;
 }
 
-export interface PublicUserData
+export interface EditableUserData
+{
+    firstName: string;
+}
+
+export interface PublicUserData extends EditableUserData
 {
     id: number;
-    firstName: string;
     emailAddress: string;
 }
 
@@ -45,8 +53,16 @@ export class UsersController
     public async CreateUser(emailAddress: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const result = await conn.InsertRow("users", { emailAddress, firstName: emailAddress, pwHash: "", pwSalt: "", privateKey: "", publicKey: "" });
+        const result = await conn.InsertRow("users", { emailAddress, firstName: emailAddress, privateKey: "", publicKey: "" });
         return result.insertId;
+    }
+
+    public async DeleteUser(userId: number)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.DeleteRows("users_clientSecrets", "userId = ?", userId);
+        await conn.DeleteRows("users_wallet", "userId = ?", userId);
+        await conn.DeleteRows("users", "id = ?", userId);
     }
 
     public async QueryMembersOfGroup(userGroupId: number)
@@ -68,7 +84,7 @@ export class UsersController
     public async QueryPrivateData(id: number)
     {
         let query = `
-        SELECT pwHash, pwSalt, privateKey, publicKey
+        SELECT privateKey, publicKey
         FROM users
         WHERE id = ?
         `;
@@ -121,9 +137,37 @@ export class UsersController
         return rows;
     }
 
-    public async UpdateUserPassword(userId: number, pwSalt: string, pwHash: string, privateKey: string, publicKey: string)
+    public async RequestClientSecretData(userId: number)
+    {
+        let query = `
+        SELECT pwHash, pwSalt
+        FROM users_clientSecrets
+        WHERE userId = ?
+        `;
+
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne<ClientSecretData>(query, userId);
+
+        return row;
+    }
+
+    public async UpdateUserClientSecret(userId: number, pwHash: string, pwSalt: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.UpdateRows("users", { pwHash, pwSalt, privateKey, publicKey }, "id = ?", userId);
+        const result = await conn.UpdateRows("users_clientSecrets", { pwHash, pwSalt }, "userId = ?", userId);
+        if(result.affectedRows === 0)
+            await conn.InsertRow("users_clientSecrets", { pwHash, pwSalt, userId });
+    }
+
+    public async UpdateUserData(userId: number, data: EditableUserData)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.UpdateRows("users", { firstName: data.firstName }, "id = ?", userId);
+    }
+
+    public async UpdateUserKeys(userId: number, privateKey: string, publicKey: string)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.UpdateRows("users", { privateKey, publicKey }, "id = ?", userId);
     }
 }

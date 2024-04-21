@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,14 +15,13 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * */
-import { APIController, Body, Get, Path, Post } from "acts-util-apilib";
-import { UsersController } from "../data-access/UsersController";
+import { APIController, Body, Delete, Get, Path, Post, Put } from "acts-util-apilib";
+import { EditableUserData, UsersController } from "../data-access/UsersController";
 import { UsersManager } from "../services/UsersManager";
 
 interface UserCreationData
 {
     emailAddress: string;
-    password: string;
 }
 
 @APIController("users")
@@ -37,10 +36,32 @@ class UsersAPIController
         @Body userCreationData: UserCreationData
     )
     {
-        await this.usersManager.CreateUser(userCreationData.emailAddress, userCreationData.password);
+        await this.usersManager.CreateUser(userCreationData.emailAddress);
     }
 
-    @Get("{userId}")
+    @Get()
+    public async RequestUsers()
+    {
+        return await this.usersController.QueryUsers();
+    }
+}
+
+@APIController("users/{userId}")
+class _api_
+{
+    constructor(private usersController: UsersController)
+    {
+    }
+
+    @Delete()
+    public async DeleteUser(
+        @Path userId: number
+    )
+    {
+        return await this.usersController.DeleteUser(userId);
+    }
+
+    @Get()
     public async RequestUser(
         @Path userId: number
     )
@@ -48,9 +69,12 @@ class UsersAPIController
         return await this.usersController.QueryUser(userId);
     }
 
-    @Get()
-    public async RequestUsers()
+    @Put()
+    public async UpdateUser(
+        @Path userId: number,
+        @Body userData: EditableUserData
+    )
     {
-        return await this.usersController.QueryUsers();
+        return await this.usersController.UpdateUserData(userId, userData);
     }
 }

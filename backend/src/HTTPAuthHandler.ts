@@ -38,9 +38,7 @@ export class HTTPAuthHandler implements RequestHandler
             if(session !== undefined)
                 return null;
         }
-        if((request.routePath === "/cluster/config/settings") && (request.httpMethod === "GET"))
-            return null;
-        if((request.routePath === "/sessions") && (request.httpMethod === "POST"))
+        if(request.routePath.startsWith("/public/"))
             return null;
         
         return {

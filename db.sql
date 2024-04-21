@@ -1,8 +1,8 @@
--- MariaDB dump 10.19  Distrib 10.11.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19  Distrib 10.11.6-MariaDB, for debian-linux-gnu (x86_64)
 --
 -- Host: localhost    Database: openprivatecloud
 -- ------------------------------------------------------
--- Server version	10.11.2-MariaDB-1
+-- Server version	10.11.6-MariaDB-0ubuntu0.23.10.2
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -343,11 +343,25 @@ CREATE TABLE `users` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `emailAddress` varchar(200) NOT NULL,
   `firstName` varchar(100) NOT NULL,
-  `pwHash` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `pwSalt` char(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `privateKey` text CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `publicKey` text CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `users_clientSecrets`
+--
+
+DROP TABLE IF EXISTS `users_clientSecrets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `users_clientSecrets` (
+  `userId` int(10) unsigned NOT NULL,
+  `pwHash` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `pwSalt` char(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  PRIMARY KEY (`userId`),
+  CONSTRAINT `users_clientSecrets_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -376,4 +390,4 @@ CREATE TABLE `users_wallet` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-10-22 22:44:00
+-- Dump completed on 2024-04-21 23:10:35

@@ -23,7 +23,18 @@ import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewMo
 type UserIdRouteParams = { userId: number };
 
 const userViewModel: ObjectViewModel<PublicUserData, UserIdRouteParams> = {
-    actions: [],
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "EditableUserData",
+            requestObject: (service, ids) => service.users._any_.get(ids.userId),
+            updateResource: (service, ids, props) => service.users._any_.put(ids.userId, props),
+        },
+        {
+            type: "delete",
+            deleteResource: (service, ids) => service.users._any_.delete(ids.userId),
+        }
+    ],
     formTitle: (_, user) => user.emailAddress,
     requestObject: (service, ids) => service.users._any_.get(ids.userId),
     schemaName: "PublicUserData",

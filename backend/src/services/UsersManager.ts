@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ import { UsersController } from "../data-access/UsersController";
 import { HostUsersManager } from "./HostUsersManager";
 import { UserWalletManager } from "./UserWalletManager";
 import { CreateRSA4096KeyPair } from "../common/crypto/asymmetric";
+import { HashPassword } from "../common/crypto/passwords";
 
  
 @Injectable
@@ -31,22 +32,10 @@ export class UsersManager
     }
     
     //Public methods
-    public async Authenticate(userId: number, password: string)
-    {
-        const user = await this.usersController.QueryPrivateData(userId);
-        if(user === undefined)
-            return null;
-            
-        const expectedHash = this.HashPassword(password, user.pwSalt);
-        return expectedHash === user.pwHash;
-    }
-
-    public async CreateUser(emailAddress: string, password: string)
+    public async CreateUser(emailAddress: string)
     {
         const userId = await this.usersController.CreateUser(emailAddress);
-        await this.SetUserPassword(userId, password);
-        
-        await this.RotateSambaPassword(userId);
+        return userId;
     }
 
     public async QuerySambaPassword(userId: number)
@@ -65,20 +54,30 @@ export class UsersManager
 
     public async SetUserPassword(userId: number, newPassword: string)
     {
-        if(!this.userWalletManager.IsUnlocked(userId))
-            throw new Error("Can't change password when user is not logged in");
+        const cs = await this.usersController.RequestClientSecretData(userId);
+        if(cs === undefined)
+        {
+            //user never had a password. Thus he also doesn't have a key, nor a samba pw
 
-        //TODO: this should probably be done in a sql transaction
-        throw new Error("TODO: IMPLEMENT THIS SAFELY!");
+            const keyPair = CreateRSA4096KeyPair(newPassword);
+            await this.usersController.UpdateUserKeys(userId, keyPair.privateKey, keyPair.publicKey);
 
-        const keyPair = CreateRSA4096KeyPair(newPassword);
+            const pwSalt = this.CreateSalt();
+            const pwHash = HashPassword(newPassword, pwSalt);
+            await this.usersController.UpdateUserClientSecret(userId, pwHash, pwSalt);
 
-        const pwSalt = this.CreateSalt();
-        const pwHash = this.HashPassword(newPassword, pwSalt);
+            await this.RotateSambaPassword(userId);
+        }
+        else
+        {
+            if(!this.userWalletManager.IsUnlocked(userId))
+                throw new Error("Can't change password when user is not logged in");
 
-        await this.usersController.UpdateUserPassword(userId, pwSalt, pwHash, keyPair.privateKey, keyPair.publicKey);
-
-        await this.userWalletManager.PrivateKeyChanged(userId, newPassword);
+            //TODO: this should probably be done in a sql transaction
+            throw new Error("TODO: IMPLEMENT THIS SAFELY!");
+            //TODO: is this actually needed? we are not changing the private key in this case, only the password it is encrypted with... test this
+            await this.userWalletManager.PrivateKeyChanged(userId, newPassword);
+        }
     }
 
     //Private methods
@@ -90,11 +89,6 @@ export class UsersManager
     private CreateSambaPassword()
     {
         const pw = crypto.randomBytes(64).toString("hex");
-        return this.HashPassword(pw, this.CreateSalt());
-    }
-
-    private HashPassword(password: string, pwSalt: string)
-    {
-        return crypto.scryptSync(password, pwSalt, 32).toString("hex");
+        return HashPassword(pw, this.CreateSalt());
     }
 }

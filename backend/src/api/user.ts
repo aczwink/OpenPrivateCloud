@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,12 +20,12 @@ import { APIController, BodyProp, Get, Header, Post, Unauthorized } from "acts-u
 import { UsersController } from "../data-access/UsersController";
 import { SessionsManager } from "../services/SessionsManager";
 import { UsersManager } from "../services/UsersManager";
-import { UserWalletManager } from "../services/UserWalletManager";
+import { AuthenticationManager } from "../services/AuthenticationManager";
 
 @APIController("user")
 class UserAPIController
 {
-    constructor(private sessionsManager: SessionsManager, private usersController: UsersController, private usersManager: UsersManager, private userWalletManager: UserWalletManager)
+    constructor(private sessionsManager: SessionsManager, private usersController: UsersController, private usersManager: UsersManager, private authenticationManager: AuthenticationManager)
     {
     }
     
@@ -38,11 +38,17 @@ class UserAPIController
     {
         const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
 
-        const ok = await this.usersManager.Authenticate(userId, oldPw);
+        const ok = await this.authenticationManager.Authenticate(userId, "client-secret", oldPw);
         if(ok)
             await this.usersManager.SetUserPassword(userId, newPw);
         else
-            return Unauthorized("wrong password");
+        {
+            const hasPw = await this.authenticationManager.DoesUserHavePassword(userId);
+            if(!hasPw && (oldPw === ""))
+                await this.usersManager.SetUserPassword(userId, newPw);
+            else
+                return Unauthorized("wrong password");
+        }
     }
 
     @Get()
