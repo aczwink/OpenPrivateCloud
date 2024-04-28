@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { ClusterDataProvider, DataSourceQueryResult } from "./ClusterDataProvider";
+import { ClusterDataProvider, DataSourceQueryResult, SourceQueryOptions } from "./ClusterDataProvider";
 
 interface ColumnNameFilterOperand
 {
@@ -42,7 +42,7 @@ interface CountQuery
 interface FilterQuery
 {
     type: "filter";
-    op: "=" | "in";
+    op: "=" | "<=" | "in";
     lhs: FilterOperand;
     rhs: FilterOperand;
 }
@@ -69,6 +69,7 @@ type DataQuery = CountQuery | FilterQuery | ProjectionQuery | SourceQuery | Sour
 export interface DataQueryRequest
 {
     queryPipeline: DataQuery[];
+    sourceQueryOptions: SourceQueryOptions;
 }
 
 @Injectable
@@ -81,7 +82,7 @@ export class DataQueryExecutor
     //Public methods
     public async ExecuteQuery(query: DataQueryRequest)
     {
-        return await this.ExecuteQueryPipeline({ keys: {}, values: [].Values<object>() }, query.queryPipeline);
+        return await this.ExecuteQueryPipeline({ keys: {}, values: [].Values<object>() }, query.queryPipeline, query.sourceQueryOptions);
     }
 
     //Private methods
@@ -93,6 +94,8 @@ export class DataQueryExecutor
         {
             case "=":
                 return lhs === rhs;
+            case "<=":
+                return lhs <= rhs;
             case "in":
                 return rhs.includes(lhs);
         }
@@ -109,14 +112,16 @@ export class DataQueryExecutor
         }
     }
 
-    private async ExecutePart(query: DataQuery, prevResult: DataSourceQueryResult): Promise<DataSourceQueryResult>
+    private async ExecutePart(query: DataQuery, prevResult: DataSourceQueryResult, sourceQueryOptions: SourceQueryOptions): Promise<DataSourceQueryResult>
     {
         switch(query.type)
         {
             case "count":
                 return {
                     keys: {
-                        count: "number"
+                        count: {
+                            dataType: "number"
+                        }
                     },
                     values: [{ count: prevResult.values.Count() }].Values()
                 };
@@ -134,24 +139,26 @@ export class DataQueryExecutor
                 };
 
             case "source":
-                return await this.clusterDataProvider.QuerySourceData(query.name);
+                return await this.clusterDataProvider.QuerySourceData(query.name, sourceQueryOptions);
 
             case "sources":
                 return {
                     keys: {
-                        name: "string"
+                        name: {
+                            dataType: "string"
+                        }
                     },
-                    values: (await this.clusterDataProvider.QueryAllSources()).Values().Map(x => ({ name: x}))
+                    values: this.clusterDataProvider.QueryRootNamespaces().Map(k => ({ name: k }))
                 };
         }
     }
 
-    private async ExecuteQueryPipeline(prevResult: DataSourceQueryResult, query: DataQuery[]): Promise<DataSourceQueryResult>
+    private async ExecuteQueryPipeline(prevResult: DataSourceQueryResult, query: DataQuery[], sourceQueryOptions: SourceQueryOptions): Promise<DataSourceQueryResult>
     {
         if(query.length === 0)
             return prevResult;
 
-        const result = await this.ExecutePart(query[0], prevResult);
-        return await this.ExecuteQueryPipeline(result, query.slice(1));
+        const result = await this.ExecutePart(query[0], prevResult, sourceQueryOptions);
+        return await this.ExecuteQueryPipeline(result, query.slice(1), sourceQueryOptions);
     }
 }

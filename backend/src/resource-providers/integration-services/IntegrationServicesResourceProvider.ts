@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourcePro
 import { ResourceReference } from "../../common/ResourceReference";
 import { IntegrationServicesProperties } from "./properties";
 import { ManagedActiveDirectoryManager } from "./ManagedActiveDirectoryManager";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
  
 @Injectable
 export class IntegrationServicesResourceProvider implements ResourceProvider<IntegrationServicesProperties>
@@ -95,5 +96,10 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
                 return await this.activeDirectoryDomainControllerManager.QueryResourceState(resourceReference);
         }
         return "corrupt";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

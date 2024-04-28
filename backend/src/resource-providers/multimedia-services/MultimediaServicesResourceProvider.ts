@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2022-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2022-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,7 @@ import { AVTranscoderProperties } from "./AVTranscoderProperties";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { AVTranscoderConfig, AVTranscoderQuality } from "./AVTranscoderConfig";
 import { ResourceReference } from "../../common/ResourceReference";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 
 @Injectable
 export class MultimediaServicesResourceProvider implements ResourceProvider<AVTranscoderProperties>
@@ -99,5 +100,10 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         return "running";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

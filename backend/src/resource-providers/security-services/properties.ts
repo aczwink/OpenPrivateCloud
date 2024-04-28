@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,4 +23,15 @@ export interface KeyVaultProperties extends BaseResourceProperties
     type: "key-vault";
 }
 
-export type SecurityServicesProperties = KeyVaultProperties;
+export interface WAFProperties extends BaseResourceProperties
+{
+    type: "web-application-firewall";
+
+    /**
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vnetResourceExternalId: string;
+}
+
+export type SecurityServicesProperties = KeyVaultProperties | WAFProperties;

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -117,6 +117,12 @@ export class ResourceProviderManager
     public Register(resourceProviderClass: Instantiatable<ResourceProvider<any>>)
     {
         this._resourceProviders.push(GlobalInjector.Resolve(resourceProviderClass));
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference)
+    {
+        const rp = this.FindResourceProviderByResource(resourceReference);
+        return await rp.RequestDataProvider(resourceReference);
     }
 
     public async RetrieveInstanceCheckSchedule(instanceId: number)

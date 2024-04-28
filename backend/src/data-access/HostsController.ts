@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,11 @@ interface Host
      * @title Hostname
      */
     hostName: string;
+}
+
+interface FullHostData extends Host
+{
+    id: number;
 }
 
 @Injectable
@@ -96,6 +101,12 @@ export class HostsController
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         return conn.Select<Host>("SELECT hostName FROM hosts");
+    }
+
+    public async RequestHostIdsAndNames()
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        return conn.Select<FullHostData>("SELECT id, hostName FROM hosts");
     }
 
     public async RequestHostIds()

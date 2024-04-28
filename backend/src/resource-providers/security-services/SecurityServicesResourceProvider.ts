@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,11 +21,13 @@ import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourcePro
 import { SecurityServicesProperties } from "./properties";
 import { ResourceReference } from "../../common/ResourceReference";
 import { KeyVaultManager } from "./KeyVaultManager";
+import { WAFManager } from "./WAFManager";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
  
 @Injectable
 export class SecurityServicesResourceProvider implements ResourceProvider<SecurityServicesProperties>
 {
-    constructor(private keyVaultManager: KeyVaultManager)
+    constructor(private keyVaultManager: KeyVaultManager, private wafManager: WAFManager)
     {
     }
 
@@ -43,6 +45,11 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
                 healthCheckSchedule: null,
                 schemaName: "KeyVaultProperties"
             },
+            {
+                fileSystemType: "btrfs",
+                healthCheckSchedule: null,
+                schemaName: "WAFProperties"
+            },
         ];
     }
 
@@ -57,6 +64,9 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
         {
             case resourceProviders.securityServices.keyVaultResourceTypeName.name:
                 await this.keyVaultManager.DeleteResource(resourceReference);
+                break;
+            case resourceProviders.securityServices.wafResourceTypeName.name:
+                await this.wafManager.DeleteResource(resourceReference);
                 break;
         }
 
@@ -78,6 +88,9 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
             case "key-vault":
                 await this.keyVaultManager.ProvideResource(instanceProperties, context);
                 return {};
+            case "web-application-firewall":
+                await this.wafManager.ProvideResource(instanceProperties, context);
+                return {};
         }
     }
 
@@ -87,7 +100,14 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
         {
             case resourceProviders.securityServices.keyVaultResourceTypeName.name:
                 return await this.keyVaultManager.QueryResourceState(resourceReference);
+            case resourceProviders.securityServices.wafResourceTypeName.name:
+                return await this.wafManager.QueryResourceState(resourceReference);
         }
         return "corrupt";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

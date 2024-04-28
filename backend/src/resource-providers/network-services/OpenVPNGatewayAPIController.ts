@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -121,13 +121,5 @@ class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
             hostName: resourceReference.hostName,
         };
         return result;
-    }
-
-    @Get("logs")
-    public async QueryLogs(
-        @Common resourceReference: ResourceReference,
-    )
-    {
-        return await this.openVPNGatwayManager.ReadInstanceLogs(resourceReference);
     }
 }

@@ -16,13 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { FileDownloadService, RootInjector } from "acfrontend";
+import { FileDownloadService, JSX_CreateElement, RootInjector } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common";
-import { OpenVPNGatewayClient, OpenVPNGatewayConnectedClientEntry, OpenVPNGatewayExternalConfig, OpenVPNGatewayInfo, OpenVPNGatewayLogEntry } from "../../../dist/api";
+import { OpenVPNGatewayClient, OpenVPNGatewayConnectedClientEntry, OpenVPNGatewayExternalConfig, OpenVPNGatewayInfo } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
+import { DataExplorerComponent } from "../../Views/data-explorer/DataExplorerComponent";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -47,15 +48,6 @@ const connectionsViewModel: ListViewModel<OpenVPNGatewayConnectedClientEntry, Re
     displayName: "Connections",
     requestObjects: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.connections.get(ids.resourceGroupName, ids.resourceName),
     schemaName: "OpenVPNGatewayConnectedClientEntry"
-};
-
-const logsViewModel: ListViewModel<OpenVPNGatewayLogEntry, ResourceAndGroupId> = {
-    type: "list",
-    actions: [],
-    boundActions: [],
-    displayName: "Logs",
-    requestObjects: (service, ids) => service.resourceProviders._any_.networkservices.openvpngateway._any_.logs.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "OpenVPNGatewayLogEntry"
 };
 
 const clientsViewModel: ListViewModel<OpenVPNGatewayClient, ResourceAndGroupId> = {
@@ -118,7 +110,16 @@ export const openVPNGatewayViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     key: "connections",
                 },
                 {
-                    child: logsViewModel,
+                    child: {
+                        type: "element",
+                        element: (_, ids) => {
+                            const query = `
+                            source resourceGroups.${ids.resourceGroupName}.${BuildResourceId(ids.resourceGroupName, ids.resourceName)}
+                            `;
+
+                            return <DataExplorerComponent query={query} />;
+                        }
+                    },
                     displayName: "Logs",
                     key: "logs",
                 },

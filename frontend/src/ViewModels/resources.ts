@@ -36,6 +36,7 @@ import { apiGatewayViewModel } from "./web-services/api-gateway";
 import { addcViewModel } from "./integration-services/managed-ad";
 import { objectStorageViewModel } from "./file-services/object-storage";
 import { ResourceListComponent } from "../Views/resources/ResourceListComponent";
+import { wafViewModel } from "./security-services/waf";
 
 export const resourcesRoutes: RoutingViewModel = {
     type: "routing",
@@ -87,6 +88,10 @@ export const resourcesRoutes: RoutingViewModel = {
         {
             key: `${resourceProviders.securityServices.name}/${resourceProviders.securityServices.keyVaultResourceTypeName.name}/:resourceName`,
             viewModel: keyVaultViewModel,
+        },
+        {
+            key: `${resourceProviders.securityServices.name}/${resourceProviders.securityServices.wafResourceTypeName.name}/:resourceName`,
+            viewModel: wafViewModel,
         },
         {
             key: `${resourceProviders.webServices.name}/${resourceProviders.webServices.apiGatewayResourceType.name}/:resourceName`,

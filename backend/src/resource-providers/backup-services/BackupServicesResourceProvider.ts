@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { ModulesManager } from "../../services/ModulesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
 import { ResourceReference } from "../../common/ResourceReference";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 
 @Injectable
 export class BackupServicesResourceProvider implements ResourceProvider<BackupVaultProperties>
@@ -78,5 +79,10 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     {
         this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
         return "running";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

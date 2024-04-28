@@ -30,6 +30,12 @@ import { FirewallDebugSettings, HostFirewallTracingManager } from "../services/H
 import { HostTakeOverService } from "../services/HostTakeOverService";
 import { HealthController } from "../data-access/HealthController";
 
+interface HostBootEntryDTO
+{
+    bootNumber: number;
+    bootTime: Date;
+}
+
 interface NetworkInterfaceDTO
 {
     name: string;
@@ -106,6 +112,26 @@ class HostAPIController
         if(hostId === undefined)
             return NotFound("host does not exist");
         return await this.healthController.QueryHostHealthData(hostId);
+    }
+
+    @Get("boots")
+    public async QueryBoots(
+        @Path hostName: string
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+        
+        const data = await this.remoteCommandExecutor.ExecuteBufferedCommand(["sudo", "journalctl", "--list-boots", "-o", "json"], hostId);
+        const entries = JSON.parse(data.stdOut) as any[];
+        return entries.map( (x: any) => {
+            const result: HostBootEntryDTO = {
+                bootNumber: x.index,
+                bootTime: new Date(x.first_entry / 1000)
+            };
+            return result;
+        });
     }
 
     @Get("networkInterfaces")

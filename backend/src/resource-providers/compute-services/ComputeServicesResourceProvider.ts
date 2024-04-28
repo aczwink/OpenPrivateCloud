@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ import { ContainerAppServiceManager } from "./ContainerAppServiceManager";
 import { ComputeServicesProperties } from "./Properties";
 import { DockerManager } from "./DockerManager";
 import { ResourceReference } from "../../common/ResourceReference";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
  
 @Injectable
 export class ComputeServicesResourceProvider implements ResourceProvider<ComputeServicesProperties>
@@ -106,5 +107,10 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
                 return await this.virtualMachineManager.QueryResourceState(resourceReference);
         }
         return "corrupt";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

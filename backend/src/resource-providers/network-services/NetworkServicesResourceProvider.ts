@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ import { ResourceReference } from "../../common/ResourceReference";
 import { NetworkServicesProperties } from "./properties";
 import { DNS_ServerManager } from "./DNS_ServerManager";
 import { VNetManager } from "./VNetManager";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
  
 @Injectable
 export class NetworkServicesResourceProvider implements ResourceProvider<NetworkServicesProperties>
@@ -117,5 +118,15 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
                 return await this.vnetManager.QueryResourceState(resourceReference);
         }
         return "corrupt";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.networkServices.openVPNGatewayResourceType.name:
+                return await this.openVPNGatwayManager.GetLogDataProvider(resourceReference);
+        }
+        return null;
     }
 }

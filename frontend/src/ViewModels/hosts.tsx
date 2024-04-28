@@ -16,14 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { FirewallRule, Host, HostHealthData, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
+import { JSX_CreateElement } from "acfrontend";
+import { FirewallRule, Host, HostBootEntryDTO, HostHealthData, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
+import { DataExplorerComponent } from "../Views/data-explorer/DataExplorerComponent";
 import { HostFirewallTracingComponent } from "../Views/host/HostFirewallTracingComponent";
 import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../UI/ResponseHandler";
 
 const hostOverviewViewModel: ObjectViewModel<HostHealthData, HostId> = {
     type: "object",
@@ -92,6 +95,61 @@ const storageDeviceViewModel: MultiPageViewModel<StorageDeviceId> = {
     ],
     formTitle: x => x.storageDevicePath,
     type: "multiPage"
+};
+
+const bootsViewModel: ListViewModel<HostBootEntryDTO, HostId> = {
+    actions: [],
+    boundActions: [],
+    displayName: "Boots",
+    requestObjects: (service, ids) => service.hosts._any_.boots.get(ids.hostName),
+    schemaName: "HostBootEntryDTO",
+    type: "list"
+};
+
+const syslogViewModel: MultiPageViewModel<HostId> = {
+    type: "multiPage",
+    actions: [],
+    entries: [
+        {
+            displayName: "",
+            entries: [
+                {
+                    child: {
+                        type: "element",
+                        element: (_, ids) => {                            
+                            const query = `
+                            source hosts.${ids.hostName}.syslog.boot
+                            | filter PRIORITY <= 3`;
+
+                            return <DataExplorerComponent query={query} />;
+                        }
+                    },
+                    displayName: "Important",
+                    key: "important",
+                },
+                {
+                    child: bootsViewModel,
+                    displayName: "Boots",
+                    key: "boots"
+                },
+                {
+                    child: {
+                        type: "element",
+                        element: (_, ids) => {                            
+                            const query = `
+                            source hosts.${ids.hostName}.syslog.lastBoot
+                            | filter PRIORITY <= 3`;
+
+                            return <DataExplorerComponent query={query} />;
+                        }
+                    },
+                    displayName: "Last boot",
+                    key: "lastboot",
+                },
+            ]
+        }
+    ],
+    formTitle: _ => "System logs"
 };
 
 const nicsViewModel: ListViewModel<NetworkInterfaceDTO, HostId> = {
@@ -256,6 +314,11 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                         type: "bootstrap",
                         name: "activity"
                     }
+                },
+                {
+                    child: syslogViewModel,
+                    displayName: "System logs",
+                    key: "syslog"
                 },
                 {
                     child: nicsViewModel,

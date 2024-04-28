@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable, JSX_CreateElement, RootInjector, Route } from "acfrontend";
+import { Injectable, JSX_CreateElement, RootInjector, Route, Router } from "acfrontend";
 import { Dictionary, EqualsAny, OpenAPI } from "acts-util-core";
 import { AuthGuard } from "../AuthGuard";
 import { APISchemaService } from "../Services/APISchemaService";
@@ -29,8 +29,9 @@ import { ListViewModel } from "./ListViewModel";
 import { ObjectListComponent } from "./Components/ObjectListComponent";
 import { SideNavComponent } from "./Components/SideNavComponent";
 import { UnboundResourceAction } from "./UnboundActions";
-import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, ViewModel, RoutingViewModel, ComponentViewModel } from "./ViewModel";
+import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, ViewModel, RoutingViewModel, ComponentViewModel, ElementViewModel } from "./ViewModel";
 import { ViewObjectComponent } from "./Components/ViewObjectComponent";
+import { DelayedStaticContentComponent } from "./Components/DelayedStaticContentComponent";
 
 class PathTraceNode
 {
@@ -191,6 +192,15 @@ export class ViewModelsManager
     {
         return {
             component: viewModel.component,
+            guards: [AuthGuard],
+            path: "",
+        }
+    }
+
+    private BuildElementViewModelRoutes(viewModel: ElementViewModel<any>): Route
+    {
+        return {
+            component: <DelayedStaticContentComponent contentLoader={() => viewModel.element(RootInjector.Resolve(APIService), RootInjector.Resolve(Router).state.Get().routeParams)} />,
             guards: [AuthGuard],
             path: "",
         }
@@ -357,6 +367,8 @@ export class ViewModelsManager
                 return this.BuildCollectionViewModelRoutes(viewModel, parentNode);
             case "component":
                 return this.BuildComponentViewModelRoutes(viewModel);
+            case "element":
+                return this.BuildElementViewModelRoutes(viewModel);
             case "list":
                 return this.BuildListViewModelRoutes(viewModel, parentNode);
             case "multiPage":
@@ -380,6 +392,7 @@ export class ViewModelsManager
             case "object":
                 return viewModel.actions;
             case "component":
+            case "element":
             case "routing":
                 return [];
         }

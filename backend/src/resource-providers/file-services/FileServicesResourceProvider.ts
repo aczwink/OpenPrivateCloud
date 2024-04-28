@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ import { FileStoragesManager } from "./FileStoragesManager";
 import { ResourceReference } from "../../common/ResourceReference";
 import { FileServicesProperties } from "./properties";
 import { ObjectStoragesManager } from "./ObjectStoragesManager";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileServicesProperties>
@@ -107,5 +108,10 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
     public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         return "running";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

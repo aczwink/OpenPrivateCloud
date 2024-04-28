@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -42,6 +42,7 @@ import { ResourceEventListener } from "../../services/ResourceEventsManager";
 import { securityServicesEvents } from "../security-services/events";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { resourceProviders } from "openprivatecloud-common";
+import { HostSysLogBootDataProvider } from "../../services/data-providers/HostLogDataProviderService";
 
 export interface OpenVPNGatewayConnectedClientEntry
 {
@@ -73,11 +74,6 @@ export interface OpenVPNGatewayInternalConfig
     keyVaultExternalId: string;
 
     publicEndpoint: OpenVPNGatewayPublicEndpointConfig;
-}
-
-interface OpenVPNGatewayLogEntry
-{
-    message: string;
 }
 
 const openVPNConfigDialect: ConfigDialect = {
@@ -167,6 +163,11 @@ ${taData}
 `;
     }
 
+    public GetLogDataProvider(resourceReference: LightweightResourceReference)
+    {
+        return new HostSysLogBootDataProvider(resourceReference.hostId, ["-u", this.DeriveSystemDServiceName(resourceReference.id)]);
+    }
+
     public async ListClients(resourceReference: LightweightResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
@@ -230,14 +231,6 @@ ${taData}
     {
         const config = await this.resourceConfigController.QueryConfig<OpenVPNGatewayInternalConfig>(instanceId);
         return config!;
-    }
-
-    public async ReadInstanceLogs(resourceReference: LightweightResourceReference)
-    {
-        const instanceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-
-        const log = await this.remoteRootFileSystemManager.ReadTextFile(resourceReference.hostId, path.join(instanceDir, "openvpn.log"));
-        return log.split("\n").map(this.ParseLogLine.bind(this));
     }
 
     public async ReadInstanceStatus(resourceReference: LightweightResourceReference)
@@ -395,6 +388,7 @@ ${taData}
 
         const nicName = "opc-ovpn" + resourceId;
         const range = new CIDRRange(data.virtualServerAddressRange);
+
         const config = `
 dev ${nicName}
 dev-type tun
@@ -409,7 +403,6 @@ remote-cert-tls client
 ifconfig-pool-persist ${serverDir}/ipp.txt
 tls-auth ${serverDir}/ta.key 0
 status ${serverDir}/openvpn-status.log
-log ${serverDir}/openvpn.log
 
 server ${range.netAddress.ToString()} ${range.GenerateSubnetMask().ToString()}
 port ${data.port}
@@ -476,17 +469,11 @@ crl-verify ${caFilePaths.crlPath}
         return cfgParser.Parse(hostId, configPath);
     }
 
-    private ParseLogLine(line: string): OpenVPNGatewayLogEntry
-    {
-        return {
-            message: line
-        };
-    }
-
     private async StopServer(hostId: number, resourceId: number)
     {
         const serviceName = this.DeriveSystemDServiceName(resourceId);
         await this.systemServicesManager.StopService(hostId, serviceName);
+        await this.systemServicesManager.DisableService(hostId, serviceName);
     }
 
     private async UpdateConfig(instanceId: number, config: OpenVPNGatewayInternalConfig)

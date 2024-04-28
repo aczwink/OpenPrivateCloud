@@ -35,7 +35,8 @@ import { ResourceEventsManager } from "./services/ResourceEventsManager";
 import { HostFirewallManager } from "./services/HostFirewallManager";
 import { ClusterEventsManager } from "./services/ClusterEventsManager";
 import { ClusterDataProvider } from "./services/ClusterDataProvider";
-import { HostLogDataProviderService } from "./services/HostLogDataProviderService";
+import { HostsDataProvider } from "./services/data-providers/HostsDataProvider";
+import { ResourceGroupsDataProvider } from "./services/data-providers/ResourcesDataProvider";
 
 const port = 8078;
 
@@ -77,7 +78,8 @@ function SetupDataSources()
 {
     const cdp = GlobalInjector.Resolve(ClusterDataProvider);
 
-    cdp.RegisterSourceProvider(GlobalInjector.Resolve(HostLogDataProviderService));
+    cdp.RegisterSourceProvider("hosts", GlobalInjector.Resolve(HostsDataProvider));
+    cdp.RegisterSourceProvider("resourceGroups", GlobalInjector.Resolve(ResourceGroupsDataProvider));
 }
 
 async function SetupWebServer()

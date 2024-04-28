@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -41,6 +41,12 @@ export interface ComponentViewModel
 {
     type: "component";
     component: Instantiatable<Component<null | {}>>;
+}
+
+export interface ElementViewModel<IdType>
+{
+    type: "element";
+    element: (service: APIService, ids: IdType) => Promise<RenderElement>;
 }
 
 interface PageEntry
@@ -91,4 +97,4 @@ export interface RoutingViewModel
     entries: RoutingEntry[];
 }
 
-export type ViewModel = CollectionViewModel<any, any, any> | ComponentViewModel | ListViewModel<any, any> | MultiPageViewModel<any> | ObjectViewModel<any, any> | RoutingViewModel;
+export type ViewModel = CollectionViewModel<any, any, any> | ComponentViewModel | ElementViewModel<any> | ListViewModel<any, any> | MultiPageViewModel<any> | ObjectViewModel<any, any> | RoutingViewModel;

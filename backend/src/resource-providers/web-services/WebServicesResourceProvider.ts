@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ import { NodeAppServiceManager } from "./NodeAppServiceManager";
 import { WebServicesResourceProperties } from "./Properties";
 import { ResourceReference } from "../../common/ResourceReference";
 import { API_GatewayManager } from "./API_GatewayManager";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 
 @Injectable
 export class WebServicesResourceProvider implements ResourceProvider<WebServicesResourceProperties>
@@ -175,5 +176,10 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
                 return await this.staticWebsitesManager.QueryResourceState(resourceReference);
         }
         return "corrupt";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

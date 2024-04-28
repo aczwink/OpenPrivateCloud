@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourcePro
 import { MariadbProperties } from "./MariaDB/MariadbProperties";
 import { MariaDBManager } from "./MariaDB/MariaDBManager";
 import { ResourceReference } from "../../common/ResourceReference";
+import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 
   
 @Injectable
@@ -86,5 +87,10 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
             throw new Error("Warnings are reported on the database");
             
         return "running";
+    }
+
+    public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
+    {
+        return null;
     }
 }

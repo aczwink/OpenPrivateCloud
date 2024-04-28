@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,13 @@ import { Dictionary } from "acts-util-core";
 import { EnumeratorBuilder } from "acts-util-core/dist/Enumeration/EnumeratorBuilder";
 import { Injectable } from "acts-util-node";
 
-export type DataSourceSchema = "number" | "string";
+export interface DataSourceSchema
+{
+    dataType: "number" | "string";
+    title?: string;
+    format?: "date-time-us";
+    valueMapping?: object;
+}
 
 export interface DataSourceQueryResult
 {
@@ -28,13 +34,23 @@ export interface DataSourceQueryResult
     values: EnumeratorBuilder<any>;
 }
 
-export interface DataSourcesProvider
+export interface SourceQueryOptions
 {
-    readonly rootNameSpace: string;
-
-    QuerySourceData(name: string): Promise<DataSourceQueryResult>;
-    QuerySources(): Promise<string[]>;
+    maxRecordCount: number;
+    startTime: number;
+    endTime: number;
 }
+
+export interface DataSourceProvider
+{    
+    QuerySourceData(queryOptions: SourceQueryOptions): Promise<DataSourceQueryResult>;
+}
+
+export interface DataSourceCollectionProvider
+{
+    QueryChildren(): Promise<Dictionary<DataSourcesProvider>>;
+}
+export type DataSourcesProvider = DataSourceProvider | DataSourceCollectionProvider;
 
 @Injectable
 export class ClusterDataProvider
@@ -49,31 +65,49 @@ export class ClusterDataProvider
     {
         function ReflectValueType(value: any): DataSourceSchema
         {
-            if(typeof value === "number")
-                return "number";
-            return "string";
+            return {
+                dataType: (typeof value === "number") ? "number" : "string"
+            };
         }
 
         return obj.Entries().ToDictionary( (kv: any) => kv.key, (kv: any) => ReflectValueType(kv.value!));
     }
 
-    public async QueryAllSources()
+    public QueryRootNamespaces()
     {
-        const all = await this.providers.Values().Map(x => x!.QuerySources()).PromiseAll();
-        return all.Values().Map(x => x.Values()).Flatten().ToArray();
+        return this.providers.OwnKeys();
     }
 
-    public async QuerySourceData(name: string)
+    public async QuerySourceData(name: string, queryOptions: SourceQueryOptions): Promise<DataSourceQueryResult>
     {
-        const rootNameSpace = name.split(".")[0];
-        return await this.providers[rootNameSpace]!.QuerySourceData(name);
+        const parts = name.split(".");
+        let provider = this.providers[parts[0]]!;
+        for(let i = 1; i < parts.length; i++)
+        {
+            const children = await provider.QueryChildren()
+            const child = children[parts[i]];
+            provider = child! as DataSourceCollectionProvider;
+        }
+        if("QuerySourceData" in provider)
+        {
+            const leaf = provider as DataSourceProvider;
+            return await leaf.QuerySourceData(queryOptions);
+        }
+        return {
+            keys: {
+                name: {
+                    dataType: "string"
+                }
+            },
+            values: (await provider.QueryChildren()).OwnKeys().Map(k => ({ name: k })),
+        };
     }
 
-    public RegisterSourceProvider(provider: DataSourcesProvider)
+    public RegisterSourceProvider(rootNameSpace: string, provider: DataSourceCollectionProvider)
     {
-        this.providers[provider.rootNameSpace] = provider;
+        this.providers[rootNameSpace] = provider;
     }
 
     //Private state
-    private providers: Dictionary<DataSourcesProvider>;
+    private providers: Dictionary<DataSourceCollectionProvider>;
 }

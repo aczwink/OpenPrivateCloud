@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@
 
 import { ResourceReference } from "../common/ResourceReference";
 import { TimeSchedule } from "../common/TimeSchedule";
+import { DataSourcesProvider } from "../services/ClusterDataProvider";
 
 export interface BaseResourceProperties
 {
@@ -72,4 +73,5 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
     InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
     QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>;
+    RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>;
 }
