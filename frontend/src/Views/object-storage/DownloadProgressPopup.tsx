@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { RootInjector, FileDownloadService, PopupManager, ProgressSpinner, JSX_CreateElement, Component } from "acfrontend";
-import { ResponseData } from "../../dist/api";
-import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../UI/ResponseHandler";
+import { ResponseData } from "../../../dist/api";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { Property } from "acts-util-core";
 
 class DownloadModalPopup extends Component<{ progress: Property<ProgressEvent | null>; startTime: number; }>

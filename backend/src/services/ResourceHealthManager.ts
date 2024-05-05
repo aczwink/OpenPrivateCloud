@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -43,18 +43,23 @@ export class ResourceHealthManager
     {
         const ref = await this.resourcesManager.CreateResourceReference(resourceId);
         const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref!);
-        
+
+        let status;        
         try
         {
             const result = await resourceProvider.QueryResourceState(ref!);
             const extracted = this.ExtractResourceStateResult(result);
             await this.UpdateResourceAvailability(resourceId, extracted.status, extracted.msg);
+            status = extracted.status;
         }
         catch(e)
         {
             await this.UpdateResourceAvailability(resourceId, HealthStatus.Down, e);
-            return;
+            status = HealthStatus.Down;
         }
+
+        if(status === HealthStatus.Corrupt)
+            this.CheckResource(resourceId);
     }
 
     public async ScheduleResourceCheck(resourceId: number)
@@ -84,9 +89,8 @@ export class ResourceHealthManager
 
     public async UpdateResourceAvailability(resourceId: number, status: HealthStatus, logData?: unknown)
     {
-        const mergedStatus = await this.MergeHealthStatus(resourceId, status);
         const log = this.errorService.ExtractDataAsMultipleLines(logData);
-        await this.healthController.UpdateResourceAvailability(resourceId, mergedStatus, log);
+        await this.healthController.UpdateResourceAvailability(resourceId, status, log);
     }
 
     //Private methods
@@ -97,8 +101,10 @@ export class ResourceHealthManager
             return false; //resource was deleted
 
         const hd = await this.healthController.QueryResourceHealthData(resourceId);
-        if(hd!.status !== HealthStatus.Up)
+        if(hd?.status === HealthStatus.Down)
             return false; //resource is not reachable so can't perform health test
+        if(hd?.status === HealthStatus.InDeployment)
+            return true; //resource is still being deployed. Try later
 
         const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref);
 
@@ -147,32 +153,10 @@ export class ResourceHealthManager
         return groups[0].id;
     }
 
-    private async MergeHealthStatus(resourceId: number, desiredStatus: HealthStatus)
-    {
-        const hd = await this.healthController.QueryResourceHealthData(resourceId);
-        const currentStatus = hd?.status ?? HealthStatus.InDeployment;
-
-        if(currentStatus === HealthStatus.InDeployment)
-            return desiredStatus; //deployment status can go to any other
-        if(desiredStatus === HealthStatus.InDeployment)
-        {
-            //we can only go to deployment, if the service is up and healthy
-            if(currentStatus === HealthStatus.Up)
-                return desiredStatus;
-            return currentStatus;
-        }
-
-        if( (currentStatus === HealthStatus.Down) && (desiredStatus === HealthStatus.Up) )
-            return desiredStatus; //if a service was down and is now up thats fine
-
-        return Math.max(desiredStatus, currentStatus) as HealthStatus; //can only go from better to worse
-    }
-
     private async UpdateResourceHealth(resourceId: number, status: HealthStatus, logData?: unknown)
     {
-        const mergedStatus = await this.MergeHealthStatus(resourceId, status);
         const log = this.errorService.ExtractDataAsMultipleLines(logData);
-        await this.healthController.UpdateResourceHealth(resourceId, mergedStatus, log);
+        await this.healthController.UpdateResourceHealth(resourceId, status, log);
     }
 
     //Event handlers

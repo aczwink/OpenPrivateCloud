@@ -21,7 +21,9 @@ import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "
 import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO, SnapshotDTO } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
-import { DownloadFileUsingProgressPopup } from "../../Views/DownloadProgressPopup";
+import { DownloadFileUsingProgressPopup } from "../../Views/object-storage/DownloadProgressPopup";
+import { ObjectStorageThumbnailComponent } from "../../Views/object-storage/ObjectStorageThumbnailComponent";
+import { JSX_CreateElement } from "acfrontend";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -129,7 +131,18 @@ const filesViewModel: CollectionViewModel<FileMetaDataOverviewDataDTO, ResourceA
     extractId: x => x.id,
     idKey: "fileId",
     requestObjects: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "FileMetaDataOverviewDataDTO"
+    schemaName: "FileMetaDataOverviewDataDTO",
+
+    renderInfo: {
+        id: "id",
+        order: ["mediaType"],
+        properties: {
+            mediaType: {
+                render: (obj, ids) => <ObjectStorageThumbnailComponent fileMetadata={obj} resourceGroupName={ids.resourceGroupName} resourceName={ids.resourceName} />,
+                title: "",
+            }
+        }
+    }
 };
 
 const snapshotsViewModel: ListViewModel<SnapshotDTO, ResourceAndGroupId> = {

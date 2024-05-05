@@ -24,6 +24,23 @@ import { IdBoundResourceAction } from "./IdBoundActions";
 import { ListViewModel } from "./ListViewModel";
 import { UnboundResourceAction } from "./UnboundActions";
 
+interface PropertyRenderInfo<ObjectType, IdType>
+{
+    render?: (obj: ObjectType, ids: IdType) => RenderValue;
+    title?: string;
+}
+
+type PropertyRenderInfoDictionary<ObjectType, IdType> = {
+    [key in keyof ObjectType]?: PropertyRenderInfo<ObjectType, IdType>;
+};
+
+export interface RenderInfo<ObjectType, IdType>
+{
+    id?: keyof ObjectType;
+    order?: (keyof ObjectType)[];
+    properties?: PropertyRenderInfoDictionary<ObjectType, IdType>
+}
+
 export interface CollectionViewModel<ObjectType, IdType, ObjectCreationType = ObjectType>
 {
     type: "collection";
@@ -33,6 +50,7 @@ export interface CollectionViewModel<ObjectType, IdType, ObjectCreationType = Ob
     displayName: string;
     extractId: (resource: ObjectType) => number | string;
     idKey: string;
+    renderInfo?: RenderInfo<ObjectType, IdType>;
     requestObjects: (service: APIService, ids: IdType) => Promise<ResponseData<number, number, ObjectType[]>>;
     schemaName: string;
 }

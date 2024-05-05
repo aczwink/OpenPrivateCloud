@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,7 @@ import { APISchemaService } from "./APISchemaService";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
+import { opcSpecialGroups, opcSpecialUsers } from "../common/UserAndGroupDefinitions";
 
 const c_diskUUIDPrefix = "/dev/disk/by-uuid/";
 
@@ -85,6 +86,18 @@ export class MountsManager
         const input = await this.remoteFileSystemManager.ReadTextFile(hostId, "/etc/fstab");
         const parser = new fstabParser();
         return parser.Parse(input).map(this.MapFSTabEntry.bind(this));
+    }
+
+    public async CreateTemporaryFileSystem(hostId: number, sizeInMB: number)
+    {
+        const rand = crypto.pseudoRandomBytes(64).toString("hex");
+        const mountPoint = await this.CreateUniqueMountPoint(hostId, rand);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mount", "-t", "tmpfs", "-o", "size=" + sizeInMB + "m", "tmpfs", mountPoint], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", opcSpecialUsers.host + ":" + opcSpecialGroups.host, mountPoint], hostId);
+        return {
+            mountPoint,
+            Release: this.UnmountAndRemoveMountPoint.bind(this, hostId, mountPoint)
+        };
     }
 
     public async UnmountAndRemoveMountPointIfStandard(hostId: number, devicePath: string)
@@ -167,5 +180,13 @@ export class MountsManager
             await new Promise<void>(resolve => setTimeout(resolve, i * 1000) );
         }
         throw new Error("Failed unmounting file system: " + devicePath);
+    }
+
+    private async UnmountAndRemoveMountPoint(hostId: number, mountPoint: string)
+    {
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "sync", mountPoint], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "umount", mountPoint], hostId);
+        if( (mountPoint !== undefined) && (mountPoint.startsWith("/media/opc")) )
+            await this.remoteRootFileSystemManager.RemoveDirectory(hostId, mountPoint);
     }
 }

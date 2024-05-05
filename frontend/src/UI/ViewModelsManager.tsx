@@ -179,6 +179,7 @@ export class ViewModelsManager
                         objectBoundActions={[]}
                         requestObjects={ids => viewModel.requestObjects(RootInjector.Resolve(APIService), ids)}
                         unboundActions={viewModel.actions}
+                        renderInfo={viewModel.renderInfo ?? {}}
                     />,
                     path: "",
                 }
@@ -252,6 +253,7 @@ export class ViewModelsManager
                         objectBoundActions={viewModel.boundActions}
                         requestObjects={ids => viewModel.requestObjects(RootInjector.Resolve(APIService), ids)}
                         unboundActions={viewModel.actions}
+                        renderInfo={{}}
                         />,
                     path: "",
                 }

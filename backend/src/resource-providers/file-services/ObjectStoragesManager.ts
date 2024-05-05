@@ -17,12 +17,11 @@
  * */
 import crypto from "crypto";
 import path from "path";
-import { Injectable } from "acts-util-node";
+import { Injectable, Lock } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { Dictionary, NumberDictionary } from "acts-util-core";
-import { TaskScheduler } from "../../services/TaskScheduler";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ObjectStorageProperties } from "./properties";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
@@ -30,6 +29,9 @@ import { ResourceDependenciesController } from "../../data-access/ResourceDepend
 import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricDecryptStream, OPCFormat_SymmetricEncrypt, SymmetricKeyToBuffer, UnpackSymmetricKey } from "../../common/crypto/symmetric";
 import { GenerateRandomUUID } from "../../common/crypto/randomness";
 import { Readable } from "stream";
+import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
+import { ModulesManager } from "../../services/ModulesManager";
+import { AVPreviewService } from "./AVPreviewService";
 
 export interface FileMetaDataRevision
 {
@@ -56,7 +58,6 @@ interface ObjectStorageFileIndex
 interface ObjectStorageIndex
 {
     files: Dictionary<ObjectStorageFileIndex>;
-    fileWriteUpdateId?: number;
 }
 
 interface Snapshot
@@ -70,13 +71,17 @@ interface StoredFileMetaData
     revisions: FileMetaDataRevision[];
 }
 
+export type ThumbType = "" | "t" | "p";
+
 @Injectable
 export class ObjectStoragesManager
 {
-    constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private taskScheduler: TaskScheduler, private resourceConfigController: ResourceConfigController,
-        private keyVaultManager: KeyVaultManager, private resourceDependenciesController: ResourceDependenciesController)
+    constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceConfigController: ResourceConfigController,
+        private keyVaultManager: KeyVaultManager, private resourceDependenciesController: ResourceDependenciesController, private remoteCommandExecutor: RemoteCommandExecutor,
+        private modulesManager: ModulesManager, private avPreviewService: AVPreviewService)
     {
         this.cachedIndex = {};
+        this.thumbCreationLock = new Lock;
     }
 
     //Public methods
@@ -120,6 +125,8 @@ export class ObjectStoragesManager
 
     public async ProvideResource(properties: ObjectStorageProperties, resourceReference: LightweightResourceReference)
     {
+        await this.modulesManager.EnsureModuleIsInstalled(resourceReference.hostId, "ffmpeg");
+        
         const kvRef = await this.keyVaultManager.ResolveKeyVaultReference(properties.rootKEK_KeyVaultReference);
         const config: ObjectStorageConfig = {
             keyName: kvRef.objectName,
@@ -132,6 +139,7 @@ export class ObjectStoragesManager
         await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, this.GetBlobsPath(resourceReference));
         await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, this.GetFilesDataPath(resourceReference));
         await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, this.GetSnapshotsPath(resourceReference));
+        await this.remoteFileSystemManager.CreateDirectory(resourceReference.hostId, this.GetThumbnailsPath(resourceReference));
 
         const key = CreateSymmetricKey("aes-256");
         const keyBuffer = SymmetricKeyToBuffer(key);
@@ -202,6 +210,29 @@ export class ObjectStoragesManager
         });
     }
 
+    public async RequestFileThumbnail(resourceReference: LightweightResourceReference, fileId: string, thumbType: ThumbType)
+    {
+        const metaData = await this.RequestFileMetaData(resourceReference, fileId);
+        const isImage = metaData.currentRev.mediaType.startsWith("image/");
+        if(!(isImage || metaData.currentRev.mediaType.startsWith("video/")))
+            return undefined;
+
+        const thumbPath = path.join(this.GetThumbnailsPath(resourceReference), metaData.currentRev.blobId + thumbType);
+        let encryptedThumb;
+        try
+        {
+            encryptedThumb = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, thumbPath);
+        }
+        catch(e: any)
+        {
+            this.CreateThumbnailJob(resourceReference, metaData.currentRev.blobId, metaData.currentRev.blobSize, isImage);
+            return undefined;
+        }
+        const decryptedThumb = await this.DecryptBuffer(resourceReference, encryptedThumb);
+
+        return decryptedThumb;
+    }
+
     public async SaveFile(resourceReference: LightweightResourceReference, fileId: string, blob: Buffer, mediaType: string, originalName: string)
     {
         const blobId = await this.WriteBlob(resourceReference, blob);
@@ -254,8 +285,54 @@ export class ObjectStoragesManager
 
     //Private state
     private cachedIndex: NumberDictionary<ObjectStorageIndex>;
+    private indexWriteTimer?: NodeJS.Timeout;
+    private thumbCreationLock: Lock;
 
     //Private methods
+    private async CreateThumbnailJob(resourceReference: LightweightResourceReference, blobId: string, blobSize: number, isImage: boolean)
+    {
+        function MapType(type: "preview" | "thumb" | "tiles"): ThumbType
+        {
+            switch(type)
+            {
+                case "preview":
+                    return "p";
+                case "thumb":
+                    return "";
+                case "tiles":
+                    return "t";
+            }
+        }
+
+        const locked = await this.thumbCreationLock.Lock();
+
+        //avoid computing it multiple times
+        const thumbPath = path.join(this.GetThumbnailsPath(resourceReference), blobId);
+        const exists = await this.remoteFileSystemManager.Exists(resourceReference.hostId, thumbPath);
+        if(exists)
+            return;
+
+        const mountPoint = await this.avPreviewService.CreateWorkspace(resourceReference.hostId, blobSize);
+        try
+        {
+            const blobStream = await this.ReadBlob(resourceReference, blobId);
+            const blobPath = path.join(mountPoint, blobId);
+            await this.remoteFileSystemManager.StreamToFile(resourceReference.hostId, blobPath, blobStream);
+
+            const previews = await this.avPreviewService.CreatePreviews(blobPath, isImage);
+            for (const previewFile of previews)
+            {
+                const thumb = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, previewFile.path);
+                await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, thumbPath + MapType(previewFile.type), await this.EncryptBuffer(resourceReference, thumb));
+            }
+        }
+        finally
+        {
+            await this.avPreviewService.ReleaseWorkspace();
+            locked.Release();
+        }
+    }
+
     private async DecryptBuffer(resourceReference: LightweightResourceReference, encrypted: Buffer)
     {
         const dek = await this.DeriveDataEncryptionKey(resourceReference);
@@ -332,6 +409,12 @@ export class ObjectStoragesManager
         return path.join(root, "snapshots");
     }
 
+    private GetThumbnailsPath(resourceReference: LightweightResourceReference)
+    {
+        const root = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(root, "thumbs");
+    }
+
     private async ReadBlob(resourceReference: LightweightResourceReference, blobId: string)
     {
         const blobPath = path.join(this.GetBlobsPath(resourceReference), blobId);
@@ -380,8 +463,8 @@ export class ObjectStoragesManager
         else
             files[fileId] = { lastAccessTime: Date.now() };
 
-        if(index.fileWriteUpdateId === undefined)
-            index.fileWriteUpdateId = this.taskScheduler.ScheduleAfterHours(3, this.WriteIndex.bind(this, resourceReference.id));
+        if(this.indexWriteTimer === undefined)
+            this.indexWriteTimer = setTimeout(this.WriteIndex.bind(this, resourceReference.id), 1000 * 60 * 3);
     }
 
     private async WriteBlob(resourceReference: LightweightResourceReference, blob: Buffer): Promise<string>
@@ -400,7 +483,7 @@ export class ObjectStoragesManager
 
     private async WriteIndex(resourceId: number)
     {
-        this.cachedIndex[resourceId]!.fileWriteUpdateId = undefined;
+        this.indexWriteTimer = undefined;
         const resourceReference = await this.resourcesManager.CreateResourceReference(resourceId);
         if(resourceReference === undefined)
             throw new Error("TODO: implement me");

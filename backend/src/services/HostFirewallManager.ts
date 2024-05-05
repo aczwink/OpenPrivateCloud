@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ import { HostNetworkInterfaceCardsManager } from "./HostNetworkInterfaceCardsMan
 import { CIDRRange } from "../common/CIDRRange";
 import { IPv4 } from "../common/IPv4";
 import { HostFirewallTracingManager } from "./HostFirewallTracingManager";
+import { DistroInfoService } from "./DistroInfoService";
 
 
 interface FlatFirewallRule
@@ -38,7 +39,7 @@ interface FlatFirewallRule
 export class HostFirewallManager
 {
     constructor(private hostNetFilterService: HostNetfilterService, private hostFirewallZonesManager: HostFirewallZonesManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager,
-        private hostFirewallTracingManager: HostFirewallTracingManager)
+        private hostFirewallTracingManager: HostFirewallTracingManager, private distroInfoService: DistroInfoService)
     {
         this.hostFirewallZonesManager.SubscribeForChanges({
             next: this.ApplyRuleSet.bind(this)
@@ -107,11 +108,13 @@ export class HostFirewallManager
             }
         ];
         const nftVersion = await this.hostNetFilterService.ReadNetfilterVersion(hostId);
+        const arch = await this.distroInfoService.FetchCPU_Architecture(hostId); //for a reason I don't know the raspberry pi does not support connection tracking in the bridge family
+
         await this.hostNetFilterService.WriteRuleSet(hostId, [
             {
                 name: "opc_filter",
                 family: "bridge",
-                chains: (nftVersion[0] === 0) ? [] : bridgeChains, //no support for connection tracking in client tools below v1.x :(
+                chains: ((nftVersion[0] === 0) || (arch === "arm64")) ? [] : bridgeChains, //no support for connection tracking in client tools below v1.x :(
             },
             {
                 name: "opc_filter",

@@ -75,3 +75,12 @@ sudo systemctl start openprivatecloud.service
 wget https://raw.githubusercontent.com/aczwink/OpenPrivateCloud/main/installation/controller_update.sh
 chmod +x controller_update.sh
 ./controller_update.sh
+
+
+#make script executable by OPC
+#REPLACE: %YOURUSER% with your user
+sudo echo "opc-controller ALL = (%YOURUSER%) NOPASSWD: /srv/opc/controller_update.sh
+%YOURUSER% ALL = (root) NOPASSWD: /usr/bin/mv frontend/dist/* /var/www/html/openprivatecloud_frontend/
+%YOURUSER% ALL = (root) NOPASSWD: /usr/bin/mv acts-util-core.js /var/www/html/openprivatecloud_frontend/
+%YOURUSER% ALL = (root) NOPASSWD: /usr/bin/mv acfrontend.js /var/www/html/openprivatecloud_frontend/
+%YOURUSER% ALL = (root) NOPASSWD: /usr/bin/systemctl restart openprivatecloud.service" > /etc/sudoers.d/opc-update

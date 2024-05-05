@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -97,6 +97,18 @@ export class VNetManager implements FirewallZoneDataProvider
         rules.Remove(idx);
 
         await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
+        await this.hostFirewallManager.ApplyRuleSet(resourceReference.hostId);
+    }
+
+    public async DeployHostConfiguration(resourceReference: LightweightResourceReference)
+    {
+        await this.CreateBridge(resourceReference);
+        await this.sysCtlConfService.SetIPForwardingState(resourceReference.hostId, true);
+
+        const config = await this.QueryConfig(resourceReference);
+        if(config.settings.enableDHCPv4)
+            await this.StartDNS_DHCP_Server(resourceReference);
+
         await this.hostFirewallManager.ApplyRuleSet(resourceReference.hostId);
     }
 
@@ -229,13 +241,8 @@ export class VNetManager implements FirewallZoneDataProvider
         await this.resourceConfigController.UpdateOrInsertConfig(context.resourceReference.id, config);
 
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
-        await this.CreateBridge(context.resourceReference);
-        await this.sysCtlConfService.SetIPForwardingState(context.hostId, true);
 
-        if(instanceProperties.enableDHCPv4)
-            await this.StartDNS_DHCP_Server(context.resourceReference);
-
-        await this.hostFirewallManager.ApplyRuleSet(context.hostId);
+        await this.DeployHostConfiguration(context.resourceReference);
     }
 
     public async QueryConfig(resourceReference: LightweightResourceReference): Promise<VNetConfig>
@@ -248,7 +255,7 @@ export class VNetManager implements FirewallZoneDataProvider
     {
         const exists = await this.DoesBridgeExist(resourceReference);
         if(!exists)
-            return { state: "down", context: "bridge is down" };
+            return { state: "corrupt", context: "bridge is not there" };
         return "running";
     }
 

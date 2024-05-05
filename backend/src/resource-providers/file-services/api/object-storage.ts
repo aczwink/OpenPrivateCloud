@@ -16,13 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete, Post, Forbidden, Ok } from "acts-util-apilib";
+import { APIController, Common, Get, Header, Path, Put, NotFound, FormField, Body, Delete, Post, Forbidden, Ok, Query } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { c_fileServicesResourceProviderName, c_objectStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
 import { SessionsManager } from "../../../services/SessionsManager";
 import { ResourceReference, ResourceReferenceWithSession } from "../../../common/ResourceReference";
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
-import { FileMetaDataRevision, ObjectStoragesManager } from "../ObjectStoragesManager";
+import { FileMetaDataRevision, ObjectStoragesManager, ThumbType } from "../ObjectStoragesManager";
 import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 import { PermissionsManager } from "../../../services/PermissionsManager";
 import { permissions } from "openprivatecloud-common";
@@ -41,6 +41,7 @@ interface FileMetaDataOverviewDataDTO
      * @format byteSize
      */
     size: number;
+    lastAccessTime: Date;
 }
 
 interface FileMetaDataDTO
@@ -102,11 +103,12 @@ class _api_ extends ResourceAPIControllerBase
             return Forbidden("access to files denied");
 
         const files = await this.objectStoragesManager.SearchFiles(context.resourceReference);
-        return files.map<FileMetaDataOverviewDataDTO>(x => ({
+        return files.Values().Map<Promise<FileMetaDataOverviewDataDTO>>(async x => ({
             id: x.id,
             mediaType: x.mediaType,
-            size: x.blobSize
-        }));
+            size: x.blobSize,
+            lastAccessTime: new Date(await this.objectStoragesManager.RequestFileAccessTime(context.resourceReference, x.id))
+        })).PromiseAll();
     }
 
     @Delete("files/{fileId}")
@@ -168,6 +170,21 @@ class _api_ extends ResourceAPIControllerBase
         return Ok(result.stream, {
             "Content-Length": result.size
         });
+    }
+
+    @Get("files/{fileId}/thumb")
+    public async DownloadFileThumb(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string,
+        @Query thumbType: ThumbType
+    )
+    {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to thumbnail denied");
+
+        const result = await this.objectStoragesManager.RequestFileThumbnail(context.resourceReference, fileId, thumbType);
+        return result;
     }
 
     @Get("files/{fileId}/revisions/{revisionNumber}")

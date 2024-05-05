@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -115,6 +115,12 @@ export class LetsEncryptManager
         return "waiting";
     }
 
+    public async ReadConfig(resourceId: number)
+    {
+        const configOptional = await this.resourceConfigController.QueryConfig<LetsEncryptCertBotConfig>(resourceId);
+        return configOptional!;
+    }
+
     public async ReadExpiryDate(resourceReference: LightweightResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
@@ -143,11 +149,12 @@ export class LetsEncryptManager
     public async RequestNumberOfRemainingValidDays(resourceReference: LightweightResourceReference)
     {
         const expiryDate = await this.ReadExpiryDate(resourceReference);
-        const diff = expiryDate!.valueOf() - Date.now();
-        if(diff < 0)
-            return 0;
+        return this.keyVaultManager.ComputeNumberOfRemainingValidDays(expiryDate!);
+    }
 
-        return diff / (24 * 60 * 60 * 1000);
+    public async WriteConfig(resourceId: number, config: LetsEncryptCertBotConfig)
+    {
+        await this.resourceConfigController.UpdateOrInsertConfig(resourceId, config);
     }
 
     //Private methods
@@ -267,12 +274,6 @@ export class LetsEncryptManager
         };
     }
 
-    private async ReadConfig(resourceId: number)
-    {
-        const configOptional = await this.resourceConfigController.QueryConfig<LetsEncryptCertBotConfig>(resourceId);
-        return configOptional!;
-    }
-
     private async RenewCertificate(resourceReference: ResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
@@ -330,10 +331,5 @@ export class LetsEncryptManager
 
         const containerName = this.DeriveContainerName(resourceReference.id);
         await this.dockerManager.CreateContainerInstanceAndStartItAndExecuteCommand(resourceReference.hostId, containerName, containerConfig, command);
-    }
-
-    private async WriteConfig(resourceId: number, config: LetsEncryptCertBotConfig)
-    {
-        await this.resourceConfigController.UpdateOrInsertConfig(resourceId, config);
     }
 }

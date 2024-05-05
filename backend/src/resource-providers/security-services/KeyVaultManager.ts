@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -70,6 +70,25 @@ export class KeyVaultManager
     }
 
     //Public methods
+    public async CheckResourceHealth(resourceReference: LightweightResourceReference)
+    {
+        const remDays = await this.RequestRemainingValidDaysOfCRL(resourceReference);
+        if((remDays !== undefined) && (remDays <= 60))
+        {
+            const caDir = this.GetCA_Dir(resourceReference);
+            await this.easyRSAManager.UpdateCRL(resourceReference.hostId, caDir);
+        }
+    }
+
+    public ComputeNumberOfRemainingValidDays(expiryDate: Date | number)
+    {
+        const diff = expiryDate.valueOf() - Date.now();
+        if(diff < 0)
+            return 0;
+
+        return diff / (24 * 60 * 60 * 1000);
+    }
+
     public async CreateEncryptionCommand(input: Command, encryptionKeyKeyVaultReference: string): Promise<Command>
     {
         const result = await this.ResolveKeyVaultReference(encryptionKeyKeyVaultReference);
@@ -281,8 +300,16 @@ export class KeyVaultManager
         return config.caConfig;
     }
 
-    public QueryResourceState(resourceReference: LightweightResourceReference): ResourceStateResult
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
     {
+        const remDays = await this.RequestRemainingValidDaysOfCRL(resourceReference);
+        if((remDays !== undefined) && (remDays <= 0))
+        {
+            return {
+                context: "crl is expired",
+                state: "corrupt"
+            };
+        }
         return "running";
     }
 
@@ -349,6 +376,21 @@ export class KeyVaultManager
     {
         const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetKeysDir(resourceReference));
         return children.Values().Map(async x => this.RequestKey(resourceReference, x)).PromiseAll();
+    }
+
+    private async RequestRemainingValidDaysOfCRL(resourceReference: LightweightResourceReference)
+    {
+        const paths = this.GetCAPaths(resourceReference);
+        if(await this.remoteFileSystemManager.Exists(resourceReference.hostId, paths.crlPath))
+        {
+            const expiryDateContent = await this.remoteCommandExecutor.ExecuteBufferedCommand(["openssl", "crl", "-nextupdate", "-noout", "-in", paths.crlPath], resourceReference.hostId);
+            const parts = expiryDateContent.stdOut.split("=");
+            const expiryDate = Date.parse(parts[1]);
+
+            return this.ComputeNumberOfRemainingValidDays(expiryDate);
+        }
+
+        return undefined;
     }
 
     public async ResolveKeyVaultReference(keyVaultReference: string)

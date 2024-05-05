@@ -42,7 +42,10 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
         return [
             {
                 fileSystemType: "btrfs",
-                healthCheckSchedule: null,
+                healthCheckSchedule: {
+                    type: "weekly",
+                    counter: 3
+                },
                 schemaName: "KeyVaultProperties"
             },
             {
@@ -56,6 +59,12 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
     //Public methods
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.securityServices.keyVaultResourceTypeName.name:
+                await this.keyVaultManager.CheckResourceHealth(resourceReference);
+                break;
+        }
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>

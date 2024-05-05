@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -144,7 +144,7 @@ export class ShellFrontend2
     {
         if(command[0] === "sudo")
         {
-            command.splice(1, 0, 'PS1="' + g_PS1 + '"', "--stdin");
+            command.splice(1, 0, 'PS1="' + g_PS1 + '"', "--stdin", "-k");
         }
 
         const cmdLine = command.join(" ");

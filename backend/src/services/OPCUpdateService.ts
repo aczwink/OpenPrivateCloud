@@ -28,7 +28,11 @@ export class OPCUpdateService
     //Public methods
     public async ExecuteSoftwareUpdate()
     {
+        const path = "/srv/opc";
+
+        const result = await this.localCommandExecutor.ExecuteCommand(["stat", "-c", "%U", path]);
+        const owner = result.stdout.trim();
         //TODO: find real path
-        await this.localCommandExecutor.ExecuteCommand(["./controller_update.sh"], "/srv/opc");
+        await this.localCommandExecutor.ExecuteCommand(["sudo", "-u", owner, "./controller_update.sh"], path);
     }
 }

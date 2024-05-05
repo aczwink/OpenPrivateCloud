@@ -18,6 +18,8 @@
 
 import ssh2 from "ssh2";
 import { Injectable } from "acts-util-node";
+import { Readable } from "stream";
+import { TimeUtil } from "acts-util-core";
 
 export type Command = string[] | {
     type: "redirect-stdout" | "pipe",
@@ -42,6 +44,7 @@ export interface SSHConnection
     RemoveDirectory(remotePath: string): Promise<void>;
     SpawnShell(): Promise<ssh2.ClientChannel>;
     StreamFile(filePath: string): ssh2.ReadStream;
+    StreamToFile(filePath: string, stream: Readable): Promise<void>;
     UnlinkFile(remotePath: string): Promise<void>;
     WriteFile(remotePath: string, content: Buffer, mode?: number): Promise<void>;
 }
@@ -217,6 +220,23 @@ class SSHConnectionImpl implements SSHConnection
     public StreamFile(remotePath: string): ssh2.ReadStream
     {
         return this.sftp.createReadStream(remotePath);
+    }
+
+    public async StreamToFile(filePath: string, stream: Readable): Promise<void>
+    {
+        const outStream = this.sftp.createWriteStream(filePath);
+        stream.pipe(outStream);
+
+        //stream events are not getting called for a reason I do not understand -.-
+        while(true)
+        {
+            const stat1 = await this.QueryStatus(filePath);
+            await TimeUtil.Delay(3000);
+            const stat2 = await this.QueryStatus(filePath);
+
+            if(stat1.size === stat2.size)
+                break;
+        }
     }
 
     public UnlinkFile(remotePath: string): Promise<void>

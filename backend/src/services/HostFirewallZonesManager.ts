@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -141,8 +141,17 @@ export class HostFirewallZonesManager
 
         const externalZoneData = await this.FetchZoneData(hostId, "external");
 
+        const nonCustomZones = [
+            //the standard zones that are always there
+            "external", "trusted",
+            //container or vm nics
+            "docker-container-nic", "qemu-vm-nic",
+            //docker
+            "docker_gwbridge"
+        ];
+
         return {
-            customZones: await zoneInterfaces.Entries().Filter(kv => !["docker-container-nic", "external", "trusted", "qemu-vm-nic"].includes(kv.key.toString())).Map(kv => this.BuildZoneData(hostId, kv.key.toString(), kv.value!)).PromiseAll(),
+            customZones: await zoneInterfaces.Entries().Filter(kv => !nonCustomZones.includes(kv.key.toString())).Map(kv => this.BuildZoneData(hostId, kv.key.toString(), kv.value!)).PromiseAll(),
 
             external: {
                 interfaceNames: zoneInterfaces["external"]!,

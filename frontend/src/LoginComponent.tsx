@@ -48,7 +48,11 @@ export class LoginComponent extends Component
     protected Render(): RenderValue
     {
         if((this.publicSettings === null))
+        {
+            if(this.failed)
+                return <h1>Error: Backend is not reachable!</h1>;
             return <ProgressSpinner />;
+        }
 
         return <div className="container text-center">
             <h1 className="my-3">Welcome to {this.publicSettings.name}</h1>
@@ -227,8 +231,15 @@ export class LoginComponent extends Component
 
     override async OnInitiated(): Promise<void>
     {
-        const response = await this.apiService.public.clusterSettings.get();
-        this.publicSettings = response.data;
+        try
+        {
+            const response = await this.apiService.public.clusterSettings.get();
+            this.publicSettings = response.data;
+        }
+        catch(e)
+        {
+            this.failed = true;
+        }
     }
 
     private async OnLogin(event: Event)

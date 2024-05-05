@@ -28,22 +28,6 @@ interface MasterKey
     authTagLength: number;
 }
 
-//TODO: masterkey should really only be the key and not the iv, use OPCFormat_SymmetricEncrypt instead
-function AES256GCM_Decrypt(key: Buffer, iv: Buffer, authTagLength: number, encryptedData: Buffer)
-{
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, {
-        authTagLength,
-    });
-
-    const authTag = encryptedData.subarray(0, authTagLength);
-    decipher.setAuthTag(authTag);
-
-    const data = encryptedData.subarray(authTagLength);
-
-    const decrypted = decipher.update(data);
-    return Buffer.concat([decrypted, decipher.final()]);
-}
-
 @Injectable
 export class ClusterKeyStoreManager
 {
@@ -97,18 +81,8 @@ export class ClusterKeyStoreManager
         const encryptedBuffer = await this.clusterKeyStoreController.QueryHostSecretValue(hostId, secretName);
         if(encryptedBuffer === undefined)
             return undefined;
-
-        if(encryptedBuffer.toString("utf-8", 0, 3) === "OPC")
-        {
-            console.log("NEW host secret", hostId, secretName, this.Decrypt(encryptedBuffer).toString("utf-8"));
-            return this.Decrypt(encryptedBuffer).toString("utf-8");
-        }        
-
-        const decrypted = this._DecryptLegacy(encryptedBuffer).toString("utf-8");
-        console.log("MIGRATED host secret", hostId, secretName, decrypted);
-        await this.SetHostSecret(hostId, secretName, decrypted);
-
-        return decrypted;
+        
+        return this.Decrypt(encryptedBuffer).toString("utf-8");
     }
 
     public async RotateMasterKey()
@@ -148,14 +122,4 @@ export class ClusterKeyStoreManager
 
     //Private state
     private masterKey?: MasterKey;
-
-    //Private methods
-    private _DecryptLegacy(encryptedData: Buffer)
-    {
-        if(this.masterKey === undefined)
-            throw new Error("Cluster key store is locked");
-
-        //TODO: masterkey should really only be the key and not the iv, use OPCFormat_SymmetricEncrypt instead
-        return AES256GCM_Decrypt(this.masterKey.key, this.masterKey.iv, this.masterKey.authTagLength, encryptedData);
-    }
 }

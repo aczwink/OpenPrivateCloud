@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@
 import { resourceProviders } from "openprivatecloud-common";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { LetsEncryptCertInfoDTO, LetsEncryptLogsDTO } from "../../../dist/api";
+import { LetsEncryptCertInfoDTO, LetsEncryptConfigDTO, LetsEncryptLogsDTO } from "../../../dist/api";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -44,6 +44,21 @@ const logsViewModel: ObjectViewModel<LetsEncryptLogsDTO, ResourceAndGroupId> = {
     schemaName: "LetsEncryptLogsDTO"
 };
 
+const configViewModel: ObjectViewModel<LetsEncryptConfigDTO, ResourceAndGroupId> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "LetsEncryptConfigDTO",
+            requestObject: (service, ids) => service.resourceProviders._any_.webservices.letsencryptcert._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, newProps) => service.resourceProviders._any_.webservices.letsencryptcert._any_.config.put(ids.resourceGroupName, ids.resourceName, newProps),
+        }
+    ],
+    formTitle: _ => "Config",
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.letsencryptcert._any_.config.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "LetsEncryptConfigDTO"
+};
+
 export const letsEncryptViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         ...BuildCommonResourceActions(BuildResourceId),
@@ -61,6 +76,11 @@ export const letsEncryptViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     child: logsViewModel,
                     displayName: "Logs",
                     key: "logs",
+                },
+                {
+                    child: configViewModel,
+                    displayName: "Config",
+                    key: "config",
                 }
             ]
         },

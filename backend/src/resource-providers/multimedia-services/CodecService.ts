@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2022-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,16 +19,32 @@
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 
-export interface FFProbe_StreamInfo
+interface FFProbe_CommonStreamInfo
 {
     codec_name: string;
-    codec_type: "video" | "audio";
-    profile: string;
+    profile?: string;
 }
+
+interface FFProbe_AudioStreamInfo extends FFProbe_CommonStreamInfo
+{
+    codec_type: "audio";
+}
+
+interface FFProbe_VideoStreamInfo extends FFProbe_CommonStreamInfo
+{
+    codec_type: "video";
+    height: number;
+    r_frame_rate: string;
+    width: number;
+}
+
+export type FFProbe_StreamInfo = FFProbe_AudioStreamInfo | FFProbe_VideoStreamInfo;
 
 interface FFProbe_MediaInfo
 {
-    format: unknown;
+    format: {
+        duration: string;
+    };
     streams: FFProbe_StreamInfo[];
 }
 
@@ -45,5 +61,14 @@ export class CodecService
         const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", mediaFilePath], hostId);
 
         return JSON.parse(result.stdOut) as FFProbe_MediaInfo;
+    }
+
+    public GetVideoStream(mediaInfo: FFProbe_MediaInfo)
+    {
+        const streams = mediaInfo.streams.filter(x => x.codec_type === "video");
+        if(streams.length != 1)
+            throw new Error("TODO: implement me");
+        
+        return streams[0] as FFProbe_VideoStreamInfo;
     }
 }

@@ -19,6 +19,7 @@ import path from "path";
 import ssh2 from "ssh2";
 import { Injectable } from "acts-util-node";
 import { RemoteConnectionsManager } from "./RemoteConnectionsManager";
+import { Readable } from "stream";
 
 @Injectable
 export class RemoteFileSystemManager
@@ -175,6 +176,13 @@ export class RemoteFileSystemManager
         }
     }
 
+    public async StreamToFile(hostId: number, filePath: string, stream: Readable)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        await conn.value.StreamToFile(filePath, stream);
+        conn.Release();
+    }
+
     public async UnlinkFile(hostId: number, path: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
@@ -185,8 +193,18 @@ export class RemoteFileSystemManager
     public async WriteFile(hostId: number, filePath: string, content: Buffer)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.WriteFile(filePath, content);
-        conn.Release();
+        try
+        {
+            await conn.value.WriteFile(filePath, content);
+        }
+        catch(e)
+        {
+            throw new Error("Writing file at path " + filePath + " on host " + hostId + " failed." + e);
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 
     public async WriteTextFile(hostId: number, filePath: string, text: string, mode?: number)

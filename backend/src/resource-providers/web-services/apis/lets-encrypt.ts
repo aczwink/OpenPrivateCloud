@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, Get, Path } from "acts-util-apilib";
+import { APIController, Body, Common, Get, Path, Put } from "acts-util-apilib";
 import { c_letsencryptCertResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { LetsEncryptManager } from "../LetsEncryptManager";
@@ -27,6 +27,14 @@ interface LetsEncryptCertInfoDTO
 {
     expiryDate: Date;
     remainingValidDays: number;
+}
+
+interface LetsEncryptConfigDTO
+{
+    /**
+     * LetsEncrypt will verify certificates by issuing requests on port 80 to the domain. Specify a different port in case you use port mapping.
+     */
+    sourcePort: number;
 }
 
 interface LetsEncryptLogsDTO
@@ -52,6 +60,31 @@ class LetsEncryptAPIController extends ResourceAPIControllerBase
     )
     {
         return this.FetchResourceReference(resourceGroupName, resourceName);
+    }
+
+    @Get("config")
+    public async QueryConfig(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        const config = await this.letsEncryptManager.ReadConfig(resourceReference.id);
+            
+        const result: LetsEncryptConfigDTO = {
+            sourcePort: config.sourcePort,
+        };
+        return result;
+    }
+
+    @Put("config")
+    public async UpdateConfig(
+        @Common resourceReference: ResourceReference,
+        @Body newValues: LetsEncryptConfigDTO
+    )
+    {
+        const config = await this.letsEncryptManager.ReadConfig(resourceReference.id);
+        config.sourcePort = newValues.sourcePort;
+
+        await this.letsEncryptManager.WriteConfig(resourceReference.id, config);
     }
 
     @Get("info")

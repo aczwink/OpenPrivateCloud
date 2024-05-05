@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -215,7 +215,7 @@ export class SSHCommandExecutor
         let stdOut = "";
         let stdErr = "";
 
-        const exitCodeString = await new Promise<string>( (resolve, reject) => {
+        const exitCode = await new Promise<number>( (resolve, reject) => {
             channel.stdout.setEncoding("utf-8");
             channel.stderr.setEncoding("utf-8");
 
@@ -232,7 +232,7 @@ export class SSHCommandExecutor
         });
 
         return {
-            exitCode: this.ParseExitCode(exitCodeString),
+            exitCode: exitCode,
             stdErr,
             stdOut,
             tracker
@@ -247,7 +247,7 @@ export class SSHCommandExecutor
         if(options.stdin !== undefined)
             channel.stdin.write(options.stdin);
 
-        const exitCodeString = await new Promise<string>( (resolve, reject) => {
+        const exitCode = await new Promise<number>( (resolve, reject) => {
             channel.stdout.setEncoding("utf-8");
             channel.stderr.setEncoding("utf-8");
 
@@ -257,7 +257,7 @@ export class SSHCommandExecutor
             this.RegisterExitEvents(channel, tracker, resolve, reject);
         });
 
-        return this.ParseExitCode(exitCodeString);
+        return exitCode;
     }
 
     private async ExecuteCommandUsingShell(connection: SSHConnection, command: Command, options: CommandOptions)
@@ -270,17 +270,11 @@ export class SSHCommandExecutor
         await shell.Close();
     }
 
-    private ParseExitCode(exitCodeString: string)
-    {
-        const exitCode = parseInt(exitCodeString);
-        return exitCode;
-    }
-
-    private RegisterExitEvents(channel: ClientChannel, tracker: ProcessTracker, resolve: (value: string) => void, reject: (reason: any) => void)
+    private RegisterExitEvents(channel: ClientChannel, tracker: ProcessTracker, resolve: (value: number) => void, reject: (reason: any) => void)
     {
         channel.on("error", reject);
         channel.on("exit", code => {
-            tracker.Add("Process exit code is:", code);
+            tracker.Add("Process exit code is:", code.toString());
             resolve(code);
         });
         channel.on("close", (code: any, signal: any) => {

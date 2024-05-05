@@ -62,6 +62,12 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
     //Public methods
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.networkServices.virtualNetworkResourceType.name:
+                await this.vnetManager.DeployHostConfiguration(resourceReference);
+                break;
+        }
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>

@@ -28,6 +28,7 @@ import { UnboundResourceAction } from "../UnboundActions";
 import { RenderReadOnlyValue, RenderTitle } from "../ValuePresentation";
 import { ObjectEditorComponent } from "./ObjectEditorComponent";
 import { APISchemaService } from "../../Services/APISchemaService";
+import { RenderInfo } from "../ViewModel";
 
 interface ObjectListInput<ObjectType>
 {
@@ -38,6 +39,7 @@ interface ObjectListInput<ObjectType>
     heading: string;
     idBoundActions: IdBoundResourceAction<any, any, any>[];
     objectBoundActions: ObjectBoundAction<any, any>[];
+    renderInfo: RenderInfo<any, any>;
     requestObjects: (routeParams: Dictionary<string>) => Promise<ResponseData<number, number, ObjectType[]>>;
     unboundActions: UnboundResourceAction<any, any>[];
 }
@@ -50,6 +52,8 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         super();
 
         this.data = null;
+        this.sortKey = "";
+        this.sortAscending = false;
     }
 
     protected Render(): RenderValue
@@ -72,8 +76,10 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         </fragment>;
     }
 
-    //Private variables
+    //Private state
     private data: ObjectType[] | null;
+    private sortKey: string | number;
+    private sortAscending: boolean;
 
     //Private methods
     private ExtractId(object: any)
@@ -81,7 +87,23 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         return this.input.extractId(object);
     }
 
-    private Order(v1: any, v2: any)
+    private GetPropertyOrder()
+    {
+        const props = this.input.elementSchema.properties.OwnKeys().ToArray();
+        const order = this.input.renderInfo.order ?? [];
+
+        const tail = props.Values().Filter(x => !order.includes(x));
+        return order.concat(tail.ToArray());
+    }
+
+    private OrderByDirection(v1: any, v2: any, ascending: boolean)
+    {
+        if(ascending)
+            return this.OrderValue(v1, v2);
+        return this.OrderValue(v2, v1);
+    }
+
+    private OrderValue(v1: any, v2: any)
     {
         if(typeof v1 === "number")
             return v1 - v2;
@@ -100,9 +122,25 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         }
     }
 
+    private RenderColumnName(key: string)
+    {
+        const props = this.input.renderInfo.properties ?? {};
+        const title = props[key]?.title ?? RenderTitle(this.input.elementSchema.properties[key]!, key.toString());
+
+        let sortIndicator = null;
+        if(this.sortKey === key)
+        {
+            const content = "caret-" + (this.sortAscending ? "down" : "up") + "-fill";
+            sortIndicator = <BootstrapIcon>{content}</BootstrapIcon>;
+        }
+
+        return <th onclick={this.OnColumnHeaderClick.bind(this, key)} style="cursor: pointer;">{title} {sortIndicator}</th>;
+    }
+
     private RenderColumnsNames()
     {
-        return this.input.elementSchema.properties.OwnKeys().Map(x => <th onclick={this.OnColumnHeaderClick.bind(this, x)}>{RenderTitle(this.input.elementSchema.properties[x]!, x.toString())}</th>).ToArray();
+        const order = this.GetPropertyOrder();
+        return order.map(x => this.RenderColumnName(x.toString()));
     }
 
     private RenderIdBoundAction(object: any, action: IdBoundResourceAction<any, any, any>)
@@ -145,12 +183,17 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
 
     private RenderObjectProperty(obj: any, key: string)
     {
+        const props = this.input.renderInfo.properties ?? {};
+        const customRender = props[key]?.render;
+        if(customRender !== undefined)
+            return customRender(obj, this.routerState.routeParams);
         return RenderReadOnlyValue(obj[key], this.input.elementSchema.properties[key]!);
     }
 
     private RenderObjectPropertyEntry(obj: any, key: string, idx: number, isRequired: boolean)
     {
-        if((idx === 0) && this.input.hasChild)
+        const isIdColumn = (key === this.input.renderInfo.id) || ((idx === 0) && this.input.hasChild);
+        if(isIdColumn)
         {
             const id = this.ExtractId(obj);
             const route = this.ReplaceRouteParams(this.input.baseUrl + "/" + encodeURIComponent(id));
@@ -165,7 +208,8 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
 
     private RenderObjectRow(obj: any)
     {
-        let entries = this.input.elementSchema.properties.OwnKeys().ToArray().map( (k, i) => <td>{this.RenderObjectPropertyEntry(obj, k.toString(), i, this.input.elementSchema.required.Contains(k))}</td>);
+        const order = this.GetPropertyOrder();
+        let entries = order.map( (k, i) => <td>{this.RenderObjectPropertyEntry(obj, k.toString(), i, this.input.elementSchema.required.Contains(k))}</td>);
         return <tr>{...entries.concat(this.RenderObjectActions(obj))}</tr>;
     }
 
@@ -186,13 +230,17 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
 
     private Sort(columnKey: string | number, ascending: boolean)
     {
-        this.data!.sort((a, b) => this.Order((a as any)[columnKey], (b as any)[columnKey]));
+        this.sortKey = columnKey;
+        this.sortAscending = ascending;
+
+        this.data!.sort((a, b) => this.OrderByDirection((a as any)[columnKey], (b as any)[columnKey], ascending));
     }
 
     //Event handlers
     private OnColumnHeaderClick(columnKey: string | number)
     {
-        this.Sort(columnKey, true);
+        const asc = (columnKey === this.sortKey) ? !this.sortAscending : true;
+        this.Sort(columnKey, asc);
         this.Update();
     }
     
