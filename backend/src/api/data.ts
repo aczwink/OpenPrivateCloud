@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -47,7 +47,7 @@ class _api_
         const result = await this.executor.ExecuteQuery(query);
         return {
             keys: result.keys.Entries().Map(kv => ({ name: kv.key.toString(), schema: kv.value! })).ToArray(),
-            values: result.values.Take(100).ToArray()
+            values: result.values.Take(500).ToArray()
         };
     }
 }

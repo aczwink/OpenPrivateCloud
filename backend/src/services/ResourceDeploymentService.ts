@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -29,12 +29,14 @@ import { ResourceHealthManager } from "./ResourceHealthManager";
 import { ProcessTrackerManager } from "./ProcessTrackerManager";
 import { ResourceConfigController } from "../data-access/ResourceConfigController";
 import { ResourcesController } from "../data-access/ResourcesController";
+import { ModulesManager } from "./ModulesManager";
 
 @Injectable
 export class ResourceDeploymentService
 {
     constructor(private hostStoragesManager: HostStoragesManager, private hostStoragesController: HostStoragesController, private hostsController: HostsController, private resourceProviderManager: ResourceProviderManager,
-        private resourceHealthManager: ResourceHealthManager, private processTrackerManager: ProcessTrackerManager, private instanceConfigController: ResourceConfigController, private resourcesController: ResourcesController)
+        private resourceHealthManager: ResourceHealthManager, private processTrackerManager: ProcessTrackerManager, private instanceConfigController: ResourceConfigController, private resourcesController: ResourcesController,
+        private modulesManager: ModulesManager)
     {
     }
 
@@ -42,6 +44,9 @@ export class ResourceDeploymentService
     public async StartInstanceDeployment(resourceProperties: BaseResourceProperties, resourceGroup: ResourceGroup, hostId: number, userId: number)
     {
         const {resourceProvider, resourceTypeDef} = this.resourceProviderManager.FindResourceProviderByResourceProperties(resourceProperties);
+
+        for (const moduleName of resourceTypeDef.requiredModules)
+            await this.modulesManager.EnsureModuleIsInstalled(hostId, moduleName);
 
         const storageId = await this.hostStoragesManager.FindOptimalStorage(hostId, resourceTypeDef.fileSystemType);
         const storage = await this.hostStoragesController.RequestHostStorage(storageId);

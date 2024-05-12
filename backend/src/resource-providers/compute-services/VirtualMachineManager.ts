@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -91,7 +91,7 @@ export class VirtualMachineManager
     public async ProvideResource(instanceProperties: VirtualMachineProperties, context: DeploymentContext)
     {
         await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "libvirt");
-        await this.linuxUsersManager.EnsureUserIsInGroup(context.hostId, opcSpecialUsers.host, linuxSystemGroupsWithPrivileges.kvm);
+        await this.linuxUsersManager.EnsureUserIsInGroup(context.hostId, opcSpecialUsers.host.name, linuxSystemGroupsWithPrivileges.kvm);
 
         const osInfo = await this.osQueryService.FindOSInfo(context.hostId, instanceProperties);
         const vmImagesDirPath = await this.EnsureVMImagesDirIsCreated(context.hostId);
@@ -140,7 +140,7 @@ export class VirtualMachineManager
         const hostId = context.hostId;
 
         const vmDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
-        const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
+        const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host.name);
         const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, linuxSystemGroupsWithPrivileges.kvm);
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, vmDir, uid, gid);
 
@@ -184,7 +184,7 @@ export class VirtualMachineManager
         const result = await this.remoteFileSystemManager.CreateDirectory(hostId, vmImagesDirPath);
         if(result === null)
         {
-            const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
+            const uid = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host.name);
             const gid = await this.hostUsersManager.ResolveHostGroupId(hostId, linuxSystemGroupsWithPrivileges.kvm);
             await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, vmImagesDirPath, uid, gid);
             await this.remoteFileSystemManager.ChangeMode(hostId, vmImagesDirPath, 0o755);

@@ -45,11 +45,13 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
             {
                 fileSystemType: "btrfs",
                 healthCheckSchedule: null,
+                requiredModules: [],
                 schemaName: "DockerContainerProperties"
             },
             {
                 healthCheckSchedule: null,
                 fileSystemType: "ext4",
+                requiredModules: [],
                 schemaName: "VirtualMachineProperties"
             }
         ];
@@ -77,7 +79,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 

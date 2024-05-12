@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -54,8 +54,8 @@ export class HostStoragesManager
     {
         const fsType = await this.fileSystemInfoService.QueryFileSystemInfoForDirectory(hostId, props.path);
 
-        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
-        const hostOPCGroupId = await this.hostUsersManager.ResolveHostGroupId(hostId, opcSpecialGroups.host);
+        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host.name);
+        const hostOPCGroupId = await this.hostUsersManager.ResolveHostGroupId(hostId, opcSpecialGroups.host.name);
         await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, props.path, hostOPCUserId, hostOPCGroupId);
 
         await this.remoteFileSystemManager.ChangeMode(hostId, props.path, 0o775);

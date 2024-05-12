@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,7 @@ import { PermissionsController } from "../../data-access/PermissionsController";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { SambaSharesManager } from "./SambaSharesManager";
 import { ResourceReference } from "../../common/ResourceReference";
+import { UserCredentialsProvider } from "../../services/UserCredentialsProvider";
 
 interface SMBShareConfig
 {
@@ -36,7 +37,7 @@ interface SMBShareConfig
 export class SingleSMBSharePerInstanceProvider
 {
     constructor(private hostsController: HostsController, private hostUsersManager: HostUsersManager, private sambaSharesManager: SambaSharesManager,
-        private permissionsController: PermissionsController)
+        private permissionsController: PermissionsController, private userCredentialsProvider: UserCredentialsProvider)
     {
     }
 
@@ -53,6 +54,14 @@ export class SingleSMBSharePerInstanceProvider
         const userName = this.hostUsersManager.MapUserToLinuxUserName(userId);
         
         return this.sambaSharesManager.GetConnectionInfo(host!.hostName, this.MapExternalIdToSMBShareName(resourceReference.externalId), userName);
+    }
+
+    public async IsShareOnline(resourceReference: ResourceReference)
+    {
+        const served = await this.sambaSharesManager.RequestServedShares(resourceReference.hostId);
+        const shareName = this.MapExternalIdToSMBShareName(resourceReference.externalId);
+
+        return served.includes(shareName);
     }
 
     public async UpdateSMBConfig(shareConfig: SMBShareConfig, resourceReference: ResourceReference)
@@ -72,14 +81,24 @@ export class SingleSMBSharePerInstanceProvider
         
         if(shareConfig.enabled)
         {
-            await this.hostUsersManager.SyncSambaGroupsMembers(hostId, readGroups.ToArray());
+            const readGroupsArray = readGroups.ToArray();
+            await this.hostUsersManager.SyncGroupsToHost(hostId, readGroupsArray);
+            await this.hostUsersManager.SyncSambaGroupsMembers(hostId, readGroupsArray);
 
             let writeGroupsLinux: string[] = [];
             if(!shareConfig.readOnly)
             {
                 const writeGroups = await this.permissionsController.QueryGroupsWithPermission(resourceReference.id, permissions.data.write);
-                await this.hostUsersManager.SyncSambaGroupsMembers(hostId, writeGroups.ToArray());
+                const writeGroupsArray = writeGroups.ToArray();
+                await this.hostUsersManager.SyncGroupsToHost(hostId, writeGroupsArray);
+                await this.hostUsersManager.SyncSambaGroupsMembers(hostId, writeGroupsArray);
                 writeGroupsLinux = writeGroups.Map(x => "+" + this.hostUsersManager.MapGroupToLinuxGroupName(x)).ToArray();
+
+                this.userCredentialsProvider.SetResourceDependenciesByGroups(resourceReference.id, [...readGroupsArray, ...writeGroupsArray])
+            }
+            else
+            {
+                this.userCredentialsProvider.SetResourceDependenciesByGroups(resourceReference.id, [...readGroupsArray])
             }
 
             await this.sambaSharesManager.SetShare(hostId, {

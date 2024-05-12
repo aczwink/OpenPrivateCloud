@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,9 +18,25 @@
 
 import { Injectable } from "acts-util-node";
 
+interface KeyVaultCertificateRevokedEvent
+{
+    type: "keyVault/certificateRevoked";
+    keyVaultResourceId: number;
+}
+
+interface UserCredentialProvideEvent
+{
+    type: "userCredentialsProvided";
+    resourceId: number;
+    userId: number;
+    secret: string;
+}
+
+export type ResourceEvent = KeyVaultCertificateRevokedEvent | UserCredentialProvideEvent;
+
 export interface ResourceEventListener
 {
-    ReceiveResourceEvent(eventName: string, sourceResourceId: number): void;
+    ReceiveResourceEvent(event: ResourceEvent): void;
 }
   
 @Injectable
@@ -32,10 +48,10 @@ export class ResourceEventsManager
     }
 
     //Public methods
-    public PublishEvent(eventName: string, sourceResourceId: number)
+    public PublishEvent(event: ResourceEvent)
     {
         for (const listener of this.listeners)
-            listener.ReceiveResourceEvent(eventName, sourceResourceId);
+            listener.ReceiveResourceEvent(event);
     }
 
     public RegisterListener(listener: ResourceEventListener)

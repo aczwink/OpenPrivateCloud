@@ -165,7 +165,7 @@ export class SSHCommandExecutor
         {
             if(command[0] === "sudo")
             {
-                return "sudo --stdin " + command.slice(1).map(EscapeArg).join(" ");
+                return "sudo --stdin -k " + command.slice(1).map(EscapeArg).join(" ");
             }
             return command.map(EscapeArg).join(" ");
         }

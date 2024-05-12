@@ -39,6 +39,7 @@ import { TimeUtil } from "acts-util-core";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
+import { ResourceDeletionService } from "../../services/ResourceDeletionService";
 
 interface LetsEncryptCertBotConfig
 {
@@ -59,7 +60,7 @@ export class LetsEncryptManager
         private resourceProviderManager: ResourceProviderManager, private hostFirewallSettingsManager: HostFirewallSettingsManager, private vnetManager: VNetManager, private dockerManager: DockerManager,
         private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager,
         private usersController: UsersController, private resourceDependenciesController: ResourceDependenciesController, private keyVaultManager: KeyVaultManager,
-        private remoteRootFileSystemManager: RemoteRootFileSystemManager)
+        private remoteRootFileSystemManager: RemoteRootFileSystemManager, private resourceDeletionService: ResourceDeletionService)
     {
     }
 
@@ -166,7 +167,7 @@ export class LetsEncryptManager
 
         await this.hostFirewallSettingsManager.DeleteRule(vNetRef.hostId, "Inbound", 1);
 
-        await this.resourceProviderManager.DeleteResource(vNetRef);
+        await this.resourceDeletionService.DeleteResource(vNetRef);
 
         const config = await this.ReadConfig(resourceReference.id);
         config.isRunning = false;

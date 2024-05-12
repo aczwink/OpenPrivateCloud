@@ -26,7 +26,6 @@ import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager"
 import { CA_Config, CertKeyPaths, EasyRSAManager } from "./EasyRSAManager";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ResourceEventsManager } from "../../services/ResourceEventsManager";
-import { securityServicesEvents } from "./events";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { Command } from "../../services/SSHService";
 import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt, SymmetricKeyToBuffer, UnpackSymmetricKey } from "../../common/crypto/symmetric";
@@ -77,6 +76,12 @@ export class KeyVaultManager
         {
             const caDir = this.GetCA_Dir(resourceReference);
             await this.easyRSAManager.UpdateCRL(resourceReference.hostId, caDir);
+        }
+
+        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+        if(!fp)
+        {
+            await this.CorrectFileOwnership(resourceReference);
         }
     }
 
@@ -310,6 +315,16 @@ export class KeyVaultManager
                 state: "corrupt"
             };
         }
+
+        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+        if(!fp)
+        {
+            return {
+                state: "corrupt",
+                context: "incorrect file ownership"
+            };
+        }
+
         return "running";
     }
 
@@ -425,7 +440,10 @@ export class KeyVaultManager
         config.state.certificates.Remove(certIdx);
         await this.UpdateConfig(resourceReference.id, config);
 
-        this.resourceEventsManager.PublishEvent(securityServicesEvents.keyVault.certificateRevoked, resourceReference.id);
+        this.resourceEventsManager.PublishEvent({
+            type: "keyVault/certificateRevoked",
+            keyVaultResourceId: resourceReference.id
+        });
     }
 
     public async UpdatePKI_Config(resourceReference: LightweightResourceReference, caConfig: CA_Config)
@@ -442,6 +460,12 @@ export class KeyVaultManager
     }
 
     //Private methods
+    private async CorrectFileOwnership(resourceReference: LightweightResourceReference)
+    {
+        const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+    }
+
     private GenerateKey(type: KeyVaultKeyType): KeyVaultKey
     {
         function KeyGen()

@@ -42,9 +42,9 @@ const port = 8078;
 
 async function EnableHealthManagement()
 {
-    await GlobalInjector.Resolve(HostAvailabilityManager).CheckAvailabilityOfHostsAndItsInstances();
-    GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckHostsHealth();
+    await GlobalInjector.Resolve(HostAvailabilityManager).CheckResourcesAvailability();
+    GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
 }
 
 function EventManagementSetup()

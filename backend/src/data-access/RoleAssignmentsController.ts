@@ -48,7 +48,7 @@ export class RoleAssignmentsController
         await conn.InsertRow("cluster_roleAssignments", roleAssignment);
     }
 
-    public async AddInstanceRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
+    public async AddResourceLevelRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         await conn.InsertRow("instances_roleAssignments", { instanceId, userGroupId: roleAssignment.userGroupId, roleId: roleAssignment.roleId });

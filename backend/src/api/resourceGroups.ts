@@ -23,12 +23,12 @@ import { permissions } from "openprivatecloud-common";
 import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { AnyResourceProperties } from "../resource-providers/ResourceProperties";
 import { HostsController } from "../data-access/HostsController";
-import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { ResourcesManager } from "../services/ResourcesManager";
 import { ResourceDeploymentService } from "../services/ResourceDeploymentService";
 import { ResourceGroupsManager } from "../services/ResourceGroupsManager";
 import { ResourceQueryService } from "../services/ResourceQueryService";
 import { PermissionsManager } from "../services/PermissionsManager";
+import { ResourceDeletionService } from "../services/ResourceDeletionService";
 
 interface ResourceGroupDTO
 {
@@ -134,9 +134,9 @@ class _api4_
 @APIController("resourceGroups/{resourceGroupName}/resources")
 class _api3_
 {
-    constructor(private resourceGroupsController: ResourceGroupsController, private hostsController: HostsController, private resourceProviderManager: ResourceProviderManager, private sessionsManager: SessionsManager,
+    constructor(private resourceGroupsController: ResourceGroupsController, private hostsController: HostsController, private sessionsManager: SessionsManager,
         private permissionsController: PermissionsController, private resourcesManager: ResourcesManager, private resourceDeploymentService: ResourceDeploymentService,
-        private resourceQueryService: ResourceQueryService)
+        private resourceQueryService: ResourceQueryService, private resourceDeletionService: ResourceDeletionService)
     {
     }
 
@@ -199,7 +199,7 @@ class _api3_
         if(ref === undefined)
             return NotFound("resource not found");
 
-        const result = await this.resourceProviderManager.DeleteResource(ref);
+        const result = await this.resourceDeletionService.DeleteResource(ref);
         if(result !== null)
         {
             switch(result.type)

@@ -44,16 +44,19 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
             {
                 fileSystemType: "btrfs",
                 healthCheckSchedule: null,
+                requiredModules: [],
                 schemaName: "DNS_ServerProperties"
             },
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: ["openvpn"],
                 schemaName: "OpenVPNGatewayProperties"
             },
             {
                 fileSystemType: "btrfs",
                 healthCheckSchedule: null,
+                requiredModules: [],
                 schemaName: "VirtualNetworkProperties"
             }
         ];
@@ -64,6 +67,9 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
     {
         switch(resourceReference.resourceTypeName)
         {
+            case resourceProviders.networkServices.openVPNGatewayResourceType.name:
+                await this.openVPNGatwayManager.DeployHostConfiguration(resourceReference);
+                break;
             case resourceProviders.networkServices.virtualNetworkResourceType.name:
                 await this.vnetManager.DeployHostConfiguration(resourceReference);
                 break;
@@ -92,7 +98,7 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 

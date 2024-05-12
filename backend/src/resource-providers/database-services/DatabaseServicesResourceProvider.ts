@@ -46,6 +46,7 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
                     atHour: 3,
                 },
                 fileSystemType: "ext4",
+                requiredModules: [],
                 schemaName: "MariadbProperties"
             }
         ];
@@ -67,7 +68,7 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 

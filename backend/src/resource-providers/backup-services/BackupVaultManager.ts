@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,8 @@ import { BackupProcessService } from "./BackupProcessService";
 import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultFileStorageConfig, BackupVaultRetentionConfig, BackupVaultSourcesConfig, BackupVaultTargetConfig, BackupVaultTrigger, KeyVaultBackupConfig, ObjectStorageBackupConfig } from "./models";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
+import { NumberDictionary } from "acts-util-core";
+import { ResourceStateResult } from "../ResourceProvider";
 
 interface BackupVaultConfig
 {
@@ -41,6 +43,7 @@ export class BackupVaultManager
 {
     constructor(private resourceConfigController: ResourceConfigController, private backupProcessService: BackupProcessService, private taskSchedulingManager: TaskSchedulingManager, private resourceDependenciesController: ResourceDependenciesController)
     {
+        this.failedBackups = {};
     }
 
     //Public methods
@@ -80,6 +83,18 @@ export class BackupVaultManager
             const lastScheduleTime = config.state.lastScheduleTime ?? new Date(0);
             this.taskSchedulingManager.ScheduleForInstance(resourceId, lastScheduleTime, config.trigger.schedule, this.OnAutomaticBackupTrigger.bind(this, resourceId));
         }
+    }
+
+    public QueryResourceState(resourceReference: LightweightResourceReference): ResourceStateResult
+    {
+        if(this.failedBackups[resourceReference.id])
+        {
+            return {
+                state: "corrupt",
+                context: "last backup failed"
+            };
+        }
+        return "running";
     }
 
     public async ReadConfig(resourceId: number): Promise<BackupVaultConfig>
@@ -163,8 +178,18 @@ export class BackupVaultManager
     public async StartBackupProcess(instanceId: number)
     {
         const config = await this.ReadConfig(instanceId);
-        await this.backupProcessService.RunBackup(instanceId, config.sources, config.target, config.retention);
+        try
+        {
+            await this.backupProcessService.RunBackup(instanceId, config.sources, config.target, config.retention);
+        }
+        catch(e)
+        {
+            this.failedBackups[instanceId] = true;
+            throw e;
+        }
         await this.backupProcessService.DeleteBackupsThatAreOlderThanRetentionPeriod(instanceId, config.sources, config.target, config.retention);
+
+        this.failedBackups[instanceId] = false;
     }
 
     public async UpdateControllerDBSource(resourceReference: LightweightResourceReference, source: BackupVaultControllerDatabaseConfig)
@@ -198,6 +223,9 @@ export class BackupVaultManager
 
         this.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
     }
+
+    //State
+    private failedBackups: NumberDictionary<boolean>;
 
     //Private methods
     private async WriteConfig(resourceId: number, config: BackupVaultConfig)

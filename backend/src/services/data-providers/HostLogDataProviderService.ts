@@ -65,15 +65,21 @@ export class HostSysLogBootDataProvider implements DataSourceProvider
             return str;
         }
 
-        function FormatDate(timestamp: number)
+        function FormatDate(utcTimeStamp: number, localTimeOffsetInMins: number)
         {
             //"--since" and "--until" always want local time
-            const dt = new Date(timestamp);
-            const str = dt.getFullYear() + "-" + PadNumber(dt.getMonth()+1, 2) + "-" + PadNumber(dt.getDate(), 2) + " " + PadNumber(dt.getHours(), 2) + ":" + PadNumber(dt.getMinutes(), 2);
+            const dt = new Date(utcTimeStamp + localTimeOffsetInMins * 60 * 1000);
+            const str = dt.getUTCFullYear() + "-" + PadNumber(dt.getUTCMonth()+1, 2) + "-" + PadNumber(dt.getUTCDate(), 2) + " " + PadNumber(dt.getUTCHours(), 2) + ":" + PadNumber(dt.getUTCMinutes(), 2);
             return str;
         }
 
         const remoteCommandExecutor = GlobalInjector.Resolve(RemoteCommandExecutor);
+
+        const timeZoneOffsetCmd = await remoteCommandExecutor.ExecuteBufferedCommand(["date", "+%z"], this.hostId);
+        const deltaHours = parseInt(timeZoneOffsetCmd.stdOut.substring(1, 3));
+        const deltaMins = parseInt(timeZoneOffsetCmd.stdOut.substring(3, 5));
+        const deltaMinsTotal = deltaHours * 60 + deltaMins;
+        const offsetInMins = (timeZoneOffsetCmd.stdOut[0] === "+") ? deltaMinsTotal : -deltaMinsTotal;
 
         const fields = ["__REALTIME_TIMESTAMP", "MESSAGE", "PRIORITY"];
         const result = await remoteCommandExecutor.ExecuteBufferedCommand([
@@ -84,8 +90,8 @@ export class HostSysLogBootDataProvider implements DataSourceProvider
             "-o", "json",
             "--output-fields=" + fields.join(","),
             "-n", queryOptions.maxRecordCount.toString(),
-            "--since", FormatDate(queryOptions.startTime),
-            "--until", FormatDate(queryOptions.endTime),
+            "--since", FormatDate(queryOptions.startTime, offsetInMins),
+            "--until", FormatDate(queryOptions.endTime, offsetInMins),
         ], this.hostId);
         const data = result.stdOut.trimEnd();
         if(data.length === 0)

@@ -273,6 +273,25 @@ CREATE TABLE `resources_dependencies` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `resources_userCredentialDependencies`
+--
+
+DROP TABLE IF EXISTS `resources_userCredentialDependencies`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `resources_userCredentialDependencies` (
+  `resourceId` int(10) unsigned NOT NULL,
+  `userId` int(10) unsigned NOT NULL,
+  `wantLoginPassword` tinyint(1) NOT NULL,
+  `state` tinyint(3) unsigned NOT NULL,
+  PRIMARY KEY (`resourceId`,`userId`),
+  KEY `resources_userCredentialDependencies_userId` (`userId`),
+  CONSTRAINT `resources_userCredentialDependencies_resourceId` FOREIGN KEY (`resourceId`) REFERENCES `instances` (`id`),
+  CONSTRAINT `resources_userCredentialDependencies_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `roles`
 --
 
@@ -390,4 +409,4 @@ CREATE TABLE `users_wallet` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-04-21 23:10:35
+-- Dump completed on 2024-05-12 21:51:11

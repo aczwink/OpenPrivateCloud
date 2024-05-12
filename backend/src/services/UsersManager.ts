@@ -18,16 +18,16 @@
 import crypto from "crypto";
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../data-access/UsersController";
-import { HostUsersManager } from "./HostUsersManager";
 import { UserWalletManager } from "./UserWalletManager";
 import { CreateRSA4096KeyPair } from "../common/crypto/asymmetric";
 import { HashPassword } from "../common/crypto/passwords";
+import { ClusterEventsManager } from "./ClusterEventsManager";
 
  
 @Injectable
 export class UsersManager
 {
-    constructor(private usersController: UsersController, private hostUsersManager: HostUsersManager, private userWalletManager: UserWalletManager)
+    constructor(private usersController: UsersController, private userWalletManager: UserWalletManager, private clusterEventsManager: ClusterEventsManager)
     {
     }
     
@@ -49,7 +49,11 @@ export class UsersManager
         const newPw = this.CreateSambaPassword();
 
         await this.userWalletManager.SetStringSecret(userId, "sambaPW", newPw);
-        await this.hostUsersManager.UpdateSambaPasswordOnAllHosts(userId, newPw);
+
+        this.clusterEventsManager.PublishEvent({
+            type: "userSambaPasswordChanged",
+            userId,
+        });
     }
 
     public async SetUserPassword(userId: number, newPassword: string)
@@ -78,6 +82,12 @@ export class UsersManager
             //TODO: is this actually needed? we are not changing the private key in this case, only the password it is encrypted with... test this
             await this.userWalletManager.PrivateKeyChanged(userId, newPassword);
         }
+
+        this.clusterEventsManager.PublishEvent({
+            type: "userPasswordChanged",
+            userId,
+            newPassword
+        });
     }
 
     //Private methods

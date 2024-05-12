@@ -18,24 +18,15 @@
 
 import { Instantiatable } from "acts-util-core";
 import { GlobalInjector, Injectable } from "acts-util-node";
-import { ResourceConfigController } from "../data-access/ResourceConfigController";
-import { ResourcesController } from "../data-access/ResourcesController";
 import { BaseResourceProperties, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../resource-providers/ResourceProvider";
 import { APISchemaService } from "./APISchemaService";
-import { PermissionsManager } from "./PermissionsManager";
-import { ResourceLogsController } from "../data-access/ResourceLogsController";
-import { HealthController } from "../data-access/HealthController";
-import { RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { ResourceReference } from "../common/ResourceReference";
 import { ErrorService } from "./ErrorService";
-import { ResourceDependenciesController } from "../data-access/ResourceDependenciesController";
 
 @Injectable
 export class ResourceProviderManager
 {
-    constructor(private apiSchemaService: APISchemaService, private resourcesController: ResourcesController, private permissionsManager: PermissionsManager, private errorService: ErrorService,
-        private instanceConfigController: ResourceConfigController, private instanceLogsController: ResourceLogsController, private healthController: HealthController, private roleAssignmentsController: RoleAssignmentsController,
-        private resourceDependenciesController: ResourceDependenciesController)
+    constructor(private apiSchemaService: APISchemaService, private errorService: ErrorService)
     {
         this._resourceProviders = [];
     }
@@ -47,33 +38,6 @@ export class ResourceProviderManager
     }
 
     //Public methods
-    public async DeleteResource(resourceReference: ResourceReference)
-    {
-        const resourceProvider = this.FindResourceProviderByName(resourceReference.resourceProviderName);
-        const resourceId = resourceReference.id;
-
-        await this.resourceDependenciesController.DeleteDependenciesOf(resourceId);
-
-        //first everything that the user is also able to do himself
-        const roleAssignments = await this.roleAssignmentsController.QueryResourceLevelRoleAssignments(resourceReference.id);
-        for (const roleAssignment of roleAssignments)
-            await this.permissionsManager.DeleteInstanceRoleAssignment(resourceId, roleAssignment);
-
-        //delete the resource
-        const result = await resourceProvider.DeleteResource(resourceReference);
-        if(result !== null)
-            return result;
-
-        //the resource is now degraded and should not be queried anymore. simply clean up
-        await this.instanceConfigController.DeleteConfig(resourceId);
-        await this.healthController.DeleteInstanceHealthData(resourceId);
-        await this.instanceLogsController.DeleteLogsAssociatedWithInstance(resourceId);
-
-        await this.resourcesController.DeleteResource(resourceReference.id);
-        
-        return null;
-    }
-
     public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string)
     {
         const resourceProvider = this.FindResourceProviderByName(resourceReference.resourceProviderName);
@@ -92,10 +56,17 @@ export class ResourceProviderManager
         return { resourceProvider, resourceTypeDef };
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference)
+    public async FindResourceTypeDefinition(resourceReference: ResourceReference)
     {
         const resourceProvider = this.FindResourceProviderByName(resourceReference.resourceProviderName);
-        await resourceProvider.InstancePermissionsChanged(resourceReference);
+        const resourceType = resourceProvider.resourceTypeDefinitions.find(x => this.ExtractTypeNameFromResourceTypeDefinition(x) === resourceReference.resourceTypeName);
+        return resourceType;
+    }
+
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference)
+    {
+        const resourceProvider = this.FindResourceProviderByName(resourceReference.resourceProviderName);
+        await resourceProvider.ResourcePermissionsChanged(resourceReference);
     }
 
     public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
@@ -125,13 +96,10 @@ export class ResourceProviderManager
         return await rp.RequestDataProvider(resourceReference);
     }
 
-    public async RetrieveInstanceCheckSchedule(instanceId: number)
+    public async RetrieveInstanceCheckSchedule(resourceReference: ResourceReference)
     {
-        const resource = await this.resourcesController.QueryResource(instanceId);
-
-        const resourceProvider = this.FindResourceProviderByName(resource!.resourceProviderName);
-        const resourceType = resourceProvider.resourceTypeDefinitions.find(x => this.ExtractTypeNameFromResourceTypeDefinition(x) === resource!.instanceType);
-        return resourceType!.healthCheckSchedule;
+        const resourceTypeDef = await this.FindResourceTypeDefinition(resourceReference);
+        return resourceTypeDef!.healthCheckSchedule;
     }
 
     //Private variables

@@ -28,12 +28,13 @@ import { ErrorService } from "./ErrorService";
 import { ResourcesManager } from "./ResourcesManager";
 import { ResourceReference } from "../common/ResourceReference";
 import { ResourceState, ResourceStateResult } from "../resource-providers/ResourceProvider";
+import { ModulesManager } from "./ModulesManager";
   
 @Injectable
 export class ResourceHealthManager
 {
     constructor(private resourcesController: ResourcesController, private resourceProviderManager: ResourceProviderManager, private resourceGroupController: ResourceGroupsController,
-        private healthController: HealthController, private taskScheduler: TaskScheduler, private notificationsManager: NotificationsManager,
+        private healthController: HealthController, private taskScheduler: TaskScheduler, private notificationsManager: NotificationsManager, private modulesManager: ModulesManager,
         private userGroupsController: UserGroupsController, private errorService: ErrorService, private resourcesManager: ResourcesManager)
     {
     }
@@ -42,15 +43,12 @@ export class ResourceHealthManager
     public async CheckResourceAvailability(resourceId: number)
     {
         const ref = await this.resourcesManager.CreateResourceReference(resourceId);
-        const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref!);
 
         let status;        
         try
         {
-            const result = await resourceProvider.QueryResourceState(ref!);
-            const extracted = this.ExtractResourceStateResult(result);
-            await this.UpdateResourceAvailability(resourceId, extracted.status, extracted.msg);
-            status = extracted.status;
+            const result = await this.UpdateResourceState(ref!);
+            status = result.extracted.status;
         }
         catch(e)
         {
@@ -62,9 +60,28 @@ export class ResourceHealthManager
             this.CheckResource(resourceId);
     }
 
+    public async RequestResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    {
+        const result = await this.UpdateResourceState(resourceReference);
+        switch(result.extracted.status)
+        {
+            case HealthStatus.Corrupt:
+                return "corrupt";
+            case HealthStatus.Down:
+                return "down";
+            case HealthStatus.InDeployment:
+                return "in deployment";
+            case HealthStatus.Up:
+            {
+                return (typeof result.state === "string") ? result.state : result.state.state;
+            }
+        }
+    }
+
     public async ScheduleResourceCheck(resourceId: number)
     {
-        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(resourceId);
+        const ref = await this.resourcesManager.CreateResourceReference(resourceId);
+        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref!);
         if(schedule === null)
             return;
 
@@ -93,6 +110,18 @@ export class ResourceHealthManager
         await this.healthController.UpdateResourceAvailability(resourceId, status, log);
     }
 
+    private async UpdateResourceState(resourceReference: ResourceReference)
+    {
+        const result = await this.resourceProviderManager.QueryResourceState(resourceReference!);
+        const extracted = this.ExtractResourceStateResult(result);
+        await this.UpdateResourceAvailability(resourceReference.id, extracted.status, extracted.msg);
+
+        return {
+            state: result,
+            extracted
+        };
+    }
+
     //Private methods
     private async CheckResource(resourceId: number)
     {
@@ -106,8 +135,11 @@ export class ResourceHealthManager
         if(hd?.status === HealthStatus.InDeployment)
             return true; //resource is still being deployed. Try later
 
-        const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref);
+        const resourceTypeDef = await this.resourceProviderManager.FindResourceTypeDefinition(ref);
+        for (const moduleName of resourceTypeDef!.requiredModules)
+            await this.modulesManager.EnsureModuleIsInstalled(ref.hostId, moduleName);
 
+        const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref);
         try
         {
             await resourceProvider.CheckResourceHealth(ref);

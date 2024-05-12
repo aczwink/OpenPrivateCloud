@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import path from "path";
-import { Injectable } from "acts-util-node";
+import { GlobalInjector, Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
@@ -24,8 +24,9 @@ import { ResourceConfigController } from "../../data-access/ResourceConfigContro
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
 import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
-import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext } from "../ResourceProvider";
+import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { ResourceEvent, ResourceEventListener, ResourceEventsManager } from "../../services/ResourceEventsManager";
+import { HostUsersManager } from "../../services/HostUsersManager";
 
 interface SMBConfig
 {
@@ -43,16 +44,36 @@ export interface FileStorageConfig
 };
 
 @Injectable
-export class FileStoragesManager
+export class FileStoragesManager implements ResourceEventListener
 {
-    constructor(private resourcesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
-        private remoteFileSystemManager: RemoteFileSystemManager, private modulesManager: ModulesManager,
+    constructor(private resourcesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager, private hostUsersManager: HostUsersManager,
+        private remoteFileSystemManager: RemoteFileSystemManager, resourceEventsManager: ResourceEventsManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: ResourceConfigController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
     {
+        resourceEventsManager.RegisterListener(this);
     }
     
     //Public methods
+    public async CheckResourceHealth(resourceReference: ResourceReference)
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        if(config.smb.enabled)
+        {
+            const online = await this.singleSMBSharePerInstanceProvider.IsShareOnline(resourceReference);
+            if(!online)
+            {
+                await this.UpdateSMBConfig(resourceReference, config);
+            }
+        }
+
+        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+        if(!fp)
+        {
+            await this.CorrectFileOwnership(resourceReference);
+        }
+    }
+
     public async CreateSnapshot(resourceReference: LightweightResourceReference)
     {
         await this.DeleteSnapshotsThatAreOlderThanRetentionPeriod(resourceReference);
@@ -133,7 +154,6 @@ export class FileStoragesManager
 
     public async ProvideResource(context: DeploymentContext)
     {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "samba");
         const resourcePath = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, resourcePath, 0o775);
 
@@ -145,6 +165,32 @@ export class FileStoragesManager
 
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, snapshotsPath);
         await this.remoteFileSystemManager.ChangeMode(context.hostId, snapshotsPath, 0o750);
+    }
+
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    {
+        const config = await this.ReadConfig(resourceReference.id);
+        if(config.smb.enabled)
+        {
+            const online = await this.singleSMBSharePerInstanceProvider.IsShareOnline(resourceReference);
+            if(!online)
+            {
+                return {
+                    state: "corrupt",
+                    context: "SMB share is not there"
+                };
+            }
+        }
+
+        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+        if(!fp)
+        {
+            return {
+                state: "corrupt",
+                context: "incorrect file ownership"
+            };
+        }
+        return "running";
     }
 
     public async QuerySnapshotsOrdered(resourceReference: LightweightResourceReference)
@@ -173,13 +219,24 @@ export class FileStoragesManager
         return config;
     }
 
+    public async ReceiveResourceEvent(event: ResourceEvent): Promise<void>
+    {
+        if(event.type === "userCredentialsProvided")
+        {
+            const ref = await this.resourcesManager.CreateResourceReference(event.resourceId);
+            await this.hostUsersManager.UpdateSambaPasswordOnHostIfExisting(ref!.hostId, event.userId, event.secret);
+        }
+    }
+
     public async RefreshPermissions(resourceReference: ResourceReference)
     {
         const dataPath = this.GetDataPath(resourceReference);
-        await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, dataPath, false);
 
         const cfg = await this.ReadConfig(resourceReference.id);
         await this.UpdateConfig(resourceReference, cfg);
+
+        //do this after so that groups and users are definitely synced
+        await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, dataPath, false);
     }
     
     public async UpdateConfig(resourceReference: ResourceReference, config: FileStorageConfig)
@@ -194,6 +251,17 @@ export class FileStoragesManager
     }
 
     //Private methods
+    private async CorrectFileOwnership(resourceReference: ResourceReference)
+    {
+        const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const dataPath = this.GetDataPath(resourceReference);
+        const snapshotsPath = this.GetSnapshotsPath(resourceReference);
+
+        const allPaths = [rootPath, dataPath, snapshotsPath];
+        for (const path of allPaths)
+            await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path, recursive: false }]);
+    }
+
     private async DeleteSnapshot(resourceReference: LightweightResourceReference, snapshotName: string)
     {
         const snapshotsPath = this.GetSnapshotsPath(resourceReference);

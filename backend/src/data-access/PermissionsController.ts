@@ -156,24 +156,6 @@ export class PermissionsController
         return rows.Values().Map(x => x.userGroupId as number);
     }
 
-    public async QueryHostsAssociatedWithGroup(userGroupId: number)
-    {
-        let query = `
-        SELECT DISTINCT hs.hostId
-        FROM hosts_storages hs
-        INNER JOIN instances i
-            ON i.storageId = hs.id
-        INNER JOIN instances_roleAssignments ira
-            ON ira.instanceId = i.id
-        WHERE ira.userGroupId = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, userGroupId);
-
-        return rows.Values().Map(x => x.hostId as number);
-    }
-
     public async QueryResourceIdsAssociatedWithGroup(userGroupId: number)
     {
         let query = `

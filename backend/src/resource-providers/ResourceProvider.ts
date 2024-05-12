@@ -18,6 +18,7 @@
 
 import { ResourceReference } from "../common/ResourceReference";
 import { TimeSchedule } from "../common/TimeSchedule";
+import { ModuleName } from "../distro/DistroPackageManager";
 import { DataSourcesProvider } from "../services/ClusterDataProvider";
 
 export interface BaseResourceProperties
@@ -36,6 +37,7 @@ export interface ResourceTypeDefinition
 {
     healthCheckSchedule: TimeSchedule | null;
     fileSystemType: "btrfs" | "ext4";
+    requiredModules: ModuleName[];
     schemaName: string;
 }
 
@@ -70,7 +72,7 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
     CheckResourceHealth(resourceReference: ResourceReference): Promise<void>;
     DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>;
     ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>;
-    InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
+    ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
     QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>;
     RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>;

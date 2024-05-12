@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,13 +18,10 @@
 
 import { Injectable } from "acts-util-node";
 import { opcGroupPrefixes, opcSpecialGroups, opcUserPrefixes } from "../common/UserAndGroupDefinitions";
-import { HostsController } from "../data-access/HostsController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { UsersController } from "../data-access/UsersController";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { LinuxUsersManager } from "./LinuxUsersManager";
-import { UserCredentialsProvider } from "./UserCredentialsProvider";
-import { UserWalletManager } from "./UserWalletManager";
 
 interface SambaUser
 {
@@ -35,8 +32,7 @@ interface SambaUser
 @Injectable
 export class HostUsersManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private linuxUsersManager: LinuxUsersManager, private userWalletManager: UserWalletManager,
-        private hostsController: HostsController, private permissionsController: PermissionsController, private userCredentialsProvider: UserCredentialsProvider)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private linuxUsersManager: LinuxUsersManager, private permissionsController: PermissionsController)
     {
     }
 
@@ -128,9 +124,15 @@ export class HostUsersManager
 
         const members = await this.usersController.QueryMembersOfGroup(userGroupId);
         for (const member of members)
-            await this.SyncUserToHost(hostId, member.id, opcSpecialGroups.userPrimaryGroup);
+            await this.SyncUserToHost(hostId, member.id);
 
         await this.SyncGroupMembersToHost(hostId, linuxGroupName, members.Values().Map(x => x.id).Map(this.MapUserToLinuxUserName.bind(this)).ToSet());
+    }
+
+    public async SyncGroupsToHost(hostId: number, userGroupIds: number[])
+    {
+        for (const userGroupId of userGroupIds)
+            await this.SyncGroupToHost(hostId, userGroupId);
     }
 
     public async SyncSambaGroupMembers(hostId: number, userGroupId: number)
@@ -152,22 +154,16 @@ export class HostUsersManager
     {
         const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
         if(!exists)
-        {
             await this.AddDisabledSambaUser(hostId, this.MapUserToLinuxUserName(userId));
-            this.userCredentialsProvider.RegisterForUserCredentialProvisionForHost(userId, hostId, this.OnUserCredentialsProvided.bind(this));
-        }
     }
     
-    public async UpdateSambaPasswordOnAllHosts(userId: number, newPw: string)
+    public async UpdateSambaPasswordOnHostIfExisting(hostId: number, userId: number, newPw: string)
     {
-        const hostIds = await this.hostsController.RequestHostIds();
-        for (const hostId of hostIds)
+        const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
+        if(exists)
         {
-            const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
-            if(exists)
-            {
-                await this.UpdateSambaPassword(hostId, this.MapUserToLinuxUserName(userId), newPw);
-            }
+            await this.UpdateSambaPassword(hostId, this.MapUserToLinuxUserName(userId), newPw);
+            await this.EnableSambaUser(hostId, userId);
         }
     }
 
@@ -179,12 +175,14 @@ export class HostUsersManager
 
     private async CreateHostGroup(hostId: number, linuxGroupName: string)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "groupadd", linuxGroupName], hostId);
+        const gid = this.MapOPCIdToLinuxId(this.MapLinuxGroupNameToGroupId(linuxGroupName));
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "groupadd", "-g", gid.toString(), linuxGroupName], hostId);
     }
 
     private async CreateHostUser(hostId: number, linuxUserName: string, primaryLinuxGroupName: string)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "useradd", "-M", "-g", primaryLinuxGroupName, linuxUserName], hostId);
+        const uid = this.MapOPCIdToLinuxId(this.MapLinuxUserNameToUserId(linuxUserName));
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "useradd", "-M", "-u", uid.toString(), "-g", primaryLinuxGroupName, linuxUserName], hostId);
     }
 
     private async DeleteHostGroup(hostId: number, linuxGroupName: string)
@@ -223,6 +221,23 @@ export class HostUsersManager
     {
         const linuxUserName = this.MapUserToLinuxUserName(userId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-se", linuxUserName], hostId);
+    }
+
+    private MapLinuxGroupNameToGroupId(linuxUserName: string)
+    {
+        const idPart = linuxUserName.substring(opcGroupPrefixes.group.length);
+        return parseInt(idPart);
+    }
+
+    private MapOPCIdToLinuxId(userOrGroupId: number)
+    {
+        //We reserve a cross-host unique id for a user or group so that file permissions are still intact even if switchting to another host (for example because the original host is not usable anymore)
+
+        //We reserve the following range of uid/gid-s for OPC users/groups: 40000-49999 (see https://en.wikipedia.org/wiki/User_identifier)
+        if(userOrGroupId > 9999)
+            throw new Error("User or group id is out of supported range :S");
+
+        return 40000 + userOrGroupId;
     }
 
     private async QuerySambaUsers(hostId: number)
@@ -266,13 +281,17 @@ export class HostUsersManager
     /**
      * @returns The host user id
      */
-     private async SyncUserToHost(hostId: number, userId: number, linuxGroupName: string)
+     private async SyncUserToHost(hostId: number, userId: number)
      {
          const linuxUserName = this.MapUserToLinuxUserName(userId);
          const uid = await this.TryResolveHostUserId(hostId, linuxUserName);
          if(uid === undefined)
          {
-             await this.CreateHostUser(hostId, linuxUserName, linuxGroupName);
+            const gid = await this.TryResolveHostUserGroupId(hostId, opcSpecialGroups.userPrimaryGroup);
+            if(gid === undefined)
+                await this.remoteCommandExecutor.ExecuteCommand(["sudo", "groupadd", "-g", "50001", opcSpecialGroups.userPrimaryGroup], hostId);
+
+             await this.CreateHostUser(hostId, linuxUserName, opcSpecialGroups.userPrimaryGroup);
              return await this.ResolveHostUserId(hostId, linuxUserName);
          }
          return uid;
@@ -308,14 +327,5 @@ export class HostUsersManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-a", userName], hostId, {
             stdin
         });
-    }
-
-    //Event handlers
-    private async OnUserCredentialsProvided(userId: number, _: string, hostId: number)
-    {
-        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
-        await this.UpdateSambaPassword(hostId, this.MapUserToLinuxUserName(userId), sambaPW!);
-
-        await this.EnableSambaUser(hostId, userId);
     }
 }

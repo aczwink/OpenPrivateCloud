@@ -39,8 +39,18 @@ export class RemoteFileSystemManager
     public async ChangeOwnerAndGroup(hostId: number, path: string, uid: number, gid: number)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
-        await conn.value.ChangeOwnerAndGroup(path, uid, gid);
-        conn.Release();
+        try
+        {
+            await conn.value.ChangeOwnerAndGroup(path, uid, gid);
+        }
+        catch(e)
+        {
+            throw new Error("Changing owner and group of path " + path + " on host " + hostId + " failed. " + e);
+        }
+        finally
+        {
+            conn.Release();
+        }
     }
 
     public async CreateDirectory(hostId: number, dirPath: string, attributes?: ssh2.InputAttributes)

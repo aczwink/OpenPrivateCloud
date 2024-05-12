@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -81,7 +81,7 @@ class HealthAPIController
             return NotFound("resource not found");
 
         const hd = await this.healthController.QueryResourceHealthData(ref.id);
-        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref.id);
+        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref);
         const stateResult = await this.resourceProviderManager.QueryResourceState(ref);
 
         const res: ResourceHealthDTO = {

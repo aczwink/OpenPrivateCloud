@@ -30,6 +30,16 @@ import { FirewallDebugSettings, HostFirewallTracingManager } from "../services/H
 import { HostTakeOverService } from "../services/HostTakeOverService";
 import { HealthController } from "../data-access/HealthController";
 
+interface AddHostDTO
+{
+    hostName: string;
+    /**
+     * The Linux user password of the "opc-hu" user on the host. The controller will change that password during the takeover process.
+     * @default opchostuser
+     */
+    password: string;
+}
+
 interface HostBootEntryDTO
 {
     bootNumber: number;
@@ -57,6 +67,16 @@ interface UnattendedUpgradeConfigDto
     updatePackageLists: boolean;
 }
 
+interface UpdateHostPasswordDTO
+{
+    /**
+     * The Linux user password of the "opc-hu" user on the host.
+     * Use this in case the controller can not reach the host anymore, for example because you had to set it up again from scratch and the stored password does not work anymore.
+     * The controller will change that password during the takeover process.
+     */
+    password: string;
+}
+
 interface UpdateInfoDto
 {
     distributionName: string;
@@ -73,10 +93,10 @@ class HostsAPIController
 
     @Post()
     public async AddHost(
-        @BodyProp hostName: string
+        @Body dto: AddHostDTO
     )
     {
-        await this.hostTakeOverService.TakeOverHost(hostName);
+        await this.hostTakeOverService.TakeOverHost(dto.hostName, dto.password);
     }
 
     @Get()
@@ -91,7 +111,7 @@ class HostAPIController
 {
     constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor, private hostPerformanceMeasurementService: HostPerformanceMeasurementService,
         private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private hostFirewallZonesManager: HostFirewallZonesManager, private healthController: HealthController,
-        private processTrackerManager: ProcessTrackerManager)
+        private processTrackerManager: ProcessTrackerManager, private hostTakeOverService: HostTakeOverService)
     {
     }
 
@@ -152,6 +172,19 @@ class HostAPIController
             };
             return res;
         }));
+    }
+
+    @Put("password")
+    public async UpdatePassword(
+        @Path hostName: string,
+        @Body dto: UpdateHostPasswordDTO
+    )
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+
+        await this.hostTakeOverService.Reconnect(hostId, hostName, dto.password);
     }
 
     @Get("performance")

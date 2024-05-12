@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,13 @@ import { LightweightResourceReference, ResourceReference } from "../common/Resou
 import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
 import { HostsController } from "../data-access/HostsController";
 import { ResourceProviderManager } from "./ResourceProviderManager";
+import { opcSpecialUsers, opcSpecialGroups } from "../common/UserAndGroupDefinitions";
+
+interface ChownCorrection
+{
+    path: string;
+    recursive: boolean;
+}
  
 @Injectable
 export class ResourcesManager
@@ -54,6 +61,14 @@ export class ResourcesManager
 
         const newRef = await this.CreateResourceReference(resourceReference.id);
         await this.resourceProviderManager.ExternalResourceIdChanged(newRef!, resourceReference.externalId);
+    }
+
+    public async CorrectResourceStoragePathOwnership(resourceReference: LightweightResourceReference, correction: ChownCorrection[])
+    {
+        for (const entry of correction)
+        {
+            await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(resourceReference.hostId, entry.path, opcSpecialUsers.host.uid, opcSpecialGroups.host.gid, entry.recursive);
+        }
     }
 
     public async CreateResourceReference(resourceId: number)
@@ -114,6 +129,13 @@ export class ResourcesManager
         await this.remoteFileSystemManager.ChangeMode(resourceReference.hostId, storagePath, 0o770);
 
         return storagePath;
+    }
+
+    public async IsResourceStoragePathOwnershipCorrect(resourceReference: LightweightResourceReference)
+    {
+        const rootPath = this.BuildResourceStoragePath(resourceReference);
+        const stat = await this.remoteFileSystemManager.QueryStatus(resourceReference.hostId, rootPath)
+        return (stat.uid === opcSpecialUsers.host.uid) && (stat.gid === opcSpecialGroups.host.gid);
     }
 
     public async RemoveResourceStorageDirectory(resourceReference: LightweightResourceReference)

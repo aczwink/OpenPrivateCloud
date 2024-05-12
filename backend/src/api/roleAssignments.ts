@@ -103,8 +103,8 @@ class _api2_
         if(!canWriteData)
             return Forbidden("write access to role assignments denied");
 
-        await this.permissionsManager.AddInstanceRoleAssignment(context.resourceReference.id, roleAssignment);
-        await this.resourceProviderManager.InstancePermissionsChanged(context.resourceReference);
+        await this.permissionsManager.AddResourceLevelRoleAssignment(context.resourceReference.id, roleAssignment);
+        await this.resourceProviderManager.ResourcePermissionsChanged(context.resourceReference);
     }
 
     @Delete()
@@ -118,7 +118,7 @@ class _api2_
             return Forbidden("delete access to role assignments denied");
 
         await this.permissionsManager.DeleteInstanceRoleAssignment(context.resourceReference.id, roleAssignment);
-        await this.resourceProviderManager.InstancePermissionsChanged(context.resourceReference);
+        await this.resourceProviderManager.ResourcePermissionsChanged(context.resourceReference);
     }
 
     @Get()

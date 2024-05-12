@@ -46,6 +46,7 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: [],
                 schemaName: "AVTranscoderProperties"
             }
         ];
@@ -66,7 +67,7 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 

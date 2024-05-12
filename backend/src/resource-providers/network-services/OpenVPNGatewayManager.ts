@@ -32,14 +32,12 @@ import { Dictionary } from "acts-util-core";
 import { CIDRRange } from "../../common/CIDRRange";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
-import { ModulesManager } from "../../services/ModulesManager";
 import { SysCtlConfService } from "./SysCtlConfService";
 import { OpenVPNGatewayProperties } from "./properties";
 import { FirewallZoneData, FirewallZoneDataProvider } from "../../services/HostFirewallZonesManager";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { CA_FilePaths, CertKeyPaths } from "../security-services/EasyRSAManager";
-import { ResourceEventListener } from "../../services/ResourceEventsManager";
-import { securityServicesEvents } from "../security-services/events";
+import { ResourceEvent, ResourceEventListener } from "../../services/ResourceEventsManager";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { resourceProviders } from "openprivatecloud-common";
 import { HostSysLogBootDataProvider } from "../../services/data-providers/HostLogDataProviderService";
@@ -83,7 +81,7 @@ const openVPNConfigDialect: ConfigDialect = {
 @Injectable
 export class OpenVPNGatewayManager implements FirewallZoneDataProvider, ResourceEventListener
 {
-    constructor(private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController, private modulesManager: ModulesManager, private sysCtlConfService: SysCtlConfService,
+    constructor(private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController, private sysCtlConfService: SysCtlConfService,
         private remoteCommandExecutor: RemoteCommandExecutor, private remoteFileSystemManager: RemoteFileSystemManager, private keyVaultManager: KeyVaultManager,
         private systemServicesManager: SystemServicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager, private resourceDependenciesController: ResourceDependenciesController)
     {
@@ -107,6 +105,21 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
         await this.systemServicesManager.Reload(resourceReference.hostId);
         
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
+    }
+
+    public async DeployHostConfiguration(resourceReference: LightweightResourceReference)
+    {
+        await this.sysCtlConfService.SetIPForwardingState(resourceReference.hostId, true);
+
+        const config = await this.ReadConfig(resourceReference.id);
+        const keyRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.keyVaultExternalId);
+
+        const caPaths = this.keyVaultManager.GetCAPaths(keyRef!);
+        const serverCertPaths = await this.keyVaultManager.QueryCertificatePaths(keyRef!, config.publicEndpoint.domainName);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+
+        await this.CreateServerConfig(resourceReference.hostId, resourceDir, resourceReference.id, this.CreateDefaultConfig(), caPaths, serverCertPaths);
+        await this.AutoStartServer(resourceReference.hostId, resourceReference.id);
     }
 
     public async GenerateClientConfig(resourceReference: LightweightResourceReference, clientName: string)
@@ -200,8 +213,6 @@ ${taData}
 
     public async ProvideResource(instanceProperties: OpenVPNGatewayProperties, context: DeploymentContext)
     {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "openvpn");
-        await this.sysCtlConfService.SetIPForwardingState(context.hostId, true);
         const resourceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
 
         await this.UpdateConfig(context.resourceReference.id, {
@@ -212,10 +223,9 @@ ${taData}
         const keyRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.keyVaultExternalId);
         await this.resourceDependenciesController.EnsureResourceDependencyExists(keyRef!.id, context.resourceReference.id);
 
-        const caPaths = this.keyVaultManager.GetCAPaths(keyRef!);
-        const serverCertPaths = await this.keyVaultManager.QueryCertificatePaths(keyRef!, instanceProperties.publicEndpoint.domainName);
-        await this.CreateServerConfig(context.hostId, resourceDir, context.resourceReference.id, this.CreateDefaultConfig(), caPaths, serverCertPaths);
-        await this.AutoStartServer(context.hostId, context.resourceReference.id);
+        await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", resourceDir + "/ta.key"], context.hostId);
+
+        await this.DeployHostConfiguration(context.resourceReference);
     }
 
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
@@ -223,7 +233,12 @@ ${taData}
         const serviceName = this.DeriveSystemDServiceName(resourceReference.id);
         const isActive = await this.systemServicesManager.IsServiceActive(resourceReference.hostId, serviceName);
         if(!isActive)
+        {
+            const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, serviceName);
+            if(!exists)
+                return { state: "corrupt", context: "service does not exist" };
             return { state: "down", context: "service is not active" };
+        }
         return "running";
     }
 
@@ -292,20 +307,16 @@ ${taData}
         };
     }
 
-    public async ReceiveResourceEvent(eventName: string, sourceResourceId: number): Promise<void>
+    public async ReceiveResourceEvent(event: ResourceEvent): Promise<void>
     {
-        switch(eventName)
+        if(event.type === "keyVault/certificateRevoked")
         {
-            case securityServicesEvents.keyVault.certificateRevoked:
+            const resourceIds = await this.resourceDependenciesController.QueryResourcesThatDependOn(resourceProviders.networkServices.name, resourceProviders.networkServices.openVPNGatewayResourceType.name, event.keyVaultResourceId);
+            for (const resourceId of resourceIds)
             {
-                const resourceIds = await this.resourceDependenciesController.QueryResourcesThatDependOn(resourceProviders.networkServices.name, resourceProviders.networkServices.openVPNGatewayResourceType.name, sourceResourceId);
-                for (const resourceId of resourceIds)
-                {
-                    const ref = await this.resourcesManager.CreateResourceReference(resourceId);
-                    await this.RestartServer(ref!.hostId, ref!.id);
-                }
+                const ref = await this.resourcesManager.CreateResourceReference(resourceId);
+                await this.RestartServer(ref!.hostId, ref!.id);
             }
-            break;
         }
     }
 
@@ -384,8 +395,6 @@ ${taData}
 
     private async CreateServerConfig(hostId: number, serverDir: string, resourceId: number, data: OpenVPNServerConfig, caFilePaths: CA_FilePaths, serverCertKeyFilePaths: CertKeyPaths)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", serverDir + "/ta.key"], hostId);
-
         const nicName = "opc-ovpn" + resourceId;
         const range = new CIDRRange(data.virtualServerAddressRange);
 

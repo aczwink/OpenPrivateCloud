@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -30,7 +30,20 @@ interface UserLogInEvent
     password: string; //required for managing single sign on scenarios
 }
 
-type ClusterEvent = NoDataEvent | UserLogInEvent;
+interface UserPasswordChanged
+{
+    type: "userPasswordChanged";
+    userId: number;
+    newPassword: string;
+}
+
+interface UserSambaPasswordChangedEvent
+{
+    type: "userSambaPasswordChanged";
+    userId: number;
+}
+
+type ClusterEvent = NoDataEvent | UserLogInEvent | UserPasswordChanged | UserSambaPasswordChangedEvent;
 
 type EventCallback = (event: ClusterEvent) => void;
   

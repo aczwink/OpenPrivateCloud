@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ import { FileEntry } from "../../../dist/api";
 import { APISchemaService } from "../../Services/APISchemaService";
 import { APIService } from "../../Services/APIService";
 import { RenderReadOnlyValue } from "../../UI/ValuePresentation";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 
 @Injectable
 export class DirectoryViewComponent extends Component<{ resourceGroupName: string; resourceName: string }>
@@ -65,14 +66,13 @@ export class DirectoryViewComponent extends Component<{ resourceGroupName: strin
 
     private async QueryEntries(path: string)
     {
-        const result = await this.apiService.resourceProviders._any_.fileservices.filestorage._any_.contents.get(this.input.resourceGroupName, this.input.resourceName, { dirPath: path });
-        if(result.statusCode === 200)
+        const response = await this.apiService.resourceProviders._any_.fileservices.filestorage._any_.contents.get(this.input.resourceGroupName, this.input.resourceName, { dirPath: path });
+        const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
+        if(result.ok)
         {
             this.dirPath = path;
-            this.entries = result.data;
+            this.entries = result.value;
         }
-        else
-            throw new Error("NOT IMPLEMENTED");
     }
 
     private RenderEntry(entry: FileEntry)

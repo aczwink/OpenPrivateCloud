@@ -48,6 +48,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
             {
                 fileSystemType: "btrfs",
                 healthCheckSchedule: null,
+                requiredModules: [],
                 schemaName: "JdownloaderProperties"
             },
             {
@@ -56,26 +57,31 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
                     counter: 3,
                 },
                 fileSystemType: "btrfs",
+                requiredModules: [],
                 schemaName: "LetsEncryptProperties"
             },
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: [],
                 schemaName: "NextcloudProperties"
             },
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: [],
                 schemaName: "NodeAppServiceProperties"
             },
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: [],
                 schemaName: "StaticWebsiteProperties"
             },
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: [],
                 schemaName: "API_GatewayProperties"
             }
         ];
@@ -121,7 +127,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
         switch(resourceReference.resourceTypeName)
         {

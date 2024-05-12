@@ -18,16 +18,14 @@
 
 import { EnumeratorBuilder } from "acts-util-core/dist/Enumeration/EnumeratorBuilder";
 import { Injectable } from "acts-util-node";
-import { ResourceReference } from "../common/ResourceReference";
-import { HealthStatus } from "../data-access/HealthController";
 import { ResourceState } from "../resource-providers/ResourceProvider";
 import { ResourcesController } from "../data-access/ResourcesController";
 import { ResourcesManager } from "./ResourcesManager";
-import { ResourceProviderManager } from "./ResourceProviderManager";
 import { PermissionsManager } from "./PermissionsManager";
 import { permissions } from "openprivatecloud-common";
 import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
 import { PermissionsController } from "../data-access/PermissionsController";
+import { ResourceHealthManager } from "./ResourceHealthManager";
 
 interface ResourceOverviewDataDTO
 {
@@ -42,7 +40,7 @@ interface ResourceOverviewDataDTO
 @Injectable
 export class ResourceQueryService
 {
-    constructor(private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private resourceProviderManager: ResourceProviderManager, private permissionsManager: PermissionsManager, 
+    constructor(private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private resourceHealthManager: ResourceHealthManager, private permissionsManager: PermissionsManager, 
         private resourceGroupsController: ResourceGroupsController, private permissionsController: PermissionsController)
     {
     }
@@ -72,7 +70,7 @@ export class ResourceQueryService
                 name: row!.name,
                 resourceGroupName: row!.resourceGroupName,
                 resourceProviderName: row!.resourceProviderName,
-                state: await this.GetResourceState(ref!, row!.status)
+                state: await this.resourceHealthManager.RequestResourceState(ref!)
             };
             return res;
         }).PromiseAll();
@@ -80,25 +78,6 @@ export class ResourceQueryService
     }
 
     //Private methods
-    private async GetResourceState(resourceReference: ResourceReference, healthStatus: HealthStatus): Promise<ResourceState>
-    {
-        switch(healthStatus)
-        {
-            case HealthStatus.Corrupt:
-                return "corrupt";
-            case HealthStatus.Down:
-                return "down";
-            case HealthStatus.InDeployment:
-                return "in deployment";
-            case HealthStatus.Up:
-            {
-                const rp = this.resourceProviderManager.FindResourceProviderByResource(resourceReference);
-                const result = await rp.QueryResourceState(resourceReference);
-                return (typeof result === "string") ? result : result.state;
-            }
-        }
-    }
-
     private async QueryResourceIdsOfResourceGroups(userId: number, resourceGroupIds: EnumeratorBuilder<number>)
     {
         return await resourceGroupIds.Map(resourceGroupId => this.permissionsController.QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(userId, resourceGroupId)).MapAsync(x => x.ToSet()).PromiseAll();

@@ -43,11 +43,13 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: ["samba"],
                 schemaName: "FileStorageProperties"
             },
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: [],
                 schemaName: "ObjectStorageProperties"
             }
         ];
@@ -56,6 +58,15 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
     //Public methods
     public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
     {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.fileServices.fileStorageResourceType.name:
+                await this.fileStoragesManager.CheckResourceHealth(resourceReference);
+                break;
+            case resourceProviders.fileServices.objectStorageResourceType.name:
+                await this.objectStoragesManager.CheckResourceHealth(resourceReference);
+                break;
+        }
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
@@ -80,7 +91,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
         }
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
         switch(resourceReference.resourceTypeName)
         {
@@ -107,6 +118,13 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
 
     public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.fileServices.fileStorageResourceType.name:
+                return await this.fileStoragesManager.QueryResourceState(resourceReference);
+            case resourceProviders.fileServices.objectStorageResourceType.name:
+                return await this.objectStoragesManager.QueryResourceState(resourceReference);
+        }
         return "running";
     }
 

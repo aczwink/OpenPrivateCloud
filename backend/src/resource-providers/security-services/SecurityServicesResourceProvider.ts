@@ -46,11 +46,13 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
                     type: "weekly",
                     counter: 3
                 },
+                requiredModules: [],
                 schemaName: "KeyVaultProperties"
             },
             {
                 fileSystemType: "btrfs",
                 healthCheckSchedule: null,
+                requiredModules: [],
                 schemaName: "WAFProperties"
             },
         ];
@@ -86,7 +88,7 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -57,20 +57,27 @@ export const opcSpecialGroups = {
     /**
      * A private group for the host user. No other user should be in this group.
      */
-    host: "opc-hg",
+    host: {
+        gid: 50000,
+        name: "opc-hg",
+    },
 
     /**
      * OpenPrivateCloud users that are synced to linux hosts need a primary group.
      * This group should usually have no permissions/files except such ones that are granted to ALL OpenPrivateCloud users no matter what roles they have assigned.
+     * gid: 50001
      */
     userPrimaryGroup: "opc-upg"
 };
 
 export const opcSpecialUsers = {
     /**
-     * Processes on the host will be executed through this user. THe controller uses it for managing the host
+     * Processes on the host will be executed through this user. The controller uses it for managing the host
      */
-    host: "opc-hu"
+    host: {
+        name: "opc-hu",
+        uid: 50000
+    }
 };
 
 export const opcUserPrefixes = {

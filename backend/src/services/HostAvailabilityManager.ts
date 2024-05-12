@@ -27,19 +27,48 @@ import { ErrorService } from "./ErrorService";
 import { NumberDictionary } from "acts-util-core";
 import { HostUpdateManager } from "./HostUpdateManager";
 import { HostStorageDevicesManager, SMART_Result } from "./HostStorageDevicesManager";
+import { opcSpecialUsers, opcSpecialGroups } from "../common/UserAndGroupDefinitions";
+import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
+import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
 
  
 @Injectable
 export class HostAvailabilityManager
 {
     constructor(private modulesManager: ModulesManager, private hostsController: HostsController, private instancesController: ResourcesController, private healthController: HealthController,
-        private remoteConnectionsManager: RemoteConnectionsManager, private errorService: ErrorService, private hostUpdateManager: HostUpdateManager,
-        private resourceHealthManager: ResourceHealthManager, private hostStorageDevicesManager: HostStorageDevicesManager)
+        private remoteConnectionsManager: RemoteConnectionsManager, private errorService: ErrorService, private hostUpdateManager: HostUpdateManager, private remoteFileSystemManager: RemoteFileSystemManager,
+        private resourceHealthManager: ResourceHealthManager, private hostStorageDevicesManager: HostStorageDevicesManager, private remoteRootFileSystemManager: RemoteRootFileSystemManager)
     {
     }
 
     //Public methods
-    public async CheckAvailabilityOfHostsAndItsInstances()
+    public async CheckHostsHealth()
+    {
+        const hostIds = await this.hostsController.RequestHostIds();
+        for (const hostId of hostIds)
+        {
+            await this.EnsureHostIsConfiguredAppropriatly(hostId);
+
+            const updateInfo = await this.hostUpdateManager.QueryUpdateInfo(hostId);
+            if(updateInfo.updatablePackagesCount > 10)
+                await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "host hasn't been updated in a while");
+            else
+            {
+                const storageDevices = await this.hostStorageDevicesManager.QueryStorageDevices(hostId);
+                for (const storageDevice of storageDevices)
+                {
+                    const smart = await this.hostStorageDevicesManager.QuerySMARTInfo(hostId, storageDevice.path);
+                    if(!this.VerifySMARTData(smart))
+                    {
+                        await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "storage device problem");
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    public async CheckResourcesAvailability()
     {
         const hostIds = await this.hostsController.RequestHostIds();
 
@@ -62,33 +91,17 @@ export class HostAvailabilityManager
         }
     }
 
-    public async CheckHostsHealth()
-    {
-        const hostIds = await this.hostsController.RequestHostIds();
-        for (const hostId of hostIds)
-        {
-            const updateInfo = await this.hostUpdateManager.QueryUpdateInfo(hostId);
-            if(updateInfo.updatablePackagesCount > 10)
-                await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "host hasn't been updated in a while");
-            else
-            {
-                const storageDevices = await this.hostStorageDevicesManager.QueryStorageDevices(hostId);
-                for (const storageDevice of storageDevices)
-                {
-                    const smart = await this.hostStorageDevicesManager.QuerySMARTInfo(hostId, storageDevice.path);
-                    if(!this.VerifySMARTData(smart))
-                    {
-                        await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "storage device problem");
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
     public async EnsureHostIsConfiguredAppropriatly(hostId: number)
     {
         await this.modulesManager.EnsureModuleIsInstalled(hostId, "core");
+
+        const storages = await this.hostsController.RequestHostStorages(hostId);
+        for (const storage of storages)
+        {
+            const fp = await this.IsStoragePathOwnershipCorrect(hostId, storage.path);
+            if(!fp)
+                await this.remoteRootFileSystemManager.ChangeOwnerAndGroup(hostId, storage.path, opcSpecialUsers.host.uid, opcSpecialGroups.host.gid);
+        }
     }
 
     //Private methods
@@ -106,6 +119,12 @@ export class HostAvailabilityManager
         }
         await this.UpdateHostHealth(hostId, HealthStatus.Up);
         return true;
+    }
+
+    private async IsStoragePathOwnershipCorrect(hostId: number, storagePath: string)
+    {
+        const stat = await this.remoteFileSystemManager.QueryStatus(hostId, storagePath)
+        return (stat.uid === opcSpecialUsers.host.uid) && (stat.gid === opcSpecialGroups.host.gid);
     }
 
     private VerifySMARTData(smartData: SMART_Result)

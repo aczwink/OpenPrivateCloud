@@ -20,7 +20,6 @@ import { Injectable } from "acts-util-node";
 import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
 import { BackupVaultProperties } from "./BackupVaultProperties";
 import { resourceProviders } from "openprivatecloud-common";
-import { ModulesManager } from "../../services/ModulesManager";
 import { BackupVaultManager } from "./BackupVaultManager";
 import { ResourceReference } from "../../common/ResourceReference";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
@@ -28,7 +27,7 @@ import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 @Injectable
 export class BackupServicesResourceProvider implements ResourceProvider<BackupVaultProperties>
 {
-    constructor(private modulesManager: ModulesManager, private backupVaultManager: BackupVaultManager)
+    constructor(private backupVaultManager: BackupVaultManager)
     {
     }
 
@@ -44,6 +43,7 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
             {
                 healthCheckSchedule: null,
                 fileSystemType: "btrfs",
+                requiredModules: ["webdav"],
                 schemaName: "BackupVaultProperties"
             }
         ];
@@ -63,14 +63,12 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
     }
 
     public async ProvideResource(instanceProperties: BackupVaultProperties, context: DeploymentContext): Promise<DeploymentResult>
-    {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "webdav");
-        
+    {        
         //this is a virtual resource
         return {};
     }
@@ -78,7 +76,7 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
     {
         this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
-        return "running";
+        return this.backupVaultManager.QueryResourceState(resourceReference);
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

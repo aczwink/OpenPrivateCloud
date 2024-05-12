@@ -32,6 +32,7 @@ import { Readable } from "stream";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { ModulesManager } from "../../services/ModulesManager";
 import { AVPreviewService } from "./AVPreviewService";
+import { ResourceStateResult } from "../ResourceProvider";
 
 export interface FileMetaDataRevision
 {
@@ -85,6 +86,16 @@ export class ObjectStoragesManager
     }
 
     //Public methods
+    public async CheckResourceHealth(resourceReference: LightweightResourceReference)
+    {
+        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+        if(!fp)
+        {
+            const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+            await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+        }
+    }
+
     public async CreateSnapshot(resourceReference: LightweightResourceReference)
     {
         const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetFilesDataPath(resourceReference));
@@ -153,6 +164,19 @@ export class ObjectStoragesManager
             files: {},
         };
         this.WriteIndex(resourceReference.id);
+    }
+
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    {
+        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+        if(!fp)
+        {
+            return {
+                state: "corrupt",
+                context: "incorrect file ownership"
+            };
+        }
+        return "running";
     }
 
     public async RequestFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)

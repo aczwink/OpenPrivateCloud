@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,7 @@ import { UserCredentialsProvider } from "../../services/UserCredentialsProvider"
 import { PermissionsManager } from "../../services/PermissionsManager";
 import { resourceProviders } from "openprivatecloud-common";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
+import { ResourceEvent, ResourceEventListener, ResourceEventsManager } from "../../services/ResourceEventsManager";
 
 export interface ADDC_Configuration
 {
@@ -73,13 +74,14 @@ interface ADDC_Config
 //GPO documentation for samba: https://wiki.samba.org/index.php/Group_Policy
 
 @Injectable
-export class ManagedActiveDirectoryManager
+export class ManagedActiveDirectoryManager implements ResourceEventListener
 {
     constructor(private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private resourceConfigController: ResourceConfigController,
         private distroInfoService: DistroInfoService, private remoteCommandExecutor: RemoteCommandExecutor, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager,
         private usersController: UsersController, private userCredentialsProvider: UserCredentialsProvider, private permissionsManager: PermissionsManager,
-        private resourceDependenciesController: ResourceDependenciesController)
+        private resourceDependenciesController: ResourceDependenciesController, resourceEventsManager: ResourceEventsManager)
     {
+        resourceEventsManager.RegisterListener(this);
     }
     
     //Public methods
@@ -124,6 +126,27 @@ export class ManagedActiveDirectoryManager
     {
         const config = await this.ReadConfig(resourceReference.id);
         return config.config;
+    }
+
+    public async ReceiveResourceEvent(event: ResourceEvent): Promise<void>
+    {
+        if(event.type === "userCredentialsProvided")
+        {
+            const config = await this.ReadConfig(event.resourceId);
+
+            const ref = await this.resourcesManager.CreateResourceReference(event.resourceId);
+            if(ref === undefined)
+                return; //resource might have been deleted in the mean time
+
+            const userEntry = config.state.userMapping[event.userId];
+            if(userEntry === undefined)
+                return; //user might not exist anymore
+
+            await this.SetUserPassword(ref!, userEntry.mappedName, event.secret);
+
+            userEntry.state = "synchronized";
+            await this.UpdateConfig(event.resourceId, config);
+        }
     }
 
     public async ResourcePermissionsChanged(resourceReference: LightweightResourceReference)
@@ -274,9 +297,8 @@ export class ManagedActiveDirectoryManager
         }
 
         await this.UpdateConfig(resourceReference.id, config);
-
-        for (const userId of createdUserIds)
-            this.userCredentialsProvider.RegisterForUserCredentialProvision(userId, resourceReference.id, this.OnUserCredentialsProvided.bind(this));
+        
+        this.userCredentialsProvider.SetResourceDependencies(resourceReference.id, desiredUserIds.ToArray(), true);
     }
 
     private async DoFullUserSynchronization(resourceReference: LightweightResourceReference)
@@ -411,7 +433,7 @@ export class ManagedActiveDirectoryManager
         await this.UpdateConfig(resourceReference.id, config);
 
         for (const userId of createdUserIds)
-            this.userCredentialsProvider.RegisterForUserCredentialProvision(userId, resourceReference.id, this.OnUserCredentialsProvided.bind(this));
+            this.userCredentialsProvider.SetResourceDependencies(resourceReference.id, createdUserIds, true);
     }
 
     private async SynchronizeDomainAdmins(resourceReference: LightweightResourceReference)
@@ -445,24 +467,5 @@ export class ManagedActiveDirectoryManager
         const config = await this.ReadConfig(resourceReference.id);
 
         await this.RestartServer(resourceReference, config);
-    }
-
-    //Event handlers
-    private async OnUserCredentialsProvided(userId: number, password: string, resourceId: number)
-    {
-        const config = await this.ReadConfig(resourceId);
-
-        const ref = await this.resourcesManager.CreateResourceReference(resourceId);
-        if(ref === undefined)
-            return; //resource might have been deleted in the mean time
-
-        const userEntry = config.state.userMapping[userId];
-        if(userEntry === undefined)
-            return; //user might not exist anymore
-
-        await this.SetUserPassword(ref!, userEntry.mappedName, password);
-
-        userEntry.state = "synchronized";
-        await this.UpdateConfig(resourceId, config);
     }
 }

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,6 @@
 import { Injectable } from "acts-util-node";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { UserGroupsController } from "../data-access/UserGroupsController";
-import { HostUsersManager } from "./HostUsersManager";
 import { ResourceProviderManager } from "./ResourceProviderManager";
 import { ResourcesManager } from "./ResourcesManager";
 
@@ -26,7 +25,7 @@ import { ResourcesManager } from "./ResourcesManager";
 @Injectable
 export class UserGroupsManager
 {
-    constructor(private userGroupsController: UserGroupsController, private hostUsersManager: HostUsersManager, private permissionsController: PermissionsController,
+    constructor(private userGroupsController: UserGroupsController, private permissionsController: PermissionsController,
         private resourceProviderManager: ResourceProviderManager, private resourcesManager: ResourcesManager)
     {
     }
@@ -35,26 +34,25 @@ export class UserGroupsManager
     public async AddMember(userGroupId: number, userId: number)
     {
         await this.userGroupsController.AddMember(userGroupId, userId);
-        await this.ResyncGroupToAllHosts(userGroupId);
-
-        const resourceIds = await this.permissionsController.QueryResourceIdsAssociatedWithGroup(userGroupId);
-        for (const resourceId of resourceIds)
-        {
-            const ref = await this.resourcesManager.CreateResourceReference(resourceId);
-            await this.resourceProviderManager.InstancePermissionsChanged(ref!);
-        }
+        await this.RefreshResourcePermissionsOfGroup(userGroupId);
     }
 
     public async RemoveMembership(userGroupId: number, userId: number)
     {
         await this.userGroupsController.RemoveMembership(userGroupId, userId);
-        await this.ResyncGroupToAllHosts(userGroupId);
+        await this.RefreshResourcePermissionsOfGroup(userGroupId);
     }
 
     //Private methods
-    private async ResyncGroupToAllHosts(userGroupId: number)
+    private async RefreshResourcePermissionsOfGroup(userGroupId: number)
     {
-        const hosts = await this.permissionsController.QueryHostsAssociatedWithGroup(userGroupId);
-        await hosts.Map(x => this.hostUsersManager.SyncGroupToHost(x, userGroupId)).PromiseAll();
+        //TODO: cluster level
+        //TODO: RG level
+        const resourceIds = await this.permissionsController.QueryResourceIdsAssociatedWithGroup(userGroupId);
+        for (const resourceId of resourceIds)
+        {
+            const ref = await this.resourcesManager.CreateResourceReference(resourceId);
+            await this.resourceProviderManager.ResourcePermissionsChanged(ref!);
+        }
     }
 }

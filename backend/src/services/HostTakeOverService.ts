@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -36,17 +36,19 @@ export class HostTakeOverService
     }
 
     //Public methods
-    public async TakeOverHost(hostName: string)
+    public async Reconnect(hostId: number, hostName: string, password: string)
     {
-        const standardPassword = "opchostuser";
-        const newPassword = crypto.randomBytes(31).toString("hex") + "#";
+        const newPassword = await this.ChangePasswordOnRemoteHost(hostName, password);
+        this.hostsManager.SetHostPassword(hostId, newPassword);
+    }
 
-        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host, standardPassword);
-        await this.ChangeUserPassword(conn, standardPassword, newPassword);
-        conn.Close();
+    public async TakeOverHost(hostName: string, password: string)
+    {
+        const newPassword = await this.ChangePasswordOnRemoteHost(hostName, password);
 
         const hostId = await this.hostsController.AddHost(hostName);
         this.hostsManager.SetHostPassword(hostId, newPassword);
+        
         await this.modulesManager.EnsureModuleIsInstalled(hostId, "core");
 
         //enable firewall and make sure ssh is reachable
@@ -74,6 +76,17 @@ export class HostTakeOverService
     }
 
     //Private methods
+    private async ChangePasswordOnRemoteHost(hostName: string, oldPassword: string)
+    {
+        const newPassword = crypto.randomBytes(31).toString("hex") + "#";
+
+        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host.name, oldPassword);
+        await this.ChangeUserPassword(conn, oldPassword, newPassword);
+        conn.Close();
+
+        return newPassword;
+    }
+
     private async ChangeUserPassword(conn: SSHConnection, oldPassword: string, newPassword: string)
     {
         let stdin = "";
@@ -94,11 +107,11 @@ export class HostTakeOverService
     {
         //await this.localCommandExecutor.ExecuteCommand(["ssh-copy-id", "-i", "$HOME/.ssh/" + keyName + ".pub", "opc@" + hostName]);
         const pubKey = await fs.promises.readFile("/home/opc-controller/.ssh/" + keyName + ".pub", "utf-8");
-        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host, "opc");
+        const conn = await this.sshService.ConnectWithCredentials(hostName, opcSpecialUsers.host.name, "opc");
         await conn.AppendFile("/home/opc/.ssh/authorized_keys", pubKey);
 
-        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-d", opcSpecialUsers.host], { hostIdOrHostName: hostName });
-        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-l", opcSpecialUsers.host], { hostIdOrHostName: hostName });
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-d", opcSpecialUsers.host.name], { hostIdOrHostName: hostName });
+        await this.sshCommandExecutor.ExecuteCommand(conn, ["sudo", "passwd", "-l", opcSpecialUsers.host.name], { hostIdOrHostName: hostName });
 
         conn.Close();
     }

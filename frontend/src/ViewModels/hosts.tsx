@@ -17,7 +17,7 @@
  * */
 
 import { JSX_CreateElement } from "acfrontend";
-import { FirewallRule, Host, HostBootEntryDTO, HostHealthData, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto } from "../../dist/api";
+import { AddHostDTO, FirewallRule, Host, HostBootEntryDTO, HostHealthData, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto, UpdateHostPasswordDTO } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
@@ -26,7 +26,6 @@ import { HostFirewallTracingComponent } from "../Views/host/HostFirewallTracingC
 import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
-import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../UI/ResponseHandler";
 
 const hostOverviewViewModel: ObjectViewModel<HostHealthData, HostId> = {
     type: "object",
@@ -256,6 +255,33 @@ const storagesViewModel: CollectionViewModel<HostStorage, HostId, HostStorageCre
     schemaName: "HostStorage",
 };
 
+const reconnectViewModel: ObjectViewModel<UpdateHostPasswordDTO, HostId> = {
+    type: "object",
+    actions: [
+        {
+            type: "edit",
+            propertiesSchemaName: "UpdateHostPasswordDTO",
+            requestObject: async _ => ({
+                data: {
+                    password: ""
+                },
+                statusCode: 200,
+                rawBody: ""
+            }),
+            updateResource: (service, ids, props) => service.hosts._any_.password.put(ids.hostName, props),
+        }
+    ],
+    formTitle: _ => "Reconnect",
+    requestObject: async _ => ({
+        data: {
+            password: ""
+        },
+        statusCode: 200,
+        rawBody: ""
+    }),
+    schemaName: "UpdateHostPasswordDTO"
+};
+
 const hostViewModel: MultiPageViewModel<HostId> = {
     type: "multiPage",
     actions: [
@@ -384,16 +410,27 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     }
                 },
             ]
+        },
+        {
+            displayName: "Emergency",
+            entries: [
+                {
+                    displayName: "Reconnect",
+                    key: "reconnect",
+                    child: reconnectViewModel
+                }
+            ]
         }
     ],
 };
 
-const hostsViewModel: CollectionViewModel<Host, {}> = {
+const hostsViewModel: CollectionViewModel<Host, {}, AddHostDTO> = {
     type: "collection",
     actions: [
         {
             type: "create",
             createResource: (service, _, host) => service.hosts.post(host),
+            schemaName: "AddHostDTO"
         }
     ],
     child: hostViewModel,

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -37,9 +37,10 @@ export class RemoteRootFileSystemManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chmod", mode.toString(8), remotePath], hostId);
     }
 
-    public async ChangeOwnerAndGroup(hostId: number, remotePath: string, uid: number, gid: number)
+    public async ChangeOwnerAndGroup(hostId: number, remotePath: string, uid: number, gid: number, recursive?: boolean)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", uid + ":" + gid, remotePath], hostId);
+        const recursiveArgs = (recursive === true) ? ["-R"] : [];
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", ...recursiveArgs, uid + ":" + gid, remotePath], hostId);
     }
 
     public async CreateDirectory(hostId: number, remotePath: string)
@@ -112,7 +113,7 @@ export class RemoteRootFileSystemManager
     private async RequestTempPath(hostId: number)
     {
         const tempRootPath = "/tmp/opc";
-        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host);
+        const hostOPCUserId = await this.hostUsersManager.ResolveHostUserId(hostId, opcSpecialUsers.host.name);
         await this.remoteFileSystemManager.CreateDirectory(hostId, tempRootPath, {
             uid: hostOPCUserId
         });

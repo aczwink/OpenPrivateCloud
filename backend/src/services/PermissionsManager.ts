@@ -22,25 +22,25 @@ import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAs
 import { HostUsersManager } from "./HostUsersManager";
 import { ResourceReference } from "../common/ResourceReference";
 import { UsersController } from "../data-access/UsersController";
+import { ResourcesManager } from "./ResourcesManager";
+import { ResourceProviderManager } from "./ResourceProviderManager";
   
 @Injectable
 export class PermissionsManager
 {
     constructor(private resourcesController: ResourcesController, private permissionsController: PermissionsController, private hostUsersManager: HostUsersManager,
-        private roleAssignmentsController: RoleAssignmentsController, private usersController: UsersController)
+        private roleAssignmentsController: RoleAssignmentsController, private usersController: UsersController, private resourcesManager: ResourcesManager,
+        private resourceProviderManager: ResourceProviderManager)
     {
     }
     
     //Public methods
-    public async AddInstanceRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
+    public async AddResourceLevelRoleAssignment(resourceId: number, roleAssignment: RoleAssignment)
     {
-        const hostId = await this.resourcesController.QueryHostIdOfInstance(instanceId);
-        const userGroupIds = await this.permissionsController.QueryGroupsAssociatedWithHost(hostId!);
+        await this.roleAssignmentsController.AddResourceLevelRoleAssignment(resourceId, roleAssignment);
 
-        await this.roleAssignmentsController.AddInstanceRoleAssignment(instanceId, roleAssignment);
-
-        if(!userGroupIds.has(roleAssignment.userGroupId))
-            await this.hostUsersManager.SyncGroupToHost(hostId!, roleAssignment.userGroupId);
+        const ref = await this.resourcesManager.CreateResourceReference(resourceId);
+        await this.resourceProviderManager.ResourcePermissionsChanged(ref!);
     }
 
     public async DeleteInstanceRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)

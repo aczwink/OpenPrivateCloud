@@ -42,6 +42,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
             {
                 fileSystemType: "ext4", //the whole purpose of this service is to have the domain fully managed, i.e. data files can be regenerated any time by the service. To reduce disk IO for samba databases ext4 is preferred here
                 healthCheckSchedule: null,
+                requiredModules: [],
                 schemaName: "ManagedActiveDirectoryProperties"
             },
         ];
@@ -68,7 +69,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
     {
     }
 
-    public async InstancePermissionsChanged(resourceReference: ResourceReference): Promise<void>
+    public async ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>
     {
         switch(resourceReference.resourceTypeName)
         {

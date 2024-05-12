@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -115,6 +115,15 @@ chmod 600 /home/<your user>/.smbcredentials/${hostName}
         const cfg = await this.QueryConfig(hostId);
         const share = cfg.shares.find(x => x.name === shareName);
         return share;
+    }
+
+    public async RequestServedShares(hostId: number)
+    {
+        const data = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["sudo", "net", "share", "list", "--no-pass"], hostId);
+        if(data.exitCode !== 0)
+            return [];
+
+        return data.stdOut.trimEnd().split("\n");
     }
 
     public async SetShare(hostId: number, data: ShareData)
