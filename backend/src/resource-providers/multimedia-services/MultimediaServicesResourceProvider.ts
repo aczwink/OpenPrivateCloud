@@ -20,12 +20,13 @@ import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceCheckResult, ResourceCheckType, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { AVTranscoderProperties } from "./AVTranscoderProperties";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { AVTranscoderConfig, AVTranscoderQuality } from "./AVTranscoderConfig";
 import { ResourceReference } from "../../common/ResourceReference";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
+import { HealthStatus } from "../../data-access/HealthController";
 
 @Injectable
 export class MultimediaServicesResourceProvider implements ResourceProvider<AVTranscoderProperties>
@@ -44,7 +45,7 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     {
         return [
             {
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 fileSystemType: "btrfs",
                 requiredModules: [],
                 schemaName: "AVTranscoderProperties"
@@ -53,8 +54,9 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
+    public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
+        return HealthStatus.Up;
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
@@ -98,9 +100,9 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
         };
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
     {
-        return "running";
+        return ResourceState.Running;
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

@@ -18,7 +18,7 @@
 import crypto from "crypto";
 import path from "path";
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceDeletionError, ResourceState } from "../ResourceProvider";
 import { LetsEncryptProperties } from "./Properties";
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
@@ -108,12 +108,12 @@ export class LetsEncryptManager
         await this.OrchestrateCertbotWorkflow(context.resourceReference, command);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
         const config = await this.ReadConfig(resourceReference.id);
         if(config.isRunning)
-            return "running";
-        return "waiting";
+            return ResourceState.Running;
+        return ResourceState.Waiting;
     }
 
     public async ReadConfig(resourceId: number)
@@ -195,11 +195,10 @@ export class LetsEncryptManager
             const state = await this.resourceProviderManager.QueryResourceState(vNetRef);
             switch(state)
             {
-                case "corrupt":
-                case "down":
-                    throw new Error("Deployment of vnet failed");
-                case "running":
+                case ResourceState.Running:
                     return vNetRef;
+                default:
+                    throw new Error("Deployment of vnet failed");
             }
         }
 

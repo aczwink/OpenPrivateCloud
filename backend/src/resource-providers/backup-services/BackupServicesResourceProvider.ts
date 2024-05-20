@@ -17,12 +17,13 @@
  * */
 
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceCheckResult, ResourceCheckType, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { BackupVaultProperties } from "./BackupVaultProperties";
 import { resourceProviders } from "openprivatecloud-common";
 import { BackupVaultManager } from "./BackupVaultManager";
 import { ResourceReference } from "../../common/ResourceReference";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
+import { HealthStatus } from "../../data-access/HealthController";
 
 @Injectable
 export class BackupServicesResourceProvider implements ResourceProvider<BackupVaultProperties>
@@ -41,7 +42,7 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     {
         return [
             {
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 fileSystemType: "btrfs",
                 requiredModules: ["webdav"],
                 schemaName: "BackupVaultProperties"
@@ -50,8 +51,22 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
+    public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+                this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
+                if(this.backupVaultManager.DidLastBackupFail(resourceReference.id))
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "last backup failed"
+                    };
+                }
+                break;
+        }
+        return HealthStatus.Up;
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
@@ -73,9 +88,8 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
         return {};
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
     {
-        this.backupVaultManager.EnsureBackupTimerIsRunningIfConfigured(resourceReference.id);
         return this.backupVaultManager.QueryResourceState(resourceReference);
     }
 

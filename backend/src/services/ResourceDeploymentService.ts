@@ -94,7 +94,7 @@ export class ResourceDeploymentService
             tracker.Finish();
 
             await this.resourceHealthManager.CheckResourceAvailability(resourceReference.id);
-            await this.resourceHealthManager.ScheduleResourceCheck(resourceReference.id);
+            await this.resourceHealthManager.ScheduleResourceChecks(resourceReference.id);
         }
         catch(e)
         {

@@ -17,11 +17,11 @@
  * */
 
 import { APIController, Get, NotFound, Query } from "acts-util-apilib";
-import { HealthController, HealthStats, HealthStatus } from "../data-access/HealthController";
+import { HealthController, HealthStats, ResourceHealthData } from "../data-access/HealthController";
 import { ResourcesManager } from "../services/ResourcesManager";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
-import { TimeSchedule } from "../common/TimeSchedule";
 import { ResourceState } from "../resource-providers/ResourceProvider";
+import { TimeSchedule } from "../common/TimeSchedule";
 
 interface ClusterHealthStats
 {
@@ -29,29 +29,13 @@ interface ClusterHealthStats
     instancesHealth: HealthStats[];
 }
 
-interface ResourceCheckDTO
-{
-    /**
-     * @format multi-line
-     */
-    log: string;
-
-    lastSuccessfulCheck: Date;
-    schedule: TimeSchedule;
-}
-
 interface ResourceHealthDTO
 {
-    healthStatus: HealthStatus;
-    state: ResourceState;
     hostName: string;
-    
-    /**
-     * @format multi-line
-     */
-    availabilityLog: string;
 
-    checkData?: ResourceCheckDTO;
+    healthData: ResourceHealthData[];
+    state: ResourceState;
+    dataIntegrityCheckSchedule?: TimeSchedule;
 }
 
 @APIController("health")
@@ -66,7 +50,7 @@ class HealthAPIController
     {
         const res: ClusterHealthStats = {
             hostsHealth: await this.healthController.QueryHostsHealthStats(),
-            instancesHealth: await this.healthController.QueryInstancesHealthStats()
+            instancesHealth: await this.healthController.QueryResourcesHealthStats()
         };
         return res;
     }
@@ -81,23 +65,15 @@ class HealthAPIController
             return NotFound("resource not found");
 
         const hd = await this.healthController.QueryResourceHealthData(ref.id);
-        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref);
+        const schedule = await this.resourceProviderManager.RetrieveResourceCheckSchedule(ref);
         const stateResult = await this.resourceProviderManager.QueryResourceState(ref);
 
         const res: ResourceHealthDTO = {
-            availabilityLog: hd!.availabilityLog,
-            healthStatus: hd!.status,
+            healthData: hd,
             hostName: ref.hostName,
-            state: (typeof stateResult === "string") ? stateResult : stateResult.state
+            state: (typeof stateResult === "number") ? stateResult : ResourceState.Stopped,
+            dataIntegrityCheckSchedule: (schedule === null) ? undefined : schedule,
         };
-        if(schedule !== null)
-        {
-            res.checkData = {
-                log: hd!.checkLog,
-                schedule,
-                lastSuccessfulCheck: hd!.lastSuccessfulCheck,
-            };
-        }
 
         return res;
     }

@@ -19,7 +19,7 @@ import os from "os";
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext } from "../ResourceProvider";
 import { ManagedActiveDirectoryProperties } from "./properties";
 import { ManagedDockerContainerManager } from "../compute-services/ManagedDockerContainerManager";
 import { DockerContainerConfig } from "../compute-services/DockerManager";
@@ -170,6 +170,11 @@ export class ManagedActiveDirectoryManager implements ResourceEventListener
             await this.DoFullUserSynchronization(resourceReference);
     }
 
+    public async QueryHealthStatus(resourceReference: LightweightResourceReference)
+    {
+        return await this.managedDockerContainerManager.QueryHealthStatus(resourceReference);
+    }
+
     public async QueryInfo(resourceReference: LightweightResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
@@ -183,11 +188,6 @@ export class ManagedActiveDirectoryManager implements ResourceEventListener
     public async QueryLog(resourceReference: LightweightResourceReference)
     {
         return this.managedDockerContainerManager.QueryLog(resourceReference);
-    }
-
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
-    {
-        return await this.managedDockerContainerManager.QueryResourceState(resourceReference);
     }
 
     public async QueryUsers(resourceReference: LightweightResourceReference)

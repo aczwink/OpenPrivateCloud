@@ -26,6 +26,9 @@ import { permissions } from "openprivatecloud-common";
 import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { ResourceHealthManager } from "./ResourceHealthManager";
+import { ResourceReference } from "../common/ResourceReference";
+import { HealthStatus } from "../data-access/HealthController";
+import { ResourceProviderManager } from "./ResourceProviderManager";
 
 interface ResourceOverviewDataDTO
 {
@@ -34,6 +37,7 @@ interface ResourceOverviewDataDTO
     resourceGroupName: string;
     resourceProviderName: string;
     instanceType: string;
+    healthStatus: HealthStatus;
     state: ResourceState;
 }
 
@@ -41,7 +45,7 @@ interface ResourceOverviewDataDTO
 export class ResourceQueryService
 {
     constructor(private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private resourceHealthManager: ResourceHealthManager, private permissionsManager: PermissionsManager, 
-        private resourceGroupsController: ResourceGroupsController, private permissionsController: PermissionsController)
+        private resourceGroupsController: ResourceGroupsController, private permissionsController: PermissionsController, private resourceProviderManager: ResourceProviderManager)
     {
     }
     
@@ -70,7 +74,7 @@ export class ResourceQueryService
                 name: row!.name,
                 resourceGroupName: row!.resourceGroupName,
                 resourceProviderName: row!.resourceProviderName,
-                state: await this.resourceHealthManager.RequestResourceState(ref!)
+                ...await this.RequestResourceState(ref!)
             };
             return res;
         }).PromiseAll();
@@ -81,5 +85,37 @@ export class ResourceQueryService
     private async QueryResourceIdsOfResourceGroups(userId: number, resourceGroupIds: EnumeratorBuilder<number>)
     {
         return await resourceGroupIds.Map(resourceGroupId => this.permissionsController.QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(userId, resourceGroupId)).MapAsync(x => x.ToSet()).PromiseAll();
+    }
+
+    public async RequestResourceState(resourceReference: ResourceReference): Promise<{ healthStatus: HealthStatus; state: ResourceState; }>
+    {
+        const healthStatus = await this.resourceHealthManager.RequestHealthStatus(resourceReference.id);
+        switch(healthStatus!)
+        {
+            case HealthStatus.Corrupt:
+            case HealthStatus.Down:
+            case HealthStatus.InDeployment:
+                return {
+                    healthStatus,
+                    state: ResourceState.Stopped
+                };
+            case HealthStatus.Up:
+            {
+                const result = await this.resourceProviderManager.QueryResourceState(resourceReference!);
+
+                if(typeof result === "number")
+                {
+                    return {
+                        healthStatus,
+                        state: result
+                    };
+                }
+
+                return {
+                    healthStatus: HealthStatus.Corrupt,
+                    state: ResourceState.Stopped
+                };
+            }
+        }
     }
 }

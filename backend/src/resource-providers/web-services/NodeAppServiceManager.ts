@@ -20,7 +20,7 @@ import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { NodeAppServiceProperties } from "./Properties";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { opcSpecialGroups, opcSpecialUsers } from "../../common/UserAndGroupDefinitions";
@@ -29,6 +29,7 @@ import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
+import { HealthStatus } from "../../data-access/HealthController";
 
 interface NodeEnvironmentVariableMappingKeyVaultSecretValue
 {
@@ -65,6 +66,46 @@ export class NodeAppServiceManager
     }
 
     //Public methods
+    public async CheckResource(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
+    {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+            {
+                const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, this.DeriveSystemUnitName(resourceReference));
+                if(!exists)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "service does not exist"
+                    };
+                }
+
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
+            }
+            break;
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+                    await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+                }
+            }
+            break;
+        }
+
+        return HealthStatus.Up;
+    }
+
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         const serviceName = this.DeriveSystemUnitName(resourceReference);
@@ -120,20 +161,12 @@ export class NodeAppServiceManager
         return config;
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
         const isRunning = await this.IsAppServiceRunning(resourceReference);
         if(isRunning)
-            return "running";
-        const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, this.DeriveSystemUnitName(resourceReference));
-        if(!exists)
-        {
-            return {
-                state: "corrupt",
-                context: "service does not exist"
-            };
-        }
-        return "stopped";
+            return ResourceState.Running;
+        return ResourceState.Stopped;
     }
 
     public async QueryStatus(resourceReference: LightweightResourceReference)

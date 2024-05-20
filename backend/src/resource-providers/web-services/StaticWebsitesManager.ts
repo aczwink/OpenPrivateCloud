@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType } from "../ResourceProvider";
 import { StaticWebsiteProperties } from "./Properties";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { TempFilesManager } from "../../services/TempFilesManager";
@@ -27,6 +27,7 @@ import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ManagedDockerContainerManager } from "../compute-services/ManagedDockerContainerManager";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
+import { HealthStatus } from "../../data-access/HealthController";
 
 export interface StaticWebsiteConfig
 {
@@ -49,6 +50,38 @@ export class StaticWebsitesManager
     }
 
     //Public methods
+    public async CheckResource(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
+    {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
+
+                return await this.managedDockerContainerManager.QueryHealthStatus(resourceReference);
+            }
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+                    await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+                }
+            }
+            break;
+        }
+
+        return HealthStatus.Up;
+    }
+    
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
@@ -113,11 +146,6 @@ export class StaticWebsitesManager
     {
         const config = await this.resourceConfigController.QueryConfig<StaticWebsiteConfig>(resourceId);
         return config!;
-    }
-
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
-    {
-        return await this.managedDockerContainerManager.QueryResourceState(resourceReference);
     }
 
     public async UpdateConfig(resourceReference: LightweightResourceReference, config: StaticWebsiteConfig)

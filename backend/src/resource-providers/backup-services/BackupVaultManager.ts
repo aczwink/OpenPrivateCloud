@@ -24,7 +24,7 @@ import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupV
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { NumberDictionary } from "acts-util-core";
-import { ResourceStateResult } from "../ResourceProvider";
+import { ResourceState } from "../ResourceProvider";
 
 interface BackupVaultConfig
 {
@@ -75,6 +75,11 @@ export class BackupVaultManager
         await this.WriteConfig(resourceReference.id, config);
     }
 
+    public DidLastBackupFail(resourceId: number)
+    {
+        return this.failedBackups[resourceId]
+    }
+
     public async EnsureBackupTimerIsRunningIfConfigured(resourceId: number)
     {
         const config = await this.ReadConfig(resourceId);
@@ -85,16 +90,9 @@ export class BackupVaultManager
         }
     }
 
-    public QueryResourceState(resourceReference: LightweightResourceReference): ResourceStateResult
+    public QueryResourceState(resourceReference: LightweightResourceReference): ResourceState
     {
-        if(this.failedBackups[resourceReference.id])
-        {
-            return {
-                state: "corrupt",
-                context: "last backup failed"
-            };
-        }
-        return "running";
+        return ResourceState.Running;
     }
 
     public async ReadConfig(resourceId: number): Promise<BackupVaultConfig>

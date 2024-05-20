@@ -17,11 +17,12 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceCheckResult, ResourceCheckType, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { ResourceReference } from "../../common/ResourceReference";
 import { IntegrationServicesProperties } from "./properties";
 import { ManagedActiveDirectoryManager } from "./ManagedActiveDirectoryManager";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
+import { HealthStatus } from "../../data-access/HealthController";
  
 @Injectable
 export class IntegrationServicesResourceProvider implements ResourceProvider<IntegrationServicesProperties>
@@ -41,7 +42,7 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
         return [
             {
                 fileSystemType: "ext4", //the whole purpose of this service is to have the domain fully managed, i.e. data files can be regenerated any time by the service. To reduce disk IO for samba databases ext4 is preferred here
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 requiredModules: [],
                 schemaName: "ManagedActiveDirectoryProperties"
             },
@@ -49,8 +50,15 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
+    public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.integrationServices.managedActiveDirectoryResourceType.name:
+                return await this.activeDirectoryDomainControllerManager.QueryHealthStatus(resourceReference);
+        }
+
+        return HealthStatus.Up;
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
@@ -89,14 +97,9 @@ export class IntegrationServicesResourceProvider implements ResourceProvider<Int
         }
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
     {
-        switch(resourceReference.resourceTypeName)
-        {
-            case resourceProviders.integrationServices.managedActiveDirectoryResourceType.name:
-                return await this.activeDirectoryDomainControllerManager.QueryResourceState(resourceReference);
-        }
-        return "corrupt";
+        return ResourceState.Running;
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

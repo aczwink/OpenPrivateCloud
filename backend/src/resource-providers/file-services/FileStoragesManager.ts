@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import path from "path";
-import { GlobalInjector, Injectable } from "acts-util-node";
+import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
@@ -24,9 +24,10 @@ import { ResourceConfigController } from "../../data-access/ResourceConfigContro
 import { SingleSMBSharePerInstanceProvider } from "./SingleSMBSharePerInstanceProvider";
 import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager";
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { ResourceEvent, ResourceEventListener, ResourceEventsManager } from "../../services/ResourceEventsManager";
 import { HostUsersManager } from "../../services/HostUsersManager";
+import { HealthStatus } from "../../data-access/HealthController";
 
 interface SMBConfig
 {
@@ -55,23 +56,57 @@ export class FileStoragesManager implements ResourceEventListener
     }
     
     //Public methods
-    public async CheckResourceHealth(resourceReference: ResourceReference)
+    public async CheckResourceHealth(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
-        const config = await this.ReadConfig(resourceReference.id);
-        if(config.smb.enabled)
+        switch(type)
         {
-            const online = await this.singleSMBSharePerInstanceProvider.IsShareOnline(resourceReference);
-            if(!online)
+            case ResourceCheckType.Availability:
             {
-                await this.UpdateSMBConfig(resourceReference, config);
+                const config = await this.ReadConfig(resourceReference.id);
+                if(config.smb.enabled)
+                {
+                    const online = await this.singleSMBSharePerInstanceProvider.IsShareOnline(resourceReference);
+                    if(!online)
+                    {
+                        return {
+                            status: HealthStatus.Corrupt,
+                            context: "SMB share is not there"
+                        };
+                    }
+                }
+
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
             }
+            break;
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    await this.CorrectFileOwnership(resourceReference);
+                }
+
+                const config = await this.ReadConfig(resourceReference.id);
+                if(config.smb.enabled)
+                {
+                    const online = await this.singleSMBSharePerInstanceProvider.IsShareOnline(resourceReference);
+                    if(!online)
+                    {
+                        await this.UpdateSMBConfig(resourceReference, config);
+                    }
+                }
+            }
+            break;
         }
 
-        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
-        if(!fp)
-        {
-            await this.CorrectFileOwnership(resourceReference);
-        }
+        return HealthStatus.Up;
     }
 
     public async CreateSnapshot(resourceReference: LightweightResourceReference)
@@ -167,30 +202,9 @@ export class FileStoragesManager implements ResourceEventListener
         await this.remoteFileSystemManager.ChangeMode(context.hostId, snapshotsPath, 0o750);
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
     {
-        const config = await this.ReadConfig(resourceReference.id);
-        if(config.smb.enabled)
-        {
-            const online = await this.singleSMBSharePerInstanceProvider.IsShareOnline(resourceReference);
-            if(!online)
-            {
-                return {
-                    state: "corrupt",
-                    context: "SMB share is not there"
-                };
-            }
-        }
-
-        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
-        if(!fp)
-        {
-            return {
-                state: "corrupt",
-                context: "incorrect file ownership"
-            };
-        }
-        return "running";
+        return ResourceState.Running;
     }
 
     public async QuerySnapshotsOrdered(resourceReference: LightweightResourceReference)

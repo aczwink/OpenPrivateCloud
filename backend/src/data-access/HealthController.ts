@@ -18,6 +18,7 @@
 
 import { DBExpression, Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
+import { ResourceCheckType } from "../resource-providers/ResourceProvider";
 
 export enum HealthStatus
 {
@@ -33,12 +34,15 @@ interface HostHealthData
     log: string;
 }
 
-interface ResourceHealthData
+export interface ResourceHealthData
 {
+    checkType: ResourceCheckType;
     status: HealthStatus;
-    availabilityLog: string;
+    /**
+     * @format multi-line
+     */
+    log: string;
     lastSuccessfulCheck: Date;
-    checkLog: string;
 }
 
 export interface HealthStats
@@ -55,10 +59,10 @@ export class HealthController
     }
 
     //Public methods
-    public async DeleteInstanceHealthData(instanceId: number)
+    public async DeleteInstanceHealthData(resourceId: number)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("instances_health", "instanceId = ?", instanceId);
+        await conn.DeleteRows("resources_health", "resourceId = ?", resourceId);
     }
 
     public async QueryHostsHealthStats()
@@ -91,32 +95,33 @@ export class HealthController
         };
     }
 
-    public async QueryResourceHealthData(instanceId: number): Promise<ResourceHealthData | undefined>
+    public async QueryResourceHealthData(resourceId: number): Promise<ResourceHealthData[]>
     {
         const query = `
-        SELECT status, availabilityLog, lastSuccessfulCheck, checkLog
-        FROM instances_health
-        WHERE instanceId = ?
+        SELECT checkType, status, log, lastSuccessfulCheck
+        FROM resources_health
+        WHERE resourceId = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, instanceId);
-        if(row === undefined)
-            return undefined;
+        const rows = await conn.Select(query, resourceId);
 
-
-        return {
+        return rows.map(row => ({
+            checkType: row.checkType,
             status: row.status,
-            availabilityLog: row.availabilityLog,
+            log: row.log,
             lastSuccessfulCheck: this.dbConnMgr.ParseDateTime(row.lastSuccessfulCheck),
-            checkLog: row.checkLog
-        };
+        }));
     }
 
-    public async QueryInstancesHealthStats()
+    public async QueryResourcesHealthStats()
     {
         const query = `
         SELECT status, COUNT(*) as cnt
-        FROM instances_health
+        FROM (
+            SELECT MAX(status) AS status
+            FROM resources_health
+            GROUP BY resourceId
+        ) tbl
         GROUP BY status;
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
@@ -139,47 +144,25 @@ export class HealthController
         }
     }
 
-    public async UpdateResourceAvailability(resourceId: number, status: HealthStatus, logData: string)
+    public async UpdateResourceHealth(resourceId: number, checkType: ResourceCheckType, status: HealthStatus, log: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
 
-        const result = await conn.UpdateRows("instances_health", {
+        const result = await conn.UpdateRows("resources_health", {
+            checkType,
             status,
-            availabilityLog: logData
-        }, "instanceId = ?", resourceId);
+            lastSuccessfulCheck: (status === HealthStatus.Up) ? DBExpression("NOW()") : undefined,
+            log,
+        }, "resourceId = ? AND checkType = ?", resourceId, checkType);
 
         if(result.affectedRows === 0)
         {
-            await conn.InsertRow("instances_health", {
-                instanceId: resourceId,
+            await conn.InsertRow("resources_health", {
+                resourceId,
+                checkType,
                 status,
-                availabilityLog: logData,
-                lastSuccessfulCheck: "0000-00-00 00:00:00",
-                checkLog: ""
-            });
-        }
-    }
-
-    public async UpdateResourceHealth(instanceId: number, status: HealthStatus, log: string)
-    {
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-
-        const lastSuccessfulCheck = (status === HealthStatus.Up) ? DBExpression("NOW()") : undefined;
-
-        const result = await conn.UpdateRows("instances_health", {
-            status,
-            lastSuccessfulCheck,
-            checkLog: log,
-        }, "instanceId = ?", instanceId);
-
-        if(result.affectedRows === 0)
-        {
-            await conn.InsertRow("instances_health", {
-                instanceId,
-                status,
-                availabilityLog: "",
-                lastSuccessfulCheck,
-                checkLog: log,
+                lastSuccessfulCheck: (status === HealthStatus.Up) ? DBExpression("NOW()") : "0000-00-00 00:00:00",
+                log,
             });
         }
     }

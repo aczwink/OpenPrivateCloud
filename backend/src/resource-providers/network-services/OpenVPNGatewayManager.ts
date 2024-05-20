@@ -31,7 +31,7 @@ import path from "path";
 import { Dictionary } from "acts-util-core";
 import { CIDRRange } from "../../common/CIDRRange";
 import { LightweightResourceReference } from "../../common/ResourceReference";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { SysCtlConfService } from "./SysCtlConfService";
 import { OpenVPNGatewayProperties } from "./properties";
 import { FirewallZoneData, FirewallZoneDataProvider } from "../../services/HostFirewallZonesManager";
@@ -41,6 +41,7 @@ import { ResourceEvent, ResourceEventListener } from "../../services/ResourceEve
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { resourceProviders } from "openprivatecloud-common";
 import { HostSysLogBootDataProvider } from "../../services/data-providers/HostLogDataProviderService";
+import { HealthStatus } from "../../data-access/HealthController";
 
 export interface OpenVPNGatewayConnectedClientEntry
 {
@@ -94,6 +95,28 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
     }
     
     //Public methods
+    public async CheckResource(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
+    {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+            {
+                const serviceName = this.DeriveSystemDServiceName(resourceReference.id);
+                const isActive = await this.systemServicesManager.IsServiceActive(resourceReference.hostId, serviceName);
+                if(!isActive)
+                {
+                    const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, serviceName);
+                    if(!exists)
+                        return { status: HealthStatus.Corrupt, context: "service does not exist" };
+                    return { status: HealthStatus.Down, context: "service is not active" };
+                }
+            }
+            break;
+        }
+
+        return HealthStatus.Up;
+    }
+    
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         await this.StopServer(resourceReference.hostId, resourceReference.id);
@@ -228,18 +251,9 @@ ${taData}
         await this.DeployHostConfiguration(context.resourceReference);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
-        const serviceName = this.DeriveSystemDServiceName(resourceReference.id);
-        const isActive = await this.systemServicesManager.IsServiceActive(resourceReference.hostId, serviceName);
-        if(!isActive)
-        {
-            const exists = await this.systemServicesManager.DoesServiceUnitExist(resourceReference.hostId, serviceName);
-            if(!exists)
-                return { state: "corrupt", context: "service does not exist" };
-            return { state: "down", context: "service is not active" };
-        }
-        return "running";
+        return ResourceState.Running;
     }
 
     public async ReadConfig(instanceId: number): Promise<OpenVPNGatewayInternalConfig>

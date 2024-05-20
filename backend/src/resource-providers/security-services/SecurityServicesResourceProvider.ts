@@ -17,12 +17,13 @@
  * */
 import { Injectable } from "acts-util-node";
 import { resourceProviders } from "openprivatecloud-common";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceCheckResult, ResourceCheckType, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { SecurityServicesProperties } from "./properties";
 import { ResourceReference } from "../../common/ResourceReference";
 import { KeyVaultManager } from "./KeyVaultManager";
 import { WAFManager } from "./WAFManager";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
+import { HealthStatus } from "../../data-access/HealthController";
  
 @Injectable
 export class SecurityServicesResourceProvider implements ResourceProvider<SecurityServicesProperties>
@@ -42,7 +43,7 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
         return [
             {
                 fileSystemType: "btrfs",
-                healthCheckSchedule: {
+                dataIntegrityCheckSchedule: {
                     type: "weekly",
                     counter: 3
                 },
@@ -51,7 +52,7 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
             },
             {
                 fileSystemType: "btrfs",
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 requiredModules: [],
                 schemaName: "WAFProperties"
             },
@@ -59,14 +60,16 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
+    public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
         switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.securityServices.keyVaultResourceTypeName.name:
-                await this.keyVaultManager.CheckResourceHealth(resourceReference);
-                break;
+                return await this.keyVaultManager.CheckResourceHealth(resourceReference, type);
+            case resourceProviders.securityServices.wafResourceTypeName.name:
+                return await this.wafManager.QueryHealthStatus(resourceReference);
         }
+        return HealthStatus.Up;
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
@@ -105,16 +108,14 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
         }
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
     {
         switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.securityServices.keyVaultResourceTypeName.name:
                 return await this.keyVaultManager.QueryResourceState(resourceReference);
-            case resourceProviders.securityServices.wafResourceTypeName.name:
-                return await this.wafManager.QueryResourceState(resourceReference);
         }
-        return "corrupt";
+        return ResourceState.Running;
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

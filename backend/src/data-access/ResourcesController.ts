@@ -130,12 +130,10 @@ export class ResourcesController
     public async QueryOverviewInstanceData(instanceId: number)
     {
         const query = `
-        SELECT i.name, i.resourceProviderName, ig.name AS resourceGroupName, i.instanceType, ih.status
+        SELECT i.name, i.resourceProviderName, ig.name AS resourceGroupName, i.instanceType
         FROM instances i
         INNER JOIN instancegroups ig
             ON ig.id = i.instanceGroupId
-        INNER JOIN instances_health ih
-            ON ih.instanceId = i.id
         WHERE i.id = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();

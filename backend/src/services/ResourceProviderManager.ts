@@ -18,7 +18,7 @@
 
 import { Instantiatable } from "acts-util-core";
 import { GlobalInjector, Injectable } from "acts-util-node";
-import { BaseResourceProperties, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../resource-providers/ResourceProvider";
+import { BaseResourceProperties, ResourceCheckType, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../resource-providers/ResourceProvider";
 import { APISchemaService } from "./APISchemaService";
 import { ResourceReference } from "../common/ResourceReference";
 import { ErrorService } from "./ErrorService";
@@ -38,6 +38,12 @@ export class ResourceProviderManager
     }
 
     //Public methods
+    public CheckResource(resourceReference: ResourceReference, type: ResourceCheckType)
+    {
+        const resourceProvider = this.FindResourceProviderByResource(resourceReference);
+        return resourceProvider.CheckResource(resourceReference, type);
+    }
+
     public async ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string)
     {
         const resourceProvider = this.FindResourceProviderByName(resourceReference.resourceProviderName);
@@ -69,7 +75,7 @@ export class ResourceProviderManager
         await resourceProvider.ResourcePermissionsChanged(resourceReference);
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState | { error: string }>
     {
         const resourceProvider = this.FindResourceProviderByResource(resourceReference);
         try
@@ -79,8 +85,7 @@ export class ResourceProviderManager
         catch(e)
         {
             return {
-                state: "down",
-                context: this.errorService.ExtractDataAsMultipleLines(e),
+                error: this.errorService.ExtractDataAsMultipleLines(e),
             };
         }
     }
@@ -96,10 +101,10 @@ export class ResourceProviderManager
         return await rp.RequestDataProvider(resourceReference);
     }
 
-    public async RetrieveInstanceCheckSchedule(resourceReference: ResourceReference)
+    public async RetrieveResourceCheckSchedule(resourceReference: ResourceReference)
     {
         const resourceTypeDef = await this.FindResourceTypeDefinition(resourceReference);
-        return resourceTypeDef!.healthCheckSchedule;
+        return resourceTypeDef!.dataIntegrityCheckSchedule;
     }
 
     //Private variables

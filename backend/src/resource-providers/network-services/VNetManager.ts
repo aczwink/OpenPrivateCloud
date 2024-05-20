@@ -18,7 +18,7 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { VirtualNetworkProperties } from "./properties";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { HostFirewallManager } from "../../services/HostFirewallManager";
@@ -31,6 +31,7 @@ import { dnsmasqManager } from "./dnsmasqManager";
 import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInterfaceCardsManager";
 import { ModulesManager } from "../../services/ModulesManager";
 import { DistroInfoService } from "../../services/DistroInfoService";
+import { HealthStatus } from "../../data-access/HealthController";
 
 interface VNetSettings
 {
@@ -68,6 +69,29 @@ export class VNetManager implements FirewallZoneDataProvider
     }
 
     //Public methods
+    public async CheckResource(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
+    {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+            {
+                const exists = await this.DoesBridgeExist(resourceReference);
+                if(!exists)
+                    return { status: HealthStatus.Corrupt, context: "bridge is not there" };
+            }
+            break;
+            case ResourceCheckType.ServiceHealth:
+            {
+                const exists = await this.DoesBridgeExist(resourceReference);
+                if(!exists)
+                    await this.DeployHostConfiguration(resourceReference);
+            }
+            break;
+        }
+
+        return HealthStatus.Up;
+    }
+
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
         const bridgeName = this.DeriveBridgeName(resourceReference);
@@ -97,18 +121,6 @@ export class VNetManager implements FirewallZoneDataProvider
         rules.Remove(idx);
 
         await this.resourceConfigController.UpdateOrInsertConfig(resourceReference.id, config);
-        await this.hostFirewallManager.ApplyRuleSet(resourceReference.hostId);
-    }
-
-    public async DeployHostConfiguration(resourceReference: LightweightResourceReference)
-    {
-        await this.CreateBridge(resourceReference);
-        await this.sysCtlConfService.SetIPForwardingState(resourceReference.hostId, true);
-
-        const config = await this.QueryConfig(resourceReference);
-        if(config.settings.enableDHCPv4)
-            await this.StartDNS_DHCP_Server(resourceReference);
-
         await this.hostFirewallManager.ApplyRuleSet(resourceReference.hostId);
     }
 
@@ -251,12 +263,9 @@ export class VNetManager implements FirewallZoneDataProvider
         return config!;
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
-        const exists = await this.DoesBridgeExist(resourceReference);
-        if(!exists)
-            return { state: "corrupt", context: "bridge is not there" };
-        return "running";
+        return ResourceState.Running;
     }
 
     public async SetFirewallRule(resourceReference: LightweightResourceReference, direction: "Inbound" | "Outbound", rule: FirewallRule)
@@ -297,6 +306,18 @@ export class VNetManager implements FirewallZoneDataProvider
         const subdiv = this.SubdivideAddressSpace(range);
 
         await this.hostNetworkInterfaceCardsManager.CreateBridge(resourceReference.hostId, bridgeName, subdiv.gatewayIP, range.length);
+    }
+
+    private async DeployHostConfiguration(resourceReference: LightweightResourceReference)
+    {
+        await this.CreateBridge(resourceReference);
+        await this.sysCtlConfService.SetIPForwardingState(resourceReference.hostId, true);
+
+        const config = await this.QueryConfig(resourceReference);
+        if(config.settings.enableDHCPv4)
+            await this.StartDNS_DHCP_Server(resourceReference);
+
+        await this.hostFirewallManager.ApplyRuleSet(resourceReference.hostId);
     }
 
     private DeriveBridgeName(resourceReference: LightweightResourceReference)

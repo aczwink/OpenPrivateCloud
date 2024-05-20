@@ -18,7 +18,7 @@
 
 import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterButton, RouterState } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common/resourceProviders";
-import { ResourceOverviewDataDTO, ResourceState } from "../../../dist/api";
+import { HealthStatus, ResourceOverviewDataDTO, ResourceState } from "../../../dist/api";
 import { APIService } from "../../Services/APIService";
  
   
@@ -68,7 +68,7 @@ export class ResourceListComponent extends Component
         return <tr>
             <td>{this.RenderResourceIcon(resource.instanceType)} <Anchor route={"/resourceGroups/" + resource.resourceGroupName + "/resources" + urlPart}>{resource.name}</Anchor></td>
             <td>{resource.instanceType}</td>
-            <td>{this.RenderState(resource.state)}</td>
+            <td>{this.RenderState(resource.healthStatus, resource.state)}</td>
             <td>{resource.resourceProviderName}</td>
         </tr>;
     }
@@ -117,21 +117,25 @@ export class ResourceListComponent extends Component
         return null;
     }
 
-    private RenderState(state: ResourceState)
+    private RenderState(healthStatus: HealthStatus, state: ResourceState)
     {
+        switch(healthStatus)
+        {
+            case HealthStatus.Corrupt:
+                return <div className="text-danger"><BootstrapIcon>x-circle-fill</BootstrapIcon></div>;
+            case HealthStatus.Down:
+                return <div className="text-warning"><BootstrapIcon>exclamation-circle-fill</BootstrapIcon></div>;
+            case HealthStatus.InDeployment:
+                return <div className="text-danger"><BootstrapIcon>hourglass-split</BootstrapIcon></div>;
+        }
+        
         switch(state)
         {
-            case "corrupt":
-                return <div className="text-danger"><BootstrapIcon>x-circle-fill</BootstrapIcon></div>;
-            case "down":
-                return <div className="text-warning"><BootstrapIcon>exclamation-circle-fill</BootstrapIcon></div>;
-            case "running":
+            case ResourceState.Running:
                 return <div className="text-success"><BootstrapIcon>check-circle-fill</BootstrapIcon></div>;
-            case "in deployment":
-                return <div className="text-danger"><BootstrapIcon>hourglass-split</BootstrapIcon></div>;
-            case "stopped":
+            case ResourceState.Stopped:
                 return <div className="text-danger"><BootstrapIcon>stop-fill</BootstrapIcon></div>;
-            case "waiting":
+            case ResourceState.Waiting:
                 return <div className="text-primary"><BootstrapIcon>clock-history</BootstrapIcon></div>;
         }
     }

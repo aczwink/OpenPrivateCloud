@@ -29,10 +29,10 @@ import { ResourceDependenciesController } from "../../data-access/ResourceDepend
 import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricDecryptStream, OPCFormat_SymmetricEncrypt, SymmetricKeyToBuffer, UnpackSymmetricKey } from "../../common/crypto/symmetric";
 import { GenerateRandomUUID } from "../../common/crypto/randomness";
 import { Readable } from "stream";
-import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
 import { ModulesManager } from "../../services/ModulesManager";
 import { AVPreviewService } from "./AVPreviewService";
-import { ResourceStateResult } from "../ResourceProvider";
+import { ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
+import { HealthStatus } from "../../data-access/HealthController";
 
 export interface FileMetaDataRevision
 {
@@ -78,7 +78,7 @@ export type ThumbType = "" | "t" | "p";
 export class ObjectStoragesManager
 {
     constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceConfigController: ResourceConfigController,
-        private keyVaultManager: KeyVaultManager, private resourceDependenciesController: ResourceDependenciesController, private remoteCommandExecutor: RemoteCommandExecutor,
+        private keyVaultManager: KeyVaultManager, private resourceDependenciesController: ResourceDependenciesController,
         private modulesManager: ModulesManager, private avPreviewService: AVPreviewService)
     {
         this.cachedIndex = {};
@@ -86,14 +86,35 @@ export class ObjectStoragesManager
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: LightweightResourceReference)
+    public async CheckResourceHealth(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
-        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
-        if(!fp)
+        switch(type)
         {
-            const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-            await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+            case ResourceCheckType.Availability:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
+            }
+            break;
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+                    await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+                }
+            }
+            break;
         }
+
+        return HealthStatus.Up;
     }
 
     public async CreateSnapshot(resourceReference: LightweightResourceReference)
@@ -166,17 +187,9 @@ export class ObjectStoragesManager
         this.WriteIndex(resourceReference.id);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
-        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
-        if(!fp)
-        {
-            return {
-                state: "corrupt",
-                context: "incorrect file ownership"
-            };
-        }
-        return "running";
+        return ResourceState.Running;
     }
 
     public async RequestFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)

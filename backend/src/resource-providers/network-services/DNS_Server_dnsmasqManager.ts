@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,8 +21,8 @@ import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager"
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInterfaceCardsManager";
 import { DNS_ServerSettings, DNS_Zone } from "./models_dns";
-import { ResourceStateResult } from "../ResourceProvider";
 import { dnsmasqManager } from "./dnsmasqManager";
+import { HealthStatus } from "../../data-access/HealthController";
 
 @Injectable
 export class DNS_Server_dnsmasqManager
@@ -32,12 +32,12 @@ export class DNS_Server_dnsmasqManager
     }
 
     //Public methods
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryHealthStatus(resourceReference: LightweightResourceReference): Promise<HealthStatus>
     {
         const running = await this.dnsmasqManager.IsServiceRunning(resourceReference);
         if(running)
-            return "running";
-        return "down";
+            return HealthStatus.Up;
+        return HealthStatus.Down;
     }
 
     public async Stop(resourceReference: LightweightResourceReference)

@@ -47,23 +47,13 @@ export class HostAvailabilityManager
         const hostIds = await this.hostsController.RequestHostIds();
         for (const hostId of hostIds)
         {
-            await this.EnsureHostIsConfiguredAppropriatly(hostId);
-
-            const updateInfo = await this.hostUpdateManager.QueryUpdateInfo(hostId);
-            if(updateInfo.updatablePackagesCount > 10)
-                await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "host hasn't been updated in a while");
-            else
+            try
             {
-                const storageDevices = await this.hostStorageDevicesManager.QueryStorageDevices(hostId);
-                for (const storageDevice of storageDevices)
-                {
-                    const smart = await this.hostStorageDevicesManager.QuerySMARTInfo(hostId, storageDevice.path);
-                    if(!this.VerifySMARTData(smart))
-                    {
-                        await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "storage device problem");
-                        return;
-                    }
-                }
+                await this.CheckHostHealth(hostId);
+            }
+            catch(e)
+            {
+                await this.UpdateHostHealth(hostId, HealthStatus.Down, e);
             }
         }
     }
@@ -119,6 +109,33 @@ export class HostAvailabilityManager
         }
         await this.UpdateHostHealth(hostId, HealthStatus.Up);
         return true;
+    }
+
+    private async CheckHostHealth(hostId: number)
+    {
+        await this.EnsureHostIsConfiguredAppropriatly(hostId);
+
+        const updateInfo = await this.hostUpdateManager.QueryUpdateInfo(hostId);
+        if(updateInfo.updatablePackagesCount > 10)
+        {
+            await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "host hasn't been updated in a while");
+            return;
+        }
+        else
+        {
+            const storageDevices = await this.hostStorageDevicesManager.QueryStorageDevices(hostId);
+            for (const storageDevice of storageDevices)
+            {
+                const smart = await this.hostStorageDevicesManager.QuerySMARTInfo(hostId, storageDevice.path);
+                if(!this.VerifySMARTData(smart))
+                {
+                    await this.UpdateHostHealth(hostId, HealthStatus.Corrupt, "storage device problem");
+                    return;
+                }
+            }
+        }
+
+        await this.UpdateHostHealth(hostId, HealthStatus.Up);
     }
 
     private async IsStoragePathOwnershipCorrect(hostId: number, storagePath: string)

@@ -18,6 +18,7 @@
 
 import { ResourceReference } from "../common/ResourceReference";
 import { TimeSchedule } from "../common/TimeSchedule";
+import { HealthStatus } from "../data-access/HealthController";
 import { ModuleName } from "../distro/DistroPackageManager";
 import { DataSourcesProvider } from "../services/ClusterDataProvider";
 
@@ -35,10 +36,32 @@ export interface BaseResourceProperties
 
 export interface ResourceTypeDefinition
 {
-    healthCheckSchedule: TimeSchedule | null;
+    dataIntegrityCheckSchedule: TimeSchedule | null;
     fileSystemType: "btrfs" | "ext4";
     requiredModules: ModuleName[];
     schemaName: string;
+}
+
+export interface ResourceCheckResult
+{
+    status: HealthStatus;
+    context: string;
+}
+
+export enum ResourceCheckType
+{
+    /**
+     * A quick check whether the service is functional. The resource shall not be altered.
+     */
+    Availability,
+    /**
+     * A more intensive check of the service. This will be executed in case the availability check signaled corruption. Auto remediation steps in order to re-establish operatability should be performed if necessary.
+     */
+    ServiceHealth,
+    /**
+     * An intensive check of whether data of the service has not been tampered with. This does not include service configuration files or so but only real user data.
+     */
+    DataIntegrity
 }
 
 export interface ResourceDeletionError
@@ -60,20 +83,23 @@ export interface DeploymentResult
     config?: any;
 }
 
-export type ResourceState = "corrupt" | "down" | "in deployment" | "running" | "stopped" | "waiting";
-type ResourceStateWithContext = { state: ResourceState; context: string; };
-export type ResourceStateResult = ResourceState | ResourceStateWithContext;
+export enum ResourceState
+{
+    Running = 1,
+    Stopped = 2,
+    Waiting = 3
+}
 
 export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
 {
     readonly name: string;
     readonly resourceTypeDefinitions: ResourceTypeDefinition[];
 
-    CheckResourceHealth(resourceReference: ResourceReference): Promise<void>;
+    CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>;
     DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>;
     ExternalResourceIdChanged(resourceReference: ResourceReference, oldExternalResourceId: string): Promise<void>;
     ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
-    QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>;
+    QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>;
     RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>;
 }

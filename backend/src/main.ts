@@ -44,7 +44,7 @@ async function EnableHealthManagement()
 {
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckHostsHealth();
     await GlobalInjector.Resolve(HostAvailabilityManager).CheckResourcesAvailability();
-    GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecks();
+    GlobalInjector.Resolve(ResourceHealthManager).ScheduleResourceChecksForAllResources();
 }
 
 function EventManagementSetup()

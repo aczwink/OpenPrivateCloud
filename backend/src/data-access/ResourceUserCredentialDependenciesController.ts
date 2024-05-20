@@ -59,7 +59,7 @@ export class ResourceUserCredentialDependenciesController
     public async RequestUserRows(userId: number, state: SyncState)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select<UserRow>("SELECT resourceId, wantLoginPassword, FROM resources_userCredentialDependencies WHERE userId = ? AND state = ?", userId, state);
+        const rows = await conn.Select<UserRow>("SELECT resourceId, wantLoginPassword FROM resources_userCredentialDependencies WHERE userId = ? AND state = ?", userId, state);
 
         return rows;
     }

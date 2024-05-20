@@ -19,7 +19,7 @@ import crypto from "crypto";
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { KeyVaultProperties } from "./properties";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
@@ -32,6 +32,7 @@ import { CreateSymmetricKey, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncr
 import { ClusterKeyStoreManager } from "../../services/ClusterKeyStoreManager";
 import { AsymmetricDecrypt, AsymmetricEncrypt, AsymmetricKeyType, CreateRSA4096KeyPairWithoutPassphrase } from "../../common/crypto/asymmetric";
 import { TempFilesManager } from "../../services/TempFilesManager";
+import { HealthStatus } from "../../data-access/HealthController";
 
 export type KeyVaultKeyType = "gpg-4096" | AsymmetricKeyType;
 interface KeyVaultKey
@@ -69,20 +70,53 @@ export class KeyVaultManager
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: LightweightResourceReference)
+    public async CheckResourceHealth(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
-        const remDays = await this.RequestRemainingValidDaysOfCRL(resourceReference);
-        if((remDays !== undefined) && (remDays <= 60))
+        switch(type)
         {
-            const caDir = this.GetCA_Dir(resourceReference);
-            await this.easyRSAManager.UpdateCRL(resourceReference.hostId, caDir);
+            case ResourceCheckType.Availability:
+            {
+                const remDays = await this.RequestRemainingValidDaysOfCRL(resourceReference);
+                if((remDays !== undefined) && (remDays <= 0))
+                {
+                    return {
+                        context: "crl is expired",
+                        status: HealthStatus.Corrupt,
+                    };
+                }
+
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
+            }
+            break;
+            case ResourceCheckType.DataIntegrity:
+            {
+                const remDays = await this.RequestRemainingValidDaysOfCRL(resourceReference);
+                if((remDays !== undefined) && (remDays <= 60))
+                {
+                    const caDir = this.GetCA_Dir(resourceReference);
+                    await this.easyRSAManager.UpdateCRL(resourceReference.hostId, caDir);
+                }
+            }
+            break;
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    await this.CorrectFileOwnership(resourceReference);
+                }
+            }
+            break;
         }
 
-        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
-        if(!fp)
-        {
-            await this.CorrectFileOwnership(resourceReference);
-        }
+        return HealthStatus.Up;
     }
 
     public ComputeNumberOfRemainingValidDays(expiryDate: Date | number)
@@ -305,27 +339,9 @@ export class KeyVaultManager
         return config.caConfig;
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
-        const remDays = await this.RequestRemainingValidDaysOfCRL(resourceReference);
-        if((remDays !== undefined) && (remDays <= 0))
-        {
-            return {
-                context: "crl is expired",
-                state: "corrupt"
-            };
-        }
-
-        const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
-        if(!fp)
-        {
-            return {
-                state: "corrupt",
-                context: "incorrect file ownership"
-            };
-        }
-
-        return "running";
+        return ResourceState.Running;
     }
 
     public async QuerySecretNames(resourceReference: LightweightResourceReference)

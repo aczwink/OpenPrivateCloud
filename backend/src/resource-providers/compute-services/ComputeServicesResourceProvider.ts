@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceCheckResult, ResourceCheckType, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { VirtualMachineManager } from "./VirtualMachineManager";
 import { ContainerAppServiceManager } from "./ContainerAppServiceManager";
@@ -24,6 +24,7 @@ import { ComputeServicesProperties } from "./Properties";
 import { DockerManager } from "./DockerManager";
 import { ResourceReference } from "../../common/ResourceReference";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
+import { HealthStatus } from "../../data-access/HealthController";
  
 @Injectable
 export class ComputeServicesResourceProvider implements ResourceProvider<ComputeServicesProperties>
@@ -44,12 +45,12 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
         return [
             {
                 fileSystemType: "btrfs",
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 requiredModules: [],
                 schemaName: "DockerContainerProperties"
             },
             {
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 fileSystemType: "ext4",
                 requiredModules: [],
                 schemaName: "VirtualMachineProperties"
@@ -58,8 +59,9 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
+    public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
+        return HealthStatus.Up;
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
@@ -99,7 +101,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
         return {};
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
     {
         switch(resourceReference.resourceTypeName)
         {
@@ -108,7 +110,7 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
             case resourceProviders.computeServices.virtualMachineResourceType.name:
                 return await this.virtualMachineManager.QueryResourceState(resourceReference);
         }
-        return "corrupt";
+        return ResourceState.Running;
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

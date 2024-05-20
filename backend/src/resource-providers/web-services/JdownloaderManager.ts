@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystem
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { SharedFolderPermissionsManager } from "../file-services/SharedFolderPermissionsManager";
 import { SingleSMBSharePerInstanceProvider } from "../file-services/SingleSMBSharePerInstanceProvider";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceState } from "../ResourceProvider";
 import { JdownloaderProperties } from "./Properties";
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 
@@ -124,12 +124,12 @@ export class JdownloaderManager
         };
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
         const isActive = await this.IsActive(resourceReference);
         if(isActive)
-            return "running";
-        return "stopped";
+            return ResourceState.Running;
+        return ResourceState.Stopped;
     }
 
     public async RefreshPermissions(resourceReference: ResourceReference)

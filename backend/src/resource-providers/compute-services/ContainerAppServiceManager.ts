@@ -18,7 +18,7 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
-import { DeploymentContext, ResourceDeletionError, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext, ResourceDeletionError, ResourceState } from "../ResourceProvider";
 import { DockerContainerConfig, DockerContainerConfigVolume, DockerContainerInfo, DockerEnvironmentVariableMapping, DockerManager } from "./DockerManager";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourcesManager } from "../../services/ResourcesManager";
@@ -152,7 +152,7 @@ export class ContainerAppServiceManager
         return this.dockerManager.QueryContainerLogs(resourceReference.hostId, containerName);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>
     {
         const state = await this.QueryContainerStatus(resourceReference);
         switch(state)
@@ -160,9 +160,9 @@ export class ContainerAppServiceManager
             case "created":
             case "exited":
             case "not created yet":
-                return "stopped";
+                return ResourceState.Stopped;
             case "running":
-                return "running";
+                return ResourceState.Running;
         }
         throw new Error(state);
     }

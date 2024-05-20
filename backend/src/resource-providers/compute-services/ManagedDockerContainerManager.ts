@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,8 @@
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { DockerContainerConfig, DockerContainerNetworkJoinOptions, DockerManager } from "./DockerManager";
-import { ResourceStateResult } from "../ResourceProvider";
 import { VNetManager } from "../network-services/VNetManager";
+import { HealthStatus } from "../../data-access/HealthController";
 
 export interface ContainerInfo
 {
@@ -110,22 +110,22 @@ export class ManagedDockerContainerManager
         return this.dockerManager.QueryContainerLogs(resourceReference.hostId, containerName);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryHealthStatus(resourceReference: LightweightResourceReference): Promise<HealthStatus>
     {
         const containerName = this.DeriveContainerName(resourceReference);
         const containerInfo = await this.dockerManager.InspectContainer(resourceReference.hostId, containerName);
         if(containerInfo === undefined)
-            return "in deployment";
+            return HealthStatus.InDeployment;
 
         switch(containerInfo.State.Status)
         {
             case "created":
             case "restarting":
-                return "in deployment";
+                return HealthStatus.InDeployment;
             case "exited":
-                return "down";
+                return HealthStatus.Down;
             case "running":
-                return "running";
+                return HealthStatus.Up;
         }
     }
 

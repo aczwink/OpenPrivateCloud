@@ -16,13 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, DeploymentResult, ResourceDeletionError, ResourceProvider, ResourceStateResult, ResourceTypeDefinition } from "../ResourceProvider";
+import { DeploymentContext, DeploymentResult, ResourceCheckResult, ResourceCheckType, ResourceDeletionError, ResourceProvider, ResourceState, ResourceTypeDefinition } from "../ResourceProvider";
 import { resourceProviders } from "openprivatecloud-common";
 import { FileStoragesManager } from "./FileStoragesManager";
 import { ResourceReference } from "../../common/ResourceReference";
 import { FileServicesProperties } from "./properties";
 import { ObjectStoragesManager } from "./ObjectStoragesManager";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
+import { HealthStatus } from "../../data-access/HealthController";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileServicesProperties>
@@ -41,13 +42,13 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
     {
         return [
             {
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 fileSystemType: "btrfs",
                 requiredModules: ["samba"],
                 schemaName: "FileStorageProperties"
             },
             {
-                healthCheckSchedule: null,
+                dataIntegrityCheckSchedule: null,
                 fileSystemType: "btrfs",
                 requiredModules: [],
                 schemaName: "ObjectStorageProperties"
@@ -56,17 +57,16 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
     }
 
     //Public methods
-    public async CheckResourceHealth(resourceReference: ResourceReference): Promise<void>
+    public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
         switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.fileServices.fileStorageResourceType.name:
-                await this.fileStoragesManager.CheckResourceHealth(resourceReference);
-                break;
+                return await this.fileStoragesManager.CheckResourceHealth(resourceReference, type);
             case resourceProviders.fileServices.objectStorageResourceType.name:
-                await this.objectStoragesManager.CheckResourceHealth(resourceReference);
-                break;
+                return await this.objectStoragesManager.CheckResourceHealth(resourceReference, type);
         }
+        return HealthStatus.Up;
     }
     
     public async DeleteResource(resourceReference: ResourceReference): Promise<ResourceDeletionError | null>
@@ -116,7 +116,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
         return {};
     }
 
-    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceStateResult>
+    public async QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>
     {
         switch(resourceReference.resourceTypeName)
         {
@@ -125,7 +125,7 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
             case resourceProviders.fileServices.objectStorageResourceType.name:
                 return await this.objectStoragesManager.QueryResourceState(resourceReference);
         }
-        return "running";
+        return ResourceState.Running;
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

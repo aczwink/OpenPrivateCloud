@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { DNS_ServerProperties } from "./properties";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext } from "../ResourceProvider";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ResourcesManager } from "../../services/ResourcesManager";
@@ -160,15 +160,15 @@ export class DNS_ServerManager
         this.UpdateServerState(context.resourceReference);
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryHealthStatus(resourceReference: LightweightResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
         switch(config.serverSettings.backend)
         {
             case "bind9":
-                return this.bindContainerManager.QueryResourceState(resourceReference);
+                return this.bindContainerManager.QueryHealthStatus(resourceReference);
             case "dnsmasq":
-                return this.dnsmasqManager.QueryResourceState(resourceReference);
+                return this.dnsmasqManager.QueryHealthStatus(resourceReference);
         }
     }
 

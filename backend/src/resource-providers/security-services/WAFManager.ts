@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { Injectable } from "acts-util-node";
-import { DeploymentContext, ResourceStateResult } from "../ResourceProvider";
+import { DeploymentContext } from "../ResourceProvider";
 import { WAFProperties } from "./properties";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ManagedDockerContainerManager } from "../compute-services/ManagedDockerContainerManager";
@@ -93,9 +93,9 @@ export class WAFManager
         return log;
     }
 
-    public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceStateResult>
+    public async QueryHealthStatus(resourceReference: LightweightResourceReference)
     {
-        return await this.managedDockerContainerManager.QueryResourceState(resourceReference);
+        return await this.managedDockerContainerManager.QueryHealthStatus(resourceReference);
     }
 
     public QuerySettings(resourceReference: LightweightResourceReference)

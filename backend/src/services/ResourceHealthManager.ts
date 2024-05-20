@@ -27,8 +27,9 @@ import { ResourceGroupsController } from "../data-access/ResourceGroupsControlle
 import { ErrorService } from "./ErrorService";
 import { ResourcesManager } from "./ResourcesManager";
 import { ResourceReference } from "../common/ResourceReference";
-import { ResourceState, ResourceStateResult } from "../resource-providers/ResourceProvider";
 import { ModulesManager } from "./ModulesManager";
+import { ResourceCheckType } from "../resource-providers/ResourceProvider";
+import { TimeSchedule } from "../common/TimeSchedule";
   
 @Injectable
 export class ResourceHealthManager
@@ -47,8 +48,8 @@ export class ResourceHealthManager
         let status;        
         try
         {
-            const result = await this.UpdateResourceState(ref!);
-            status = result.extracted.status;
+            status = this.resourceProviderManager.CheckResource(ref!, ResourceCheckType.Availability);
+            await this.UpdateResourceAvailability(resourceId, HealthStatus.Up);
         }
         catch(e)
         {
@@ -57,41 +58,27 @@ export class ResourceHealthManager
         }
 
         if(status === HealthStatus.Corrupt)
-            this.CheckResource(resourceId);
+            this.CheckResourceHealth(resourceId, ResourceCheckType.ServiceHealth);
     }
 
-    public async RequestResourceState(resourceReference: ResourceReference): Promise<ResourceState>
+    public async RequestHealthStatus(resourceId: number)
     {
-        const result = await this.UpdateResourceState(resourceReference);
-        switch(result.extracted.status)
-        {
-            case HealthStatus.Corrupt:
-                return "corrupt";
-            case HealthStatus.Down:
-                return "down";
-            case HealthStatus.InDeployment:
-                return "in deployment";
-            case HealthStatus.Up:
-            {
-                return (typeof result.state === "string") ? result.state : result.state.state;
-            }
-        }
+        const result = await this.healthController.QueryResourceHealthData(resourceId);
+        if(result.length === 0)
+            return HealthStatus.InDeployment;
+        return Math.max(...result.map(x => x.status)) as HealthStatus;
     }
 
-    public async ScheduleResourceCheck(resourceId: number)
+    public async ScheduleResourceChecks(resourceId: number)
     {
-        const ref = await this.resourcesManager.CreateResourceReference(resourceId);
-        const schedule = await this.resourceProviderManager.RetrieveInstanceCheckSchedule(ref!);
-        if(schedule === null)
-            return;
+        this.ScheduleResourceCheck(resourceId, ResourceCheckType.ServiceHealth);
 
-        const hd = await this.healthController.QueryResourceHealthData(resourceId);
-        const lastSuccessfulCheck = hd?.lastSuccessfulCheck ?? new Date(0);
-
-        this.taskScheduler.ScheduleWithOverdueProtection(lastSuccessfulCheck, schedule, this.OnInstanceCheckScheduled.bind(this, resourceId));
+        const schedule = await this.RequestDataIntegrityCheckSchedule(resourceId);
+        if(schedule !== null)
+            this.ScheduleResourceCheck(resourceId, ResourceCheckType.DataIntegrity);
     }
 
-    public async ScheduleResourceChecks()
+    public async ScheduleResourceChecksForAllResources()
     {
         const resourceGroups = await this.resourceGroupController.QueryAllGroups();
         for (const resourceGroup of resourceGroups)
@@ -99,7 +86,7 @@ export class ResourceHealthManager
             const resourceIds = await this.resourcesController.QueryAllResourceIdsInResourceGroup(resourceGroup.id);
             for (const resourceId of resourceIds)
             {
-                this.ScheduleResourceCheck(resourceId);
+                this.ScheduleResourceChecks(resourceId);
             }   
         }
     }
@@ -107,75 +94,44 @@ export class ResourceHealthManager
     public async UpdateResourceAvailability(resourceId: number, status: HealthStatus, logData?: unknown)
     {
         const log = this.errorService.ExtractDataAsMultipleLines(logData);
-        await this.healthController.UpdateResourceAvailability(resourceId, status, log);
-    }
-
-    private async UpdateResourceState(resourceReference: ResourceReference)
-    {
-        const result = await this.resourceProviderManager.QueryResourceState(resourceReference!);
-        const extracted = this.ExtractResourceStateResult(result);
-        await this.UpdateResourceAvailability(resourceReference.id, extracted.status, extracted.msg);
-
-        return {
-            state: result,
-            extracted
-        };
+        await this.healthController.UpdateResourceHealth(resourceId, ResourceCheckType.Availability, status, log);
     }
 
     //Private methods
-    private async CheckResource(resourceId: number)
+    private async CheckResourceHealth(resourceId: number, checkType: ResourceCheckType)
     {
         const ref = await this.resourcesManager.CreateResourceReference(resourceId);
         if(ref === undefined)
             return false; //resource was deleted
 
         const hd = await this.healthController.QueryResourceHealthData(resourceId);
-        if(hd?.status === HealthStatus.Down)
+        const availabilityStatus = hd.find(x => x.checkType === ResourceCheckType.Availability)?.status;
+        if(availabilityStatus === HealthStatus.Down)
             return false; //resource is not reachable so can't perform health test
-        if(hd?.status === HealthStatus.InDeployment)
+        if(availabilityStatus === HealthStatus.InDeployment)
             return true; //resource is still being deployed. Try later
 
-        const resourceTypeDef = await this.resourceProviderManager.FindResourceTypeDefinition(ref);
-        for (const moduleName of resourceTypeDef!.requiredModules)
-            await this.modulesManager.EnsureModuleIsInstalled(ref.hostId, moduleName);
+        if(checkType === ResourceCheckType.ServiceHealth)
+        {
+            const resourceTypeDef = await this.resourceProviderManager.FindResourceTypeDefinition(ref);
+            for (const moduleName of resourceTypeDef!.requiredModules)
+                await this.modulesManager.EnsureModuleIsInstalled(ref.hostId, moduleName);
+        }
 
-        const resourceProvider = this.resourceProviderManager.FindResourceProviderByResource(ref);
         try
         {
-            await resourceProvider.CheckResourceHealth(ref);
+            await this.resourceProviderManager.CheckResource(ref, checkType);
         }
         catch(e)
         {
-            await this.UpdateResourceHealth(ref.id, HealthStatus.Corrupt, e);
+            await this.UpdateResourceHealth(ref.id, checkType, HealthStatus.Corrupt, e);
             const userGroupId = await this.FindGroupAssociatedWithInstance(ref);
-            await this.notificationsManager.SendErrorNotification(userGroupId, "Instance health check failed", e);
+            await this.notificationsManager.SendErrorNotification(userGroupId, "Resource health check failed", e);
             return false;
         }
 
-        await this.UpdateResourceHealth(ref.id, HealthStatus.Up);
+        await this.UpdateResourceHealth(ref.id, checkType, HealthStatus.Up);
         return true;
-    }
-
-    private ExtractResourceStateResult(result: ResourceStateResult)
-    {
-        function GetHealthStatus(state: ResourceState)
-        {
-            switch(state)
-            {
-                case "corrupt":
-                    return HealthStatus.Corrupt;
-                case "down":
-                    return HealthStatus.Down;
-                case "in deployment":
-                    return HealthStatus.InDeployment;
-            }
-            return HealthStatus.Up;
-        }
-
-        if(typeof result === "string")
-            return { status: GetHealthStatus(result), msg: "" };
-        else
-            return { status: GetHealthStatus(result.state), msg: result.context };
     }
 
     private async FindGroupAssociatedWithInstance(resourceReference: ResourceReference)
@@ -185,17 +141,42 @@ export class ResourceHealthManager
         return groups[0].id;
     }
 
-    private async UpdateResourceHealth(resourceId: number, status: HealthStatus, logData?: unknown)
+    private async RequestDataIntegrityCheckSchedule(resourceId: number)
+    {
+        const ref = await this.resourcesManager.CreateResourceReference(resourceId);
+        const schedule = await this.resourceProviderManager.RetrieveResourceCheckSchedule(ref!);
+        return schedule;
+    }
+
+    private async ScheduleResourceCheck(resourceId: number, checkType: ResourceCheckType)
+    {
+        const hd = await this.healthController.QueryResourceHealthData(resourceId);
+        const lastSuccessfulCheck = hd.find(x => x.checkType === checkType)?.lastSuccessfulCheck ?? new Date(0);
+
+        let schedule: TimeSchedule | null;
+        switch(checkType)
+        {
+            case ResourceCheckType.DataIntegrity:
+                schedule = await this.RequestDataIntegrityCheckSchedule(resourceId);
+                break;
+            case ResourceCheckType.ServiceHealth:
+                schedule = { type: "daily", atHour: 3 };
+        }
+
+        this.taskScheduler.ScheduleWithOverdueProtection(lastSuccessfulCheck, schedule!, this.OnCheckScheduled.bind(this, resourceId, checkType));
+    }
+
+    private async UpdateResourceHealth(resourceId: number, checkType: ResourceCheckType, status: HealthStatus, logData?: unknown)
     {
         const log = this.errorService.ExtractDataAsMultipleLines(logData);
-        await this.healthController.UpdateResourceHealth(resourceId, status, log);
+        await this.healthController.UpdateResourceHealth(resourceId, checkType, status, log);
     }
 
     //Event handlers
-    private async OnInstanceCheckScheduled(instanceId: number)
-    {
-        const checkResult = await this.CheckResource(instanceId);
+    private async OnCheckScheduled(resourceId: number, checkType: ResourceCheckType)
+    {        
+        const checkResult = await this.CheckResourceHealth(resourceId, checkType);
         if(checkResult)
-            this.ScheduleResourceCheck(instanceId);
+            this.ScheduleResourceCheck(resourceId, checkType);
     }
 }
