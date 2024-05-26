@@ -132,11 +132,13 @@ export class ManagedActiveDirectoryManager implements ResourceEventListener
     {
         if(event.type === "userCredentialsProvided")
         {
-            const config = await this.ReadConfig(event.resourceId);
-
             const ref = await this.resourcesManager.CreateResourceReference(event.resourceId);
             if(ref === undefined)
                 return; //resource might have been deleted in the mean time
+            if(ref.resourceTypeName !== resourceProviders.integrationServices.managedActiveDirectoryResourceType.name)
+                return; //TODO: fix this! this event should only come if resource needs it. See UserCredentialsProvider
+
+            const config = await this.ReadConfig(event.resourceId);
 
             const userEntry = config.state.userMapping[event.userId];
             if(userEntry === undefined)

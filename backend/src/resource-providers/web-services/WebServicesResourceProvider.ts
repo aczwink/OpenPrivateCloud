@@ -95,6 +95,8 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
         {
             case resourceProviders.webServices.apiGatewayResourceType.name:
                 return await this.apiGatewayManager.QueryHealthStatus(resourceReference);
+            case resourceProviders.webServices.jdownloaderResourceType.name:
+                return await this.jdownloaderManager.QueryHealthStatus(resourceReference);
             case resourceProviders.webServices.letsencryptCertResourceType.name:
                 if(type === ResourceCheckType.DataIntegrity)
                     await this.letsEncryptManager.RenewCertificateIfRequired(resourceReference);

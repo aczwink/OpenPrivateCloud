@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -59,11 +59,6 @@ class DebianPackageManager implements DistroPackageManager
     {
         switch(moduleName)
         {
-            /*case "phpmyadmin":
-                await this.SetDebConfValue("phpmyadmin", "phpmyadmin/dbconfig-install", false);
-                await this.SetDebConfValue("phpmyadmin", "phpmyadmin/dbconfig-remove", false);
-                await this.SetDebConfValue("phpmyadmin", "phpmyadmin/reconfigure-webserver", ["apache2"]);
-                break;*/
             case "samba":
                 await this.SetDebConfValue(hostId, "samba-common", "samba-common/dhcp", false);
                 break;
@@ -118,8 +113,6 @@ class DebianPackageManager implements DistroPackageManager
     {
         switch(moduleName)
         {
-            case "apache":
-                return ["apache2"];
             case "core":
                 return ["acl", "btrfs-progs", "nftables", "smartmontools", "unattended-upgrades", "unzip"];
             case "dnsmasq":
@@ -128,14 +121,10 @@ class DebianPackageManager implements DistroPackageManager
                 return ["docker.io"];
             case "ffmpeg":
                 return ["ffmpeg"];
-            case "java":
-                return ["openjdk-11-jre-headless"];
             case "libvirt":
                 return ["libosinfo-bin", "libvirt-daemon-system", "qemu-kvm", "virtinst"];
             case "mariadb":
                 return ["mariadb-server"];
-            case "nextcloud-dependencies":
-                return ["php", "php-mysql", "php-zip", "php-xml", "php-mbstring", "php-gd", "php-curl"];
             case "node":
                 return ["nodejs"];
             case "openvpn":
@@ -144,12 +133,6 @@ class DebianPackageManager implements DistroPackageManager
                 return ["samba", "samba-common-bin"];
             case "webdav":
                 return ["davfs2"];
-            /*
-            case "cifs":
-                return ["cifs-utils"];
-            case "phpmyadmin":
-                return ["phpmyadmin", "libapache2-mod-php"];
-            */
             default:
                 throw new Error("Unknown module: " + moduleName);
         }

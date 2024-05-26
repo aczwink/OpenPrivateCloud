@@ -43,11 +43,6 @@ export const linuxSpecialGroups = {
 
 export const opcGroupPrefixes = {
     /**
-     * Primary groups for daemons. The "s" stands for service principal
-     */
-    daemon: "opc-dg-",
-
-    /**
      * OpenPrivateCloud groups are mirrored into hosts
      */
     group: "opc-g-"
@@ -81,11 +76,6 @@ export const opcSpecialUsers = {
 };
 
 export const opcUserPrefixes = {
-    /**
-     * Users for special daemon processes that should run with less privileges than the default "opc" user
-     */
-    daemon: "opc-du-",
-
     /**
      * OpenPrivateCloud users are mirrored into hosts
      */

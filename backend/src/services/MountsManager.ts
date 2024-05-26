@@ -93,7 +93,7 @@ export class MountsManager
         const rand = crypto.pseudoRandomBytes(64).toString("hex");
         const mountPoint = await this.CreateUniqueMountPoint(hostId, rand);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "mount", "-t", "tmpfs", "-o", "size=" + sizeInMB + "m", "tmpfs", mountPoint], hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", opcSpecialUsers.host + ":" + opcSpecialGroups.host, mountPoint], hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "chown", opcSpecialUsers.host.name + ":" + opcSpecialGroups.host.name, mountPoint], hostId);
         return {
             mountPoint,
             Release: this.UnmountAndRemoveMountPoint.bind(this, hostId, mountPoint)

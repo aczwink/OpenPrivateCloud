@@ -37,23 +37,6 @@ export class HostUsersManager
     }
 
     //Public methods
-    public async CreateHostServicePrincipal(hostId: number, name: string)
-    {
-        const linuxGroupName = opcGroupPrefixes.daemon + name;
-        await this.CreateHostGroup(hostId, linuxGroupName);
-
-        const linuxUserName = opcUserPrefixes.daemon + name;
-        await this.CreateHostUser(hostId, linuxUserName, linuxGroupName);
-
-        return this.ResolveHostServicePrinciple(hostId, name);
-    }
-
-    public async DeleteHostServicePrincipal(hostId: number, name: string)
-    {
-        await this.DeleteHostUser(hostId, opcUserPrefixes.daemon + name);
-        await this.DeleteHostGroup(hostId, opcGroupPrefixes.daemon + name);
-    }
-
     public MapGroupToLinuxGroupName(userGroupId: number)
     {
         return opcGroupPrefixes.group + userGroupId;
@@ -94,19 +77,6 @@ export class HostUsersManager
         const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["getent", "group", linuxGroupName], hostId);
         const parts = result.stdOut.split(":");
         return parseInt(parts[2]);
-    }
-
-    public async ResolveHostServicePrinciple(hostId: number, name: string)
-    {
-        const linuxGroupName = opcGroupPrefixes.daemon + name;
-        const linuxUserName = opcUserPrefixes.daemon + name;
-
-        return {
-            hostGroupId: await this.ResolveHostGroupId(hostId, linuxGroupName),
-            hostUserId: await this.ResolveHostUserId(hostId, linuxUserName),
-            linuxGroupName: linuxGroupName,
-            linuxUserName: linuxUserName
-        };
     }
 
     public async ResolveHostUserId(hostId: number, linuxUserName: string)

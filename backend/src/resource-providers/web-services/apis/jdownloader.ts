@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,19 +16,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Get, Header, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Conflict, Get, Header, Path, Post, Put } from "acts-util-apilib";
 import { c_jdownloaderResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { SessionsManager } from "../../services/SessionsManager";
-import { JdownloaderManager, MyJDownloaderCredentials } from "./JdownloaderManager";
-import { ResourceReference } from "../../common/ResourceReference";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { SessionsManager } from "../../../services/SessionsManager";
+import { JDownloaderPublicConfig, JdownloaderManager } from "../JdownloaderManager";
+import { ResourceReference } from "../../../common/ResourceReference";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 
 interface JdownloaderInfoDto
 {
-    hostName: string;
     isActive: boolean;
-    storagePath: string;
+    ipAddresses: string[];
+
+    /**
+     * Only valid in UI deployment model
+     */
+    uiPort: number;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_jdownloaderResourceTypeName}/{resourceName}`)
@@ -57,32 +61,36 @@ class JdownloaderAPIController extends ResourceAPIControllerBase
         await this.jdownloaderManager.StartOrStopService(resourceReference, action);
     }
 
-    @Get("credentials")
-    public async QueryCredentials(
+    @Get("config")
+    public async QueryConfig(
         @Common resourceReference: ResourceReference,
     )
     {
-        return await this.jdownloaderManager.QueryCredentials(resourceReference);
+        return await this.jdownloaderManager.RequestPublicConfig(resourceReference);
     }
 
-    @Put("credentials")
-    public async UpdateCredentials(
+    @Put("config")
+    public async UpdateConfig(
         @Common resourceReference: ResourceReference,
-        @Body credentials: MyJDownloaderCredentials
+        @Body config: JDownloaderPublicConfig
     )
     {
-        return await this.jdownloaderManager.SetCredentials(resourceReference, credentials);
+        if(await this.jdownloaderManager.IsActive(resourceReference))
+            return Conflict("Can't update configuration while service is running. Shut it down first.");
+        
+        return await this.jdownloaderManager.UpdatePublicConfig(resourceReference, config);
     }
 
     @Get("info")
     public async QueryInfo(
         @Common resourceReference: ResourceReference,
     )
-    {            
+    {
+        const info = await this.jdownloaderManager.RequestInfo(resourceReference);
         const result: JdownloaderInfoDto = {
-            hostName: resourceReference.hostName,
             isActive: await this.jdownloaderManager.IsActive(resourceReference),
-            storagePath: resourceReference.hostStoragePath
+            ipAddresses: info.ipAddresses,
+            uiPort: info.uiPort
         };
         return result;
     }

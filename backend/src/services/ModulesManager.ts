@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,6 @@ import { GlobalInjector, Injectable } from "acts-util-node";
 import { HostStoragesController } from "../data-access/HostStoragesController";
 import { DistroPackageManager, ModuleName } from "../distro/DistroPackageManager";
 import { SambaSharesManager } from "../resource-providers/file-services/SambaSharesManager";
-import { ApacheManager } from "../resource-providers/web-services/ApacheManager";
 import { DistroInfoService } from "./DistroInfoService";
 import { HostStoragesManager } from "./HostStoragesManager";
 import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
@@ -106,9 +105,6 @@ export class ModulesManager
     {
         switch(moduleName)
         {
-            case "apache":
-                await GlobalInjector.Resolve(ApacheManager).DisableSite(hostId, "000-default");
-                break;
             case "docker":
                 {
                     const distroInfoService = GlobalInjector.Resolve(DistroInfoService);

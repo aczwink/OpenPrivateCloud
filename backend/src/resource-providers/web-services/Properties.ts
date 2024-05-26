@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -32,6 +32,12 @@ export interface API_GatewayProperties extends BaseResourceProperties
 export interface JdownloaderProperties extends BaseResourceProperties
 {
     type: "jdownloader";
+
+    /**
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vnetResourceExternalId: string;
 }
 
 export interface LetsEncryptProperties extends BaseResourceProperties
@@ -64,11 +70,19 @@ export interface NextcloudProperties extends BaseResourceProperties
 {
     type: "nextcloud";
 
-     /**
+    /**
+     * @format key-vault-reference[certificate]
      * @title Certificate
-     * @format instance-same-host[web-services/letsencrypt-cert]
      */
-    certResourceExternalId: string;
+    keyVaultCertificateReference: string;
+
+    trustedDomain: string;
+
+    /**
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vnetResourceExternalId: string;
 }
 
 export interface NodeAppServiceProperties extends BaseResourceProperties

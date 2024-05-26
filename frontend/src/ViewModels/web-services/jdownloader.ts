@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,9 +17,8 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { JdownloaderInfoDto, MyJDownloaderCredentials, SMBConnectionInfo } from "../../../dist/api";
+import { JDownloaderPublicConfig, JdownloaderInfoDto, SMBConnectionInfo } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
-import { BuildAccessControlPageEntry } from "../shared/accesscontrol";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
@@ -50,19 +49,19 @@ const overviewViewModel: ObjectViewModel<JdownloaderInfoDto, ResourceAndGroupId>
     schemaName: "JdownloaderInfoDto"
 };
 
-const myjdcredentialsViewModel: ObjectViewModel<MyJDownloaderCredentials, ResourceAndGroupId> = {
+const configViewModel: ObjectViewModel<JDownloaderPublicConfig, ResourceAndGroupId> = {
     type: "object",
     actions: [
         {
             type: "edit",
-            propertiesSchemaName: "MyJDownloaderCredentials",
-            requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.credentials.get(ids.resourceGroupName, ids.resourceName),
-            updateResource: (service, ids, creds) => service.resourceProviders._any_.webservices.jdownloader._any_.credentials.put(ids.resourceGroupName, ids.resourceName, creds),
+            propertiesSchemaName: "JDownloaderPublicConfig",
+            requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.config.get(ids.resourceGroupName, ids.resourceName),
+            updateResource: (service, ids, creds) => service.resourceProviders._any_.webservices.jdownloader._any_.config.put(ids.resourceGroupName, ids.resourceName, creds),
         }
     ],
-    formTitle: _ => "MyJD Credentials",
-    requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.credentials.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "MyJDownloaderCredentials"
+    formTitle: _ => "Configuration",
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.jdownloader._any_.config.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "JDownloaderPublicConfig"
 };
 
 const smbConnectionViewModel: ObjectViewModel<SMBConnectionInfo, ResourceAndGroupId>  = {
@@ -87,9 +86,9 @@ export const jdownloaderViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                     child: overviewViewModel,
                 },
                 {
-                    key: "credentials",
-                    displayName: "Credentials",
-                    child: myjdcredentialsViewModel
+                    key: "config",
+                    displayName: "Config",
+                    child: configViewModel
                 },
                 {
                     key: "smb-connection",

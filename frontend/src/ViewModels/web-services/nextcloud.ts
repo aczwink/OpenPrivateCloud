@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,9 +17,9 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { PageNotFoundComponent } from "../../PageNotFoundComponent";
-import { MultiPageViewModel } from "../../UI/ViewModel";
+import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
+import { NextcloudInfoDTO } from "../../../dist/api";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -27,6 +27,14 @@ function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
     return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.nextcloudResourceType.name + "/" + resourceName;
 }
+
+const overviewViewModel: ObjectViewModel<NextcloudInfoDTO, ResourceAndGroupId> = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "Overview",
+    requestObject: (service, ids) => service.resourceProviders._any_.webservices.nextcloud._any_.info.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "NextcloudInfoDTO"
+};
 
 export const nextcloudViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
@@ -39,15 +47,8 @@ export const nextcloudViewModel: MultiPageViewModel<ResourceAndGroupId> = {
                 {
                     key: "overview",
                     displayName: "Overview",
-                    child: {
-                        type: "component",
-                        component: PageNotFoundComponent
-                    },
-                    icon: {
-                        name: "storage",
-                        type: "material"
-                    }
-                }
+                    child: overviewViewModel,
+                },
             ]
         },
         BuildResourceGeneralPageGroupEntry(BuildResourceId),
