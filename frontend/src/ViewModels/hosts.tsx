@@ -19,13 +19,14 @@
 import { JSX_CreateElement } from "acfrontend";
 import { AddHostDTO, FirewallRule, Host, HostBootEntryDTO, HostHealthData, HostStorage, HostStorageCreationProperties, HostStorageWithInfo, NetworkInterfaceDTO, PartitionDto, PortForwardingRule, StorageDeviceDto, UpdateHostPasswordDTO } from "../../dist/api";
 import { ListViewModel } from "../UI/ListViewModel";
-import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
+import { CollectionViewModel, ComponentViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ViewProcessesListComponent } from "../Views/activitymonitor/ViewProcessesListComponent";
 import { DataExplorerComponent } from "../Views/data-explorer/DataExplorerComponent";
 import { HostFirewallTracingComponent } from "../Views/host/HostFirewallTracingComponent";
 import { HostMonitorComponent } from "../Views/host/HostMonitorComponent";
 import { HostUpdateComponent } from "../Views/host/HostUpdateComponent";
 import { ShowSMARTInfoComponent } from "../Views/host/ShowSMARTInfoComponent";
+import { NetworkTraceSimulationComponent } from "../Views/host/NetworkTraceSimulationComponent";
 
 const hostOverviewViewModel: ObjectViewModel<HostHealthData, HostId> = {
     type: "object",
@@ -225,6 +226,11 @@ const portForwardingViewModel: ListViewModel<PortForwardingRule, HostId> = {
     schemaName: "PortForwardingRule"
 };
 
+const networkSimViewModel: ComponentViewModel = {
+    type: "component",
+    component: NetworkTraceSimulationComponent,
+};
+
 const storageViewModel: ObjectViewModel<HostStorageWithInfo, { hostName: string, storageId: number }> = {
     type: "object",
     actions: [
@@ -399,6 +405,11 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                         type: "bootstrap",
                         name: "door-open-fill"
                     }
+                },
+                {
+                    child: networkSimViewModel,
+                    displayName: "Network trace simulation",
+                    key: "networksim"
                 },
                 {
                     child: storagesViewModel,

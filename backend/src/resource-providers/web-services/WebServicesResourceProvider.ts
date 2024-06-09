@@ -49,7 +49,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
             {
                 fileSystemType: "btrfs",
                 dataIntegrityCheckSchedule: null,
-                requiredModules: [],
+                requiredModules: ["samba"],
                 schemaName: "JdownloaderProperties"
             },
             {

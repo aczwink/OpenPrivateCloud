@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -101,6 +101,16 @@ export class CIDRRange
         const len = subnetMask.split(".").Values().Map(x => CountBits(parseInt(x))).Sum();
 
         return new CIDRRange(netAddress + "/" + len);
+    }
+
+    static FromIP(ip: IPv4, prefixLength: number)
+    {
+        const shiftAmount = (32 - prefixLength);
+        const shifted = ip.intValue >>> shiftAmount;
+        const zeroed = shifted << shiftAmount;
+
+        const netAddress = new IPv4(zeroed);
+        return new CIDRRange(netAddress.ToString() + "/" + prefixLength);
     }
 
     //Private state

@@ -29,6 +29,8 @@ import { ProcessTrackerManager } from "../services/ProcessTrackerManager";
 import { FirewallDebugSettings, HostFirewallTracingManager } from "../services/HostFirewallTracingManager";
 import { HostTakeOverService } from "../services/HostTakeOverService";
 import { HealthController } from "../data-access/HealthController";
+import { NetworkTraceSimulator } from "../services/NetworkTraceSimulator";
+import { IPv4 } from "../common/IPv4";
 
 interface AddHostDTO
 {
@@ -50,6 +52,17 @@ interface NetworkInterfaceDTO
 {
     name: string;
     zone: string;
+    ip: string;
+}
+
+interface NetworkTraceSimPacketDataDTO
+{
+    protocol: "TCP" | "UDP";
+    port: number;
+}
+interface NetworkTraceSimResultDTO
+{
+    log: string[];
 }
 
 interface ProcessDto
@@ -164,11 +177,14 @@ class HostAPIController
             return NotFound("host does not exist");
 
         const interfaces = await this.hostNetworkInterfaceCardsManager.QueryAllNetworkInterfaces(hostId);
+        const addresses = await this.hostNetworkInterfaceCardsManager.QueryAllNetworkInterfacesWithAddresses(hostId);
         return Promise.all(interfaces.map(async x => {
             const zone = await this.hostFirewallZonesManager.DetermineAssignedZoneForNetworkInterface(hostId, x);
+            const iface = addresses.find(y => y.ifname === x);
             const res: NetworkInterfaceDTO = {
                 name: x,
                 zone,
+                ip: iface!.addr_info.find(x => x.family === "inet")?.local ?? ""
             };
             return res;
         }));
@@ -326,7 +342,7 @@ class _api_
 @APIController("hosts/{hostName}/firewallTracing")
 class _api9_
 {
-    constructor(private hostsController: HostsController, private hostFirewallTracingManager: HostFirewallTracingManager)
+    constructor(private hostsController: HostsController, private hostFirewallTracingManager: HostFirewallTracingManager, private networkTraceSimulator: NetworkTraceSimulator)
     {
     }
 
@@ -376,6 +392,20 @@ class _api9_
     )
     {
         return this.hostFirewallTracingManager.ReadCapturedData(hostId);
+    }
+
+    @Put("simulate")
+    public async ExecuteNetworkTraceSimulation(
+        @Common hostId: number,
+        @Body packetData: NetworkTraceSimPacketDataDTO
+    )
+    {
+        const result = await this.networkTraceSimulator.ExecuteNetworkTraceSimulation(hostId, new IPv4("0.0.0.0"), packetData.protocol, packetData.port);
+        const res: NetworkTraceSimResultDTO = {
+            log: result
+        };
+
+        return res;
     }
 }
 

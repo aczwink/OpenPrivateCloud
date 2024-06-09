@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,19 @@ import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { IPv4 } from "../common/IPv4";
 import { SystemServicesManager } from "./SystemServicesManager";
 import { CIDRRange } from "../common/CIDRRange";
+
+interface IP_Addr_AddrInfo_Entry
+{
+    family: "inet" | "inet6";
+    local: string;
+    prefixlen: number;
+}
+
+interface IP_Addr_Entry
+{
+    ifname: string;
+    addr_info: IP_Addr_AddrInfo_Entry[];
+}
 
 @Injectable
 export class HostNetworkInterfaceCardsManager
@@ -113,6 +126,23 @@ export class HostNetworkInterfaceCardsManager
     {
         const stats = await this.hostMetricsService.ReadNetworkStatistics(hostId);
         return stats.map(x => x.interfaceName);
+    }
+
+    public async QueryAllNetworkInterfacesWithAddresses(hostId: number)
+    {
+        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["ip", "-j", "addr"], hostId);
+        const parsed = JSON.parse(result.stdOut);
+
+        return parsed as IP_Addr_Entry[];
+    }
+
+    public async QueryExternalIPv4(hostId: number)
+    {
+        const iface = await this.FindExternalNetworkInterface(hostId);
+        const data = await this.QueryAllNetworkInterfacesWithAddresses(hostId);
+
+        const ifaceData = data.find(x => x.ifname === iface);
+        return ifaceData!.addr_info.find(x => x.family === "inet")!.local;
     }
 
     //Private methods
