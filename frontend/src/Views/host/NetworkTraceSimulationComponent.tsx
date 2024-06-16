@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable, Component, JSX_CreateElement, FormField, Select, NumberSpinner, RouterState } from "acfrontend";
+import { Injectable, Component, JSX_CreateElement, FormField, Select, NumberSpinner, RouterState, LineEdit } from "acfrontend";
 import { APIService } from "../../Services/APIService";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 
@@ -28,6 +28,7 @@ export class NetworkTraceSimulationComponent extends Component
         super();
 
         this.hostName = routerState.routeParams.hostName!;
+        this.sourceAddress = "10.0.0.0";
         this.protocol = "TCP";
         this.port = 443;
         this.resultLog = [];
@@ -37,6 +38,11 @@ export class NetworkTraceSimulationComponent extends Component
     {
         return <form onsubmit={this.OnExecuteSimulation.bind(this)}>
             <div className="row">
+            <div className="col">
+                    <FormField title="Source address">
+                        <LineEdit value={this.sourceAddress} onChanged={newValue => this.sourceAddress = newValue} />
+                    </FormField>
+                </div>
                 <div className="col">
                     <FormField title="Protocol">
                         <Select onChanged={newValue => this.protocol = newValue[0] as any}>
@@ -60,6 +66,7 @@ export class NetworkTraceSimulationComponent extends Component
 
     //State
     private hostName: string;
+    private sourceAddress: string;
     private protocol: "TCP" | "UDP";
     private port: number;
     private resultLog: string[];
@@ -86,7 +93,7 @@ export class NetworkTraceSimulationComponent extends Component
     {
         event.preventDefault();
 
-        const response = await this.apiService.hosts._any_.firewallTracing.simulate.put(this.hostName, { port: this.port, protocol: this.protocol });
+        const response = await this.apiService.hosts._any_.firewallTracing.simulate.put(this.hostName, { sourceAddress: this.sourceAddress, port: this.port, protocol: this.protocol });
         const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
         if(result.ok)
             this.resultLog = result.value.log;

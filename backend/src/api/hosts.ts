@@ -57,6 +57,7 @@ interface NetworkInterfaceDTO
 
 interface NetworkTraceSimPacketDataDTO
 {
+    sourceAddress: string;
     protocol: "TCP" | "UDP";
     port: number;
 }
@@ -400,7 +401,7 @@ class _api9_
         @Body packetData: NetworkTraceSimPacketDataDTO
     )
     {
-        const result = await this.networkTraceSimulator.ExecuteNetworkTraceSimulation(hostId, new IPv4("0.0.0.0"), packetData.protocol, packetData.port);
+        const result = await this.networkTraceSimulator.ExecuteNetworkTraceSimulation(hostId, new IPv4(packetData.sourceAddress), packetData.protocol, packetData.port);
         const res: NetworkTraceSimResultDTO = {
             log: result
         };

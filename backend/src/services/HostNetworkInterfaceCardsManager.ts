@@ -136,13 +136,19 @@ export class HostNetworkInterfaceCardsManager
         return parsed as IP_Addr_Entry[];
     }
 
-    public async QueryExternalIPv4(hostId: number)
+    public async QueryExternalIPv4Subnet(hostId: number)
     {
         const iface = await this.FindExternalNetworkInterface(hostId);
         const data = await this.QueryAllNetworkInterfacesWithAddresses(hostId);
 
         const ifaceData = data.find(x => x.ifname === iface);
-        return ifaceData!.addr_info.find(x => x.family === "inet")!.local;
+        const addr = ifaceData!.addr_info.find(x => x.family === "inet")!;
+
+        const ip = new IPv4(addr.local);
+        return {
+            address: ip,
+            range: CIDRRange.FromIP(ip, addr.prefixlen)
+        };
     }
 
     //Private methods

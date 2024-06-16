@@ -161,6 +161,11 @@ const nicsViewModel: ListViewModel<NetworkInterfaceDTO, HostId> = {
     schemaName: "NetworkInterfaceDTO"
 };
 
+const networkSimViewModel: ComponentViewModel = {
+    type: "component",
+    component: NetworkTraceSimulationComponent,
+};
+
 const storageDevicesViewModel: CollectionViewModel<StorageDeviceDto, HostId> = {
     type: "collection",
     actions: [],
@@ -224,11 +229,6 @@ const portForwardingViewModel: ListViewModel<PortForwardingRule, HostId> = {
     displayName: "Port forwarding rules",
     requestObjects: (service, ids) => service.hosts._any_.portForwarding.get(ids.hostName),
     schemaName: "PortForwardingRule"
-};
-
-const networkSimViewModel: ComponentViewModel = {
-    type: "component",
-    component: NetworkTraceSimulationComponent,
 };
 
 const storageViewModel: ObjectViewModel<HostStorageWithInfo, { hostName: string, storageId: number }> = {
@@ -366,6 +366,11 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                     key: "firewallTracing"
                 },
                 {
+                    child: networkSimViewModel,
+                    displayName: "Network trace simulation",
+                    key: "networksim"
+                },
+                {
                     child: storageDevicesViewModel,
                     displayName: "Storage devices",
                     key: "storage-devices",
@@ -405,11 +410,6 @@ const hostViewModel: MultiPageViewModel<HostId> = {
                         type: "bootstrap",
                         name: "door-open-fill"
                     }
-                },
-                {
-                    child: networkSimViewModel,
-                    displayName: "Network trace simulation",
-                    key: "networksim"
                 },
                 {
                     child: storagesViewModel,
