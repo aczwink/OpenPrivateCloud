@@ -33,6 +33,7 @@ import { ModulesManager } from "../../services/ModulesManager";
 import { AVPreviewService } from "./AVPreviewService";
 import { ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { HealthStatus } from "../../data-access/HealthController";
+import { LargeFileDownloadService } from "../../services/LargeFileDownloadService";
 
 export interface FileMetaDataRevision
 {
@@ -78,7 +79,7 @@ export type ThumbType = "" | "t" | "p";
 export class ObjectStoragesManager
 {
     constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceConfigController: ResourceConfigController,
-        private keyVaultManager: KeyVaultManager, private resourceDependenciesController: ResourceDependenciesController,
+        private keyVaultManager: KeyVaultManager, private resourceDependenciesController: ResourceDependenciesController, private largeFileDownloadService: LargeFileDownloadService,
         private modulesManager: ModulesManager, private avPreviewService: AVPreviewService)
     {
         this.cachedIndex = {};
@@ -115,6 +116,16 @@ export class ObjectStoragesManager
         }
 
         return HealthStatus.Up;
+    }
+
+    public async CreateFileBlobStreamRequest(resourceReference: LightweightResourceReference, userId: number, fileId: string)
+    {
+        const metaData = await this.RequestFileMetaData(resourceReference, fileId);
+        const blobId = metaData.currentRev.blobId;
+
+        await this.UpdateFileAccessTime(resourceReference, fileId);
+
+        return this.largeFileDownloadService.CreateRequest(userId, metaData.currentRev.blobSize, this.ReadBlob.bind(this, resourceReference, blobId));
     }
 
     public async CreateSnapshot(resourceReference: LightweightResourceReference)

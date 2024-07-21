@@ -18,6 +18,14 @@
 import crypto from "crypto";
 import { Readable, Transform } from "stream";
 
+interface OPCFormat_Header
+{
+    cipher: "aes-256-gcm";
+    headerLength: number;
+    authTag: Buffer;
+    iv: Buffer;
+}
+
 type SymmetricCipherType = "aes-256";
 interface SymmetricKey
 {
@@ -37,7 +45,7 @@ function AES256GCM_Encrypt(key: Buffer, iv: Buffer, authTagLength: number, data:
     return payload;
 }
 
-function OPCFormat_ReadHeaderAndCreateDecipher(key: Buffer, opcFormatData: Buffer)
+export function OPCFormat_ReadHeader(opcFormatData: Buffer): OPCFormat_Header
 {
     const signature = opcFormatData.toString("utf-8", 0, 3);
     if(signature !== "OPC")
@@ -47,24 +55,33 @@ function OPCFormat_ReadHeaderAndCreateDecipher(key: Buffer, opcFormatData: Buffe
     switch(encFormatType)
     {
         case 0:
-        {
-            const iv = opcFormatData.subarray(4, 4+16);
-            const authTag = opcFormatData.subarray(20, 20+16);
-
-            const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, {
-                authTagLength: authTag.length,
-            });
-            decipher.setAuthTag(authTag);
-        
+        {        
             return {
-                decipher,
-                headerLength: 4 + 16 + 16
+                cipher: "aes-256-gcm",
+                headerLength: 4 + 16 + 16,
+                authTag: opcFormatData.subarray(20, 20+16),
+                iv: opcFormatData.subarray(4, 4+16)
             };
         }
         break;
         default:
             throw new Error("encoding error. invalid format");
     }
+}
+
+function OPCFormat_ReadHeaderAndCreateDecipher(key: Buffer, opcFormatData: Buffer)
+{
+    const header = OPCFormat_ReadHeader(opcFormatData);
+
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, header.iv, {
+        authTagLength: header.authTag.length,
+    });
+    decipher.setAuthTag(header.authTag);
+
+    return {
+        decipher,
+        headerLength: header.headerLength
+    };
 }
 
 export function CreateSymmetricKey(cipherType: SymmetricCipherType): SymmetricKey

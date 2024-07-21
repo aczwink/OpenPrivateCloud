@@ -24,6 +24,7 @@ import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/Respo
 import { DownloadFileUsingProgressPopup } from "../../Views/object-storage/DownloadProgressPopup";
 import { ObjectStorageThumbnailComponent } from "../../Views/object-storage/ObjectStorageThumbnailComponent";
 import { JSX_CreateElement } from "acfrontend";
+import { ObjectStoragePreviewComponent } from "../../Views/object-storage/ObjectStoragePreviewComponent";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -105,6 +106,14 @@ const fileViewModel: MultiPageViewModel<FileId> = {
                     child: fileOverviewViewModel,
                     displayName: "Overview",
                     key: "overview"
+                },
+                {
+                    child: {
+                        type: "component",
+                        component: ObjectStoragePreviewComponent
+                    },
+                    displayName: "Preview",
+                    key: "preview"
                 },
                 {
                     child: fileRevisionsViewModel,

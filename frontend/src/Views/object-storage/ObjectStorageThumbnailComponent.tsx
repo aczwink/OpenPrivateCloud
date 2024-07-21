@@ -48,7 +48,7 @@ export class ObjectStorageThumbnailComponent extends Component<{ resourceGroupNa
         {
             return <div onmouseleave={() => this.showPreview = false} onclick={this.ShowTile.bind(this)}>
                 <video autoplay={true} loop={true} controls={false} muted={true} onplay={OnPlay} style={style}>
-                    <source src={this.preview!} />
+                    <source src={this.preview!} type="video/mp4" />
                 </video>
             </div>;
         }
@@ -130,8 +130,10 @@ export class ObjectStorageThumbnailComponent extends Component<{ resourceGroupNa
         }
     }
 
-    private ShowTile()
+    private ShowTile(event: Event)
     {
+        event.preventDefault();
+        event.stopPropagation();
         this.popupManager.OpenModal(<img src={this.tile!} />, { className: "fade show d-block text-center" });
     }
 

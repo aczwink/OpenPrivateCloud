@@ -16,16 +16,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, BodyProp, Get, NotFound, Post, Query, Security, Unauthorized } from "acts-util-apilib";
+import { APIController, BodyProp, Get, Header, NotFound, Path, Post, Query, Security, Unauthorized } from "acts-util-apilib";
 import { ClusterConfigManager } from "../services/ClusterConfigManager";
 import { AuthMethod, AuthenticationManager } from "../services/AuthenticationManager";
 import { UsersController } from "../data-access/UsersController";
 import { SessionsManager } from "../services/SessionsManager";
+import { LargeFileDownloadService } from "../services/LargeFileDownloadService";
+import { Ok, PartialContent } from "acts-util-apilib/dist/Responses";
 
 @APIController("public")
 class _api_
 {
-    constructor(private authenticationManager: AuthenticationManager, private clusterConfigManager: ClusterConfigManager, private usersController: UsersController, private sessionsManager: SessionsManager)
+    constructor(private authenticationManager: AuthenticationManager, private clusterConfigManager: ClusterConfigManager, private usersController: UsersController, private sessionsManager: SessionsManager,
+        private largeFileDownloadService: LargeFileDownloadService)
     {
     }
 
@@ -85,5 +88,40 @@ class _api_
             return NotFound("user does not exist");
 
         return this.authenticationManager.ExecutePreAuthenticationStep(userId, authMethod);
+    }
+
+    @Security()
+    @Get("largeFile/{id}")
+    public async DownloadLargeFile(
+        @Path id: string,
+        @Header Range?: string
+    )
+    {
+        if(Range === undefined)
+        {
+            const result = await this.largeFileDownloadService.RequestFull(id);
+            if(result === undefined)
+                return NotFound("unknown file request");
+
+            return Ok(result.data, {
+                "Content-Length": result.totalSize,
+                "Content-Type": {
+                    mediaType: "video/mp4"
+                },
+            });
+        }
+        
+        const part = await this.largeFileDownloadService.RequestPart(id, Range);
+        if(part === undefined)
+            return NotFound("unknown file request");
+
+        return PartialContent(part.data, {
+            "Accept-Ranges": "bytes",
+            "Content-Range": `bytes ${part.start}-${part.end}/${part.totalSize}`,
+            "Content-Length": part.data.byteLength,
+            "Content-Type": {
+                mediaType: "video/mp4"
+            },
+        });
     }
 }

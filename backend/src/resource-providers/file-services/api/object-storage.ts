@@ -48,6 +48,7 @@ interface FileMetaDataDTO
 {
     fileName: string;
     lastAccessTime: Date;
+    mediaType: string;
     /**
      * @format byteSize
      */
@@ -172,6 +173,19 @@ class _api_ extends ResourceAPIControllerBase
         });
     }
 
+    @Get("files/{fileId}/createBlobStream")
+    public async StreamFileBlob(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string
+    )
+    {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to blob denied");
+
+        return this.objectStoragesManager.CreateFileBlobStreamRequest(context.resourceReference, context.userId, fileId);
+    }
+
     @Get("files/{fileId}/thumb")
     public async DownloadFileThumb(
         @Common context: ResourceReferenceWithSession,
@@ -281,6 +295,7 @@ class _api_ extends ResourceAPIControllerBase
         return {
             fileName: revision.fileName,
             lastAccessTime: new Date(atime),
+            mediaType: revision.mediaType,
             size: revision.blobSize
         };
     }
