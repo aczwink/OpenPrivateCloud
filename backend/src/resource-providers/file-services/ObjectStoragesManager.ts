@@ -34,6 +34,7 @@ import { AVPreviewService } from "./AVPreviewService";
 import { ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { HealthStatus } from "../../data-access/HealthController";
 import { LargeFileDownloadService } from "../../services/LargeFileDownloadService";
+import { CodecService, FFProbe_MediaInfo } from "../multimedia-services/CodecService";
 
 export interface FileMetaDataRevision
 {
@@ -52,6 +53,11 @@ interface ObjectStorageConfig
     keyName: string;
 }
 
+export interface ObjectStorageBlobExtraMetadata
+{
+    av?: FFProbe_MediaInfo;
+}
+
 interface ObjectStorageFileIndex
 {
     lastAccessTime: number;
@@ -59,6 +65,7 @@ interface ObjectStorageFileIndex
 
 interface ObjectStorageIndex
 {
+    extraBlobMetadata: Dictionary<ObjectStorageBlobExtraMetadata>;
     files: Dictionary<ObjectStorageFileIndex>;
 }
 
@@ -80,9 +87,9 @@ export class ObjectStoragesManager
 {
     constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceConfigController: ResourceConfigController,
         private keyVaultManager: KeyVaultManager, private resourceDependenciesController: ResourceDependenciesController, private largeFileDownloadService: LargeFileDownloadService,
-        private modulesManager: ModulesManager, private avPreviewService: AVPreviewService)
+        private modulesManager: ModulesManager, private avPreviewService: AVPreviewService, private codecService: CodecService)
     {
-        this.cachedIndex = {};
+        this.index = {};
         this.thumbCreationLock = new Lock;
     }
 
@@ -122,10 +129,19 @@ export class ObjectStoragesManager
     {
         const metaData = await this.RequestFileMetaData(resourceReference, fileId);
         const blobId = metaData.currentRev.blobId;
+        const blobPath = path.join(this.GetBlobsPath(resourceReference), blobId);
 
         await this.UpdateFileAccessTime(resourceReference, fileId);
 
-        return this.largeFileDownloadService.CreateRequest(userId, metaData.currentRev.blobSize, this.ReadBlob.bind(this, resourceReference, blobId));
+        const dek = await this.DeriveDataEncryptionKey(resourceReference);
+        return await this.largeFileDownloadService.CreateRequest({
+            createStreamCallBack: this.ReadBlob.bind(this, resourceReference, blobId),
+            readBlockCallBack: (start, end) => this.remoteFileSystemManager.ReadFileBlock(resourceReference.hostId, blobPath, start, end),
+            mediaType: metaData.currentRev.mediaType,
+            totalSize: metaData.currentRev.blobSize,
+            userId,
+            key: dek
+        });
     }
 
     public async CreateSnapshot(resourceReference: LightweightResourceReference)
@@ -192,7 +208,8 @@ export class ObjectStoragesManager
         const encryptedSalt = await this.keyVaultManager.Encrypt(kvRef.kvRef, kvRef.objectName, crypto.randomBytes(16));
         await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, this.GetFileIdSaltPath(resourceReference), encryptedSalt);
 
-        this.cachedIndex[resourceReference.id] = {
+        this.index[resourceReference.id] = {
+            extraBlobMetadata: {},
             files: {},
         };
         this.WriteIndex(resourceReference.id);
@@ -203,11 +220,36 @@ export class ObjectStoragesManager
         return ResourceState.Running;
     }
 
+    public async RequestExtraMetadata(resourceReference: LightweightResourceReference, blobId: string, blobSize: number, mediaType: string)
+    {
+        const index = await this.GetIndex(resourceReference);
+        const extra = index.extraBlobMetadata[blobId];
+        if(extra !== undefined)
+            return extra;
+
+        if(mediaType.startsWith("image/") || mediaType.startsWith("video/"))
+        {
+            const locked = await this.thumbCreationLock.Lock();
+            try
+            {
+                await this.AnalyzeMissingMediaData(resourceReference, blobId, blobSize, mediaType);
+            }
+            finally
+            {
+                locked.Release();
+            }
+        }
+        else
+            index.extraBlobMetadata[blobId] = {};
+
+        return index.extraBlobMetadata[blobId]!;
+    }
+
     public async RequestFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
     {
-        if(!(resourceReference.id in this.cachedIndex))
-            this.cachedIndex[resourceReference.id]! = await this.ReadIndex(resourceReference);
-        const index = this.cachedIndex[resourceReference.id]!;
+        if(!(resourceReference.id in this.index))
+            this.index[resourceReference.id]! = await this.ReadIndex(resourceReference);
+        const index = this.index[resourceReference.id]!;
 
         const file = index.files[fileId];
         if(file === undefined)
@@ -273,7 +315,7 @@ export class ObjectStoragesManager
         }
         catch(e: any)
         {
-            this.CreateThumbnailJob(resourceReference, metaData.currentRev.blobId, metaData.currentRev.blobSize, isImage);
+            this.CreateThumbnailJob(resourceReference, metaData.currentRev.blobId, metaData.currentRev.blobSize, metaData.currentRev.mediaType);
             return undefined;
         }
         const decryptedThumb = await this.DecryptBuffer(resourceReference, encryptedThumb);
@@ -332,12 +374,12 @@ export class ObjectStoragesManager
     }
 
     //Private state
-    private cachedIndex: NumberDictionary<ObjectStorageIndex>;
+    private index: NumberDictionary<ObjectStorageIndex>;
     private indexWriteTimer?: NodeJS.Timeout;
     private thumbCreationLock: Lock;
 
     //Private methods
-    private async CreateThumbnailJob(resourceReference: LightweightResourceReference, blobId: string, blobSize: number, isImage: boolean)
+    private async AnalyzeMissingMediaData(resourceReference: LightweightResourceReference, blobId: string, blobSize: number, mediaType: string)
     {
         function MapType(type: "preview" | "thumb" | "tiles"): ThumbType
         {
@@ -352,14 +394,6 @@ export class ObjectStoragesManager
             }
         }
 
-        const locked = await this.thumbCreationLock.Lock();
-
-        //avoid computing it multiple times
-        const thumbPath = path.join(this.GetThumbnailsPath(resourceReference), blobId);
-        const exists = await this.remoteFileSystemManager.Exists(resourceReference.hostId, thumbPath);
-        if(exists)
-            return;
-
         const mountPoint = await this.avPreviewService.CreateWorkspace(resourceReference.hostId, blobSize);
         try
         {
@@ -367,16 +401,62 @@ export class ObjectStoragesManager
             const blobPath = path.join(mountPoint, blobId);
             await this.remoteFileSystemManager.StreamToFile(resourceReference.hostId, blobPath, blobStream);
 
-            const previews = await this.avPreviewService.CreatePreviews(blobPath, isImage);
-            for (const previewFile of previews)
+            //check extra meta data
+            const index = await this.GetIndex(resourceReference);
+            let extra = index.extraBlobMetadata[blobId];
+
+            if(extra === undefined)
             {
-                const thumb = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, previewFile.path);
-                await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, thumbPath + MapType(previewFile.type), await this.EncryptBuffer(resourceReference, thumb));
+                extra = index.extraBlobMetadata[blobId] = {
+                    av: await this.codecService.AnalyzeMediaFile(resourceReference.hostId, blobPath)
+                }
+                this.ScheduleIndexWrite(resourceReference);
+            }
+            const mediaInfo = extra.av!;
+
+            //thumbs
+            const isImage = mediaType.startsWith("image/");
+            const thumbTypes: ("preview" | "thumb" | "tiles")[] = isImage ? ["thumb"] : ["preview", "thumb", "tiles"];
+            for (const thumbType of thumbTypes)
+            {
+                const thumbPath = path.join(this.GetThumbnailsPath(resourceReference), blobId + MapType(thumbType));
+                const exists = await this.remoteFileSystemManager.Exists(resourceReference.hostId, thumbPath);
+                if(exists)
+                    continue;
+
+                const previewFilePath = isImage
+                    ? await this.avPreviewService.CreateImageThumb(blobPath, mediaInfo)
+                    : await this.avPreviewService.CreateVideoPreview(blobPath, extra.av!, thumbType);
+
+                const thumb = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, previewFilePath);
+                await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, thumbPath + MapType(thumbType), await this.EncryptBuffer(resourceReference, thumb));
             }
         }
         finally
         {
             await this.avPreviewService.ReleaseWorkspace();
+        }
+    }
+
+    private async CreateThumbnailJob(resourceReference: LightweightResourceReference, blobId: string, blobSize: number, mediaType: string)
+    {
+        const locked = await this.thumbCreationLock.Lock();
+
+        //avoid computing it multiple times
+        const thumbPath = path.join(this.GetThumbnailsPath(resourceReference), blobId);
+        const exists = await this.remoteFileSystemManager.Exists(resourceReference.hostId, thumbPath);
+        if(exists)
+        {
+            locked.Release();
+            return;
+        }
+
+        try
+        {
+            await this.AnalyzeMissingMediaData(resourceReference, blobId, blobSize, mediaType);
+        }
+        finally
+        {
             locked.Release();
         }
     }
@@ -451,6 +531,17 @@ export class ObjectStoragesManager
         return path.join(root, "files");
     }
 
+    private async GetIndex(resourceReference: LightweightResourceReference)
+    {
+        const index = this.index[resourceReference.id];
+        if(index === undefined)
+        {
+            const index = this.index[resourceReference.id] = await this.ReadIndex(resourceReference);
+            return index;
+        }
+        return index;
+    }
+
     private GetSnapshotsPath(resourceReference: LightweightResourceReference)
     {
         const root = this.resourcesManager.BuildResourceStoragePath(resourceReference);
@@ -480,7 +571,10 @@ export class ObjectStoragesManager
         const encrypted = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, indexPath);
         const decrypted = await this.DecryptBuffer(resourceReference, encrypted);
 
-        return JSON.parse(decrypted.toString("utf-8")) as ObjectStorageIndex;
+        const indexData = JSON.parse(decrypted.toString("utf-8")) as ObjectStorageIndex;
+        if(indexData.extraBlobMetadata === undefined)
+            indexData.extraBlobMetadata = {};
+        return indexData;
     }
 
     private RequestConfig(resourceId: number)
@@ -499,11 +593,17 @@ export class ObjectStoragesManager
         return fileMetaData;
     }
 
+    private ScheduleIndexWrite(resourceReference: LightweightResourceReference)
+    {
+        if(this.indexWriteTimer === undefined)
+            this.indexWriteTimer = setTimeout(this.WriteIndex.bind(this, resourceReference.id), 1000 * 60 * 3);
+    }
+
     private async UpdateFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
     {
-        if(!(resourceReference.id in this.cachedIndex))
-            this.cachedIndex[resourceReference.id]! = await this.ReadIndex(resourceReference);
-        const index = this.cachedIndex[resourceReference.id]!;
+        if(!(resourceReference.id in this.index))
+            this.index[resourceReference.id]! = await this.ReadIndex(resourceReference);
+        const index = this.index[resourceReference.id]!;
 
         const files = index.files;
         if(fileId in files)
@@ -511,8 +611,7 @@ export class ObjectStoragesManager
         else
             files[fileId] = { lastAccessTime: Date.now() };
 
-        if(this.indexWriteTimer === undefined)
-            this.indexWriteTimer = setTimeout(this.WriteIndex.bind(this, resourceReference.id), 1000 * 60 * 3);
+        this.ScheduleIndexWrite(resourceReference);
     }
 
     private async WriteBlob(resourceReference: LightweightResourceReference, blob: Buffer): Promise<string>
@@ -539,7 +638,7 @@ export class ObjectStoragesManager
         const root = this.resourcesManager.BuildResourceStoragePath(resourceReference);
         const indexPath = path.join(root, "index");
 
-        const buffer = Buffer.from(JSON.stringify(this.cachedIndex[resourceId]), "utf-8");
+        const buffer = Buffer.from(JSON.stringify(this.index[resourceId]), "utf-8");
 
         await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, indexPath, await this.EncryptBuffer(resourceReference, buffer));
     }

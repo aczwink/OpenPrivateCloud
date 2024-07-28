@@ -40,7 +40,7 @@ interface FFProbe_VideoStreamInfo extends FFProbe_CommonStreamInfo
 
 export type FFProbe_StreamInfo = FFProbe_AudioStreamInfo | FFProbe_VideoStreamInfo;
 
-interface FFProbe_MediaInfo
+export interface FFProbe_MediaInfo
 {
     format: {
         duration: string;

@@ -17,7 +17,7 @@
  * */
 
 import ssh2 from "ssh2";
-import { Injectable } from "acts-util-node";
+import { Injectable, Promisify } from "acts-util-node";
 import { Readable } from "stream";
 import { TimeUtil } from "acts-util-core";
 
@@ -40,6 +40,7 @@ export interface SSHConnection
     MoveFile(sourcePath: string, targetPath: string): Promise<void>;
     QueryStatus(remotePath: string): Promise<ssh2.Stats>;
     ReadFile(remotePath: string): Promise<Buffer>;
+    ReadFileBlock(remotePath: string, start: number, end: number): Promise<Buffer>;
     ReadLink(remotePath: string): Promise<string>;
     RemoveDirectory(remotePath: string): Promise<void>;
     SpawnShell(): Promise<ssh2.ClientChannel>;
@@ -178,6 +179,16 @@ class SSHConnectionImpl implements SSHConnection
                     resolve(buffer);
             });
         });
+    }
+
+    public async ReadFileBlock(remotePath: string, start: number, end: number): Promise<Buffer>
+    {
+        const stream = this.sftp.createReadStream(remotePath, { start, end });
+        const chunks: Buffer[] = [];
+        stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+        await Promisify(stream);
+
+        return Buffer.concat(chunks);
     }
 
     public ReadLink(remotePath: string): Promise<string>

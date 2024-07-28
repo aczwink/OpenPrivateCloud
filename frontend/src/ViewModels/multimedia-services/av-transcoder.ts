@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2022-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2022-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ import { resourceProviders } from "openprivatecloud-common";
 import { AVTranscoderConfig, AVTranscoderInstanceInfo } from "../../../dist/api";
 import { MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
+import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -51,6 +52,19 @@ const configViewModel: ObjectViewModel<AVTranscoderConfig, ResourceAndGroupId> =
             propertiesSchemaName: "AVTranscoderConfig",
             requestObject: (service, ids) => service.resourceProviders._any_.multimediaservices.avtranscoder._any_.config.get(ids.resourceGroupName, ids.resourceName),
             updateResource: (service, ids, config) => service.resourceProviders._any_.multimediaservices.avtranscoder._any_.config.put(ids.resourceGroupName, ids.resourceName, config),
+            loadContext: async (service, ids) => {
+                const response = await service.health.resource.get({ id: BuildResourceId(ids.resourceGroupName, ids.resourceName) });
+                const result = await ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                if(result.ok)
+                {
+                    return {
+                        hostName: result.value.hostName
+                    };
+                }
+                return {
+                    hostName: ""
+                };
+            },
         }
     ],
     formTitle: _ => "Configuration",

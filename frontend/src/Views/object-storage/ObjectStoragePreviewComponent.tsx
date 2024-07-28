@@ -103,14 +103,27 @@ export class ObjectStoragePreviewComponent extends Component
                 reader.onloadend = () => this.tile = this.GetDataAs(reader.result, "image/jpg");
             }
 
-            this.videoMediaType = fileMetadata.mediaType;
-
-            const response3 = await this.apiService.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.createBlobStream.get(resourceGroupName, resourceName, fileId);
-            if(response3.statusCode === 200)
+            if(this.SupportsStreaming(fileMetadata.mediaType))
             {
-                this.videoStreamId = response3.data;
+                this.videoMediaType = fileMetadata.mediaType;
+    
+                const response3 = await this.apiService.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.createBlobStream.get(resourceGroupName, resourceName, fileId);
+                if(response3.statusCode === 200)
+                {
+                    this.videoStreamId = response3.data;
+                }
             }
         }
+    }
+
+    private SupportsStreaming(mediaType: string)
+    {
+        switch(mediaType)
+        {
+            case "video/mp4":
+                return true;
+        }
+        return false;
     }
 
     //Event handlers

@@ -70,7 +70,8 @@ interface SnapshotDTO
 @APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_objectStorageResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
-    constructor(resourcesManager: ResourcesManager, private sessionsManager: SessionsManager, private objectStoragesManager: ObjectStoragesManager, private permissionsManager: PermissionsManager)
+    constructor(resourcesManager: ResourcesManager, private sessionsManager: SessionsManager, private objectStoragesManager: ObjectStoragesManager, private permissionsManager: PermissionsManager
+    )
     {
         super(resourcesManager, c_fileServicesResourceProviderName, c_objectStorageResourceTypeName);
     }
@@ -104,12 +105,15 @@ class _api_ extends ResourceAPIControllerBase
             return Forbidden("access to files denied");
 
         const files = await this.objectStoragesManager.SearchFiles(context.resourceReference);
-        return files.Values().Map<Promise<FileMetaDataOverviewDataDTO>>(async x => ({
-            id: x.id,
-            mediaType: x.mediaType,
-            size: x.blobSize,
-            lastAccessTime: new Date(await this.objectStoragesManager.RequestFileAccessTime(context.resourceReference, x.id))
-        })).PromiseAll();
+        return files.Values().Map(async x => {
+            const res: FileMetaDataOverviewDataDTO = {
+                id: x.id,
+                mediaType: x.mediaType,
+                size: x.blobSize,
+                lastAccessTime: new Date(await this.objectStoragesManager.RequestFileAccessTime(context.resourceReference, x.id)),
+            };
+            return res;
+        }).PromiseAll();
     }
 
     @Delete("files/{fileId}")
@@ -141,6 +145,23 @@ class _api_ extends ResourceAPIControllerBase
         
         const atime = await this.objectStoragesManager.RequestFileAccessTime(context.resourceReference, fileId);
         return this.MapRevisionToDTO(file.currentRev, atime);
+    }
+
+    @Get("files/{fileId}/meta")
+    public async QueryFileExtraMetadata(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string
+    )
+    {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to blob denied");
+
+        const file = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
+        if(file === undefined)
+            return NotFound("file not found");
+
+        return this.objectStoragesManager.RequestExtraMetadata(context.resourceReference, file.currentRev.blobId, file.currentRev.blobSize, file.currentRev.mediaType);
     }
 
     @Put("files/{fileId}")

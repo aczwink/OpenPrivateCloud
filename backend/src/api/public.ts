@@ -106,7 +106,7 @@ class _api_
             return Ok(result.data, {
                 "Content-Length": result.totalSize,
                 "Content-Type": {
-                    mediaType: "video/mp4"
+                    mediaType: result.mediaType as any
                 },
             });
         }
@@ -120,7 +120,7 @@ class _api_
             "Content-Range": `bytes ${part.start}-${part.end}/${part.totalSize}`,
             "Content-Length": part.data.byteLength,
             "Content-Type": {
-                mediaType: "video/mp4"
+                mediaType: part.mediaType as any
             },
         });
     }

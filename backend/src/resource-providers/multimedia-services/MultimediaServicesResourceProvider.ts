@@ -56,6 +56,32 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
     //Public methods
     public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
+            }
+            break;
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+                    await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+                }
+            }
+            break;
+        }
+
         return HealthStatus.Up;
     }
     

@@ -18,7 +18,7 @@
 import crypto from "crypto";
 import { Readable, Transform } from "stream";
 
-interface OPCFormat_Header
+export interface OPCFormat_Header
 {
     cipher: "aes-256-gcm";
     headerLength: number;
@@ -27,11 +27,13 @@ interface OPCFormat_Header
 }
 
 type SymmetricCipherType = "aes-256";
-interface SymmetricKey
+export interface SymmetricKey
 {
     type: SymmetricCipherType;
     key: Buffer;
 }
+
+export const OPCFormat_MaxHeaderLength = 4 + 16 + 16; //version 0 has 4 bytes header, 16 bytes iv and 16 bytes auth tag
 
 function AES256GCM_Encrypt(key: Buffer, iv: Buffer, authTagLength: number, data: Buffer)
 {
@@ -52,18 +54,32 @@ export function OPCFormat_ReadHeader(opcFormatData: Buffer): OPCFormat_Header
         throw new Error("encoding error. invalid signature");
     const encFormatType = opcFormatData.readUInt8(3);
 
+    const signatureLen = 4;
+    const authTagLen = 16;
     switch(encFormatType)
     {
         case 0:
-        {        
+        {
+            const ivLen = 16;
+            const authTagOffset = signatureLen + ivLen;
             return {
                 cipher: "aes-256-gcm",
-                headerLength: 4 + 16 + 16,
-                authTag: opcFormatData.subarray(20, 20+16),
-                iv: opcFormatData.subarray(4, 4+16)
+                headerLength: signatureLen + ivLen + authTagLen,
+                authTag: opcFormatData.subarray(authTagOffset, authTagOffset + authTagLen),
+                iv: opcFormatData.subarray(signatureLen, authTagOffset)
             };
         }
-        break;
+        case 1:
+        {
+            const ivLen = 12;
+            const authTagOffset = signatureLen + ivLen;
+            return {
+                cipher: "aes-256-gcm",
+                headerLength: signatureLen + ivLen + authTagLen,
+                authTag: opcFormatData.subarray(authTagOffset, authTagOffset + authTagLen),
+                iv: opcFormatData.subarray(signatureLen, authTagOffset)
+            };
+        }
         default:
             throw new Error("encoding error. invalid format");
     }
@@ -84,6 +100,11 @@ function OPCFormat_ReadHeaderAndCreateDecipher(key: Buffer, opcFormatData: Buffe
     };
 }
 
+export function OPCFormat_SupportsRandomAccess(header: OPCFormat_Header)
+{
+    return header.headerLength !== OPCFormat_MaxHeaderLength;
+}
+
 export function CreateSymmetricKey(cipherType: SymmetricCipherType): SymmetricKey
 {
     return {
@@ -102,9 +123,47 @@ export function OPCFormat_SymmetricDecrypt(key: SymmetricKey, opcFormatData: Buf
     return Buffer.concat([decrypted, decipher.final()]);
 }
 
+export function OPCFormat_SymmetricDecryptSlice(key: SymmetricKey, header: OPCFormat_Header, firstBlockNumber: number, encryptedBlock: Buffer)
+{
+    function incrementIV(iv: Buffer, increment: number)
+    {
+        if(iv.length !== 16) throw new Error('Only implemented for 16 bytes IV');
+    
+        const MAX_UINT32 = 0xFFFFFFFF;
+        let incrementBig = ~~(increment / MAX_UINT32);
+        let incrementLittle = (increment % MAX_UINT32) - incrementBig;
+    
+        // split the 128bits IV in 4 numbers, 32bits each
+        let overflow = 0;
+        for(let idx = 0; idx < 4; ++idx) {
+            let num = iv.readUInt32BE(12 - idx*4);
+    
+            let inc = overflow;
+            if(idx == 0) inc += incrementLittle;
+            if(idx == 1) inc += incrementBig;
+    
+            num += inc;
+    
+            let numBig = ~~(num / MAX_UINT32);
+            let numLittle = (num % MAX_UINT32) - numBig;
+            overflow = numBig;
+    
+            iv.writeUInt32BE(numLittle, 12 - idx*4);
+        }
+    }
+
+    const iv = Buffer.alloc(16);
+    header.iv.copy(iv, 0, 0, 12);
+    incrementIV(iv, 2 + firstBlockNumber); //for gcm counter starts at 1, but the aad is calculated first, so start at 2
+
+    const decipher = crypto.createDecipheriv("aes-256-ctr", key.key, iv);
+
+    const decrypted = decipher.update(encryptedBlock);
+    return Buffer.concat([decrypted, decipher.final()]);
+}
+
 export function OPCFormat_SymmetricDecryptStream(key: SymmetricKey, opcFormattedStream: Readable): Readable
 {
-    const headerLength = 4 + 16 + 16;
     let decipher: crypto.DecipherGCM | null = null;
     let buffered = Buffer.alloc(0);
     const transform = new Transform({
@@ -119,7 +178,7 @@ export function OPCFormat_SymmetricDecryptStream(key: SymmetricKey, opcFormatted
             if(decipher === null)
             {
                 buffered = Buffer.concat([buffered, chunk]);
-                if(buffered.length >= headerLength)
+                if(buffered.length >= OPCFormat_MaxHeaderLength)
                 {
                     const result = OPCFormat_ReadHeaderAndCreateDecipher(key.key, buffered);
                     decipher = result.decipher;
@@ -140,8 +199,9 @@ export function OPCFormat_SymmetricDecryptStream(key: SymmetricKey, opcFormatted
 
 export function OPCFormat_SymmetricEncrypt(key: SymmetricKey, payload: Buffer)
 {
-    const header = Buffer.concat([Buffer.from("OPC"), Buffer.from([0])]);
-    const iv = crypto.randomBytes(16);
+    const versionNumber = 1;
+    const header = Buffer.concat([Buffer.from("OPC"), Buffer.from([versionNumber])]);
+    const iv = crypto.randomBytes(12);
     const encrypted = AES256GCM_Encrypt(key.key, iv, 16, payload);
     return Buffer.concat([header, iv, encrypted]);
 }

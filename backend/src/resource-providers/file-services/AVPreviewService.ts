@@ -19,7 +19,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { MountsManager } from "../../services/MountsManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
-import { CodecService } from "../multimedia-services/CodecService";
+import { CodecService, FFProbe_MediaInfo } from "../multimedia-services/CodecService";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 
 @Injectable
@@ -32,43 +32,35 @@ export class AVPreviewService
     }
 
     //Public methods
-    public async CreatePreviews(inputPath: string, isImage: boolean): Promise<{ type: "preview" | "thumb" | "tiles"; path: string; }[]>
+    public async CreateImageThumb(inputPath: string, mediaInfo: FFProbe_MediaInfo)
     {
-        const mediaInfo = await this.codecService.AnalyzeMediaFile(this.hostId, inputPath);
-
         const vidStream = this.codecService.GetVideoStream(mediaInfo);
         const isWidthBigger = vidStream.width > vidStream.height;
         const scale = isWidthBigger ? "256:-1" : "-1:256";
 
-        if(isImage)
-        {
-            return [
-                {
-                    type: "thumb",
-                    path: await this.CreateImageThumbnail(inputPath, scale)
-                }
-            ];
-        }
+        return await this.CreateImageThumbnail(inputPath, scale);
+    }
+
+    public async CreateVideoPreview(inputPath: string, mediaInfo: FFProbe_MediaInfo, thumbType: "preview" | "thumb" | "tiles"): Promise<string>
+    {
+        const vidStream = this.codecService.GetVideoStream(mediaInfo);
+        const isWidthBigger = vidStream.width > vidStream.height;
+        const scale = isWidthBigger ? "256:-1" : "-1:256";
 
         const duration = parseFloat(mediaInfo.format.duration);
 
         const parts = vidStream.r_frame_rate.split("/");
         const frameRate = parseInt(parts[0]) / parseInt(parts[1]);
 
-        return [
-            {
-                type: "thumb",
-                path: await this.CreateImageThumbnail(inputPath, scale, 0.2 * duration)
-            },
-            {
-                type: "tiles",
-                path: await this.CreateTilesImage(inputPath, duration, frameRate, scale)
-            },
-            {
-                type: "preview",
-                path: await this.CreatePreviewVideo(inputPath, duration, scale)
-            }
-        ];
+        switch(thumbType)
+        {
+            case "preview":
+                return await this.CreatePreviewVideo(inputPath, duration, scale);
+            case "thumb":
+                return await this.CreateImageThumbnail(inputPath, scale, 0.2 * duration);
+            case "tiles":
+                return await this.CreateTilesImage(inputPath, duration, frameRate, scale);
+        }
     }
 
     public async CreateWorkspace(hostId: number, inputSize: number)

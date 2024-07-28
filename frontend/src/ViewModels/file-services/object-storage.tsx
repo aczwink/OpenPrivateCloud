@@ -18,7 +18,7 @@
 import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
 import { resourceProviders } from "openprivatecloud-common";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO, SnapshotDTO } from "../../../dist/api";
+import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO, ObjectStorageBlobExtraMetadata, SnapshotDTO } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { DownloadFileUsingProgressPopup } from "../../Views/object-storage/DownloadProgressPopup";
@@ -41,6 +41,15 @@ const fileOverviewViewModel: ObjectViewModel<FileMetaDataDTO, FileId> = {
     formTitle: _ => "Metadata",
     requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
     schemaName: "FileMetaDataDTO"
+};
+
+const fileExtraMetaDataViewModel: ObjectViewModel<ObjectStorageBlobExtraMetadata, FileId> = {
+    type: "object",
+    actions: [
+    ],
+    formTitle: _ => "Metadata",
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.meta.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
+    schemaName: "ObjectStorageBlobExtraMetadata"
 };
 
 const fileRevisionViewModel: ObjectViewModel<FileMetaDataDTO, FileId & { revisionNumber: number; }> = {
@@ -114,6 +123,11 @@ const fileViewModel: MultiPageViewModel<FileId> = {
                     },
                     displayName: "Preview",
                     key: "preview"
+                },
+                {
+                    child: fileExtraMetaDataViewModel,
+                    displayName: "Metadata",
+                    key: "extrametadata"
                 },
                 {
                     child: fileRevisionsViewModel,

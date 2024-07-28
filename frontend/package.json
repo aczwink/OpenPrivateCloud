@@ -6,7 +6,8 @@
   "scripts": {
     "generate-api": "npx acts-util-apilib && ln -sf ../../backend/dist/openapi.json dist/openapi.json",
     "start-dev": "webpack serve --open",
-    "build": "npx webpack"
+    "build": "npx webpack",
+    "build-docker-image": "docker build -t opc-frontend ."
   },
   "keywords": [],
   "author": "Amir Czwink",

@@ -20,14 +20,29 @@ import { Dictionary, NumberDictionary, TimeUtil } from "acts-util-core";
 import { Injectable } from "acts-util-node";
 import { GenerateRandomUUID } from "../common/crypto/randomness";
 import { Readable } from "stream";
+import { OPCFormat_Header, OPCFormat_MaxHeaderLength, OPCFormat_ReadHeader, OPCFormat_SupportsRandomAccess, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricDecryptSlice, SymmetricKey } from "../common/crypto/symmetric";
 
 interface RequestEntry
 {
     createStreamCallBack: () => Promise<Readable>;
+    readBlockCallBack: (start: number, end: number) => Promise<Buffer>;
     stream?: Readable;
-    offset: number;
-    buffered: Buffer[];
+    buffer: Buffer;
+    bufferedCount: number;
+    mediaType: string;
+    header: OPCFormat_Header;
     totalSize: number;
+    key: SymmetricKey;
+}
+
+interface RequestParameters
+{
+    userId: number;
+    mediaType: string;
+    totalSize: number;
+    createStreamCallBack: () => Promise<Readable>;
+    readBlockCallBack: (start: number, end: number) => Promise<Buffer>;
+    key: SymmetricKey;
 }
 
 @Injectable
@@ -39,17 +54,31 @@ export class LargeFileDownloadService
         this.userIdMap = {};
     }
 
-    public CreateRequest(userId: number, totalSize: number, createStreamCallBack: () => Promise<Readable>)
+    public async CreateRequest(params: RequestParameters)
     {
-        this.DeleteRequest(userId);
+        const headerBlock = await params.readBlockCallBack(0, OPCFormat_MaxHeaderLength);
+        const header = OPCFormat_ReadHeader(headerBlock);
+        const randomAccess = OPCFormat_SupportsRandomAccess(header);
+
+        this.DeleteRequest(params.userId);
         const id = GenerateRandomUUID();
-        this.idMap[id] = { totalSize, createStreamCallBack: createStreamCallBack, offset: 0, buffered: [] };
-        this.userIdMap[userId] = id;
+
+        this.idMap[id] = {
+            totalSize: params.totalSize,
+            mediaType: params.mediaType,
+            createStreamCallBack: params.createStreamCallBack,
+            buffer: Buffer.alloc(randomAccess ? 0 : params.totalSize),
+            bufferedCount: 0,
+            header,
+            readBlockCallBack: params.readBlockCallBack,
+            key: params.key
+        };
+        this.userIdMap[params.userId] = id;
 
         return id;
     }
 
-    public async RequestPart(id: string, rangeHeader: string): Promise<{ start: number, end: number, totalSize: number, data: Buffer } | undefined>
+    public async RequestPart(id: string, rangeHeader: string)
     {
         const request = this.idMap[id];
         if(request === undefined)
@@ -62,41 +91,17 @@ export class LargeFileDownloadService
         const inclusiveEnd = parts[1] ? parseInt(parts[1], 10) : (start + chunkSize - 1);
         const rangedEnd = Math.min(inclusiveEnd, request.totalSize - 1);
 
-        if(request.stream === undefined)
-        {
-            request.stream = await request.createStreamCallBack();
-            request.stream.on("data", chunk => {
-                request.buffered.push(chunk);
-                if(request.buffered.length > 100)
-                    request.stream?.pause();
-            });
-        }
-
-        const stream = request.stream;
-        if(request.offset < start)
-        {
-            this.Skip(request, start - request.offset);
-            request.offset = start;
-        }
-        else if(start < request.offset)
-        {
-            request.stream.pause();
-
-            request.buffered = [];
-            request.offset = 0;
-            request.stream = undefined;
-            return this.RequestPart(id, rangeHeader);
-        }
-
-        const chunk = await this.Read(request, rangedEnd - start + 1);
-        request.offset += chunk.byteLength;
-        request.stream = stream;
+        const randomAccess = OPCFormat_SupportsRandomAccess(request.header);
+        const chunk = randomAccess
+            ? await this.ReadSlice(request, start, rangedEnd - start + 1)
+            : await this.ReadSliceFromBuffer(request, start, rangedEnd - start + 1);
 
         return {
             start,
             end: rangedEnd,
+            data: chunk,
+            mediaType: request.mediaType,
             totalSize: request.totalSize,
-            data: chunk
         };
     }
 
@@ -107,8 +112,9 @@ export class LargeFileDownloadService
             return undefined;
 
         return {
+            data: await request.createStreamCallBack(),
+            mediaType: request.mediaType,
             totalSize: request.totalSize,
-            data: await request.createStreamCallBack()
         };
     }
 
@@ -125,42 +131,33 @@ export class LargeFileDownloadService
         delete this.userIdMap[userId];
     }
 
-    private async Read(request: RequestEntry, count: number)
+    private async ReadSlice(request: RequestEntry, offset: number, count: number)
     {
-        const result = [];
-        while(count > 0)
-        {
-            if(request.buffered.length < 100)
-                request.stream?.resume();
-            if(request.buffered.length === 0)
-            {
-                if(request.stream?.readableEnded)
-                    break;
-                await TimeUtil.Delay(500);
-                continue;
-            }
+        const firstBlockNumber = Math.floor(offset / 16);
+        const lastBlockNumber = Math.ceil((offset + count) / 16);
 
-            const b = request.buffered[0];
-            if(b.byteLength > count)
-            {
-                result.push(b.subarray(0, count));
-                request.buffered[0] = b.subarray(count);
-                break;
-            }
-            else
-            {
-                result.push(b);
-                request.buffered.Remove(0);
-                count -= b.byteLength;
-            }
-        }
+        const encryptedBlock = await request.readBlockCallBack(firstBlockNumber * 16 + request.header.headerLength, lastBlockNumber * 16 + request.header.headerLength);
+        const decryptedBlock = OPCFormat_SymmetricDecryptSlice(request.key, request.header, firstBlockNumber, encryptedBlock);
 
-        return Buffer.concat(result);
+        const startSkip = offset % 16;
+        return decryptedBlock.subarray(startSkip, startSkip + count);
     }
 
-    private Skip(request: RequestEntry, skip: number)
+    private async ReadSliceFromBuffer(request: RequestEntry, offset: number, count: number)
     {
-        this.Read(request, skip);
+        if(request.stream === undefined)
+        {
+            request.stream = await request.createStreamCallBack();
+            request.stream.on("data", chunk => {
+                request.buffer.fill(chunk, request.bufferedCount, request.bufferedCount + chunk.length);
+                request.bufferedCount += chunk.length;
+            });
+        }
+
+        while((offset + count) > request.bufferedCount)
+            await TimeUtil.Delay(500);
+
+        return request.buffer.subarray(offset, offset + count);
     }
 }
 //TODO: session logout event

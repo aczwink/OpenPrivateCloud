@@ -131,6 +131,24 @@ export class RemoteFileSystemManager
         }
     }
 
+    public async ReadFileBlock(hostId: number, filePath: string, start: number, end: number)
+    {
+        const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);
+        try
+        {
+            const result = await conn.value.ReadFileBlock(filePath, start, end);
+            return result;
+        }
+        catch(e)
+        {
+            throw new Error("Reading file block at path " + filePath + " on host " + hostId + " failed." + e);
+        }
+        finally
+        {
+            conn.Release();
+        }
+    }
+
     public async ReadLink(hostId: number, filePath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);

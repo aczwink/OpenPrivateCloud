@@ -1,0 +1,36 @@
+version: '3.3'
+
+services:
+  db:
+    container_name: opc-db
+    environment:
+      - MARIADB_DATABASE=openprivatecloud
+      - MARIADB_PASSWORD=opc #TODO: set pw here
+      - MARIADB_ROOT_PASSWORD=opc #TODO: set pw here
+      - MARIADB_USER=opc
+    image: mariadb
+    restart: always
+    volumes:
+      - ./dbdatadir:/var/lib/mysql:Z
+      - ./dbimport:/docker-entrypoint-initdb.d/
+
+  backend:
+    container_name: opc-backend
+    image: opc-backend
+    networks:
+      - host
+    restart: always
+    volumes:
+      - ./certs:/etc/OpenPrivateCloud:ro
+
+  frontend:
+    container_name: opc-frontend
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=443 #port inside container
+    image: opc-frontend
+    ports:
+      - "8079:443"
+    restart: always
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
