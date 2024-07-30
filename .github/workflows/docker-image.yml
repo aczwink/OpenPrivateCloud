@@ -60,9 +60,11 @@ jobs:
       working-directory: ./common
     - run: npm run build
       working-directory: ./common
+    - run: npm link
+      working-directory: ./common
 
     #build backend
-    - run: npm link acts-util-node
+    - run: npm link acts-util-node openprivatecloud-common
       working-directory: ./backend
     - run: npm install
       working-directory: ./backend
