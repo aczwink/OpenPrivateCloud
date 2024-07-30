@@ -54,6 +54,15 @@ jobs:
     - run: npm link
       working-directory: ./actsutil/node
 
+    #build acts-util-apilib
+    - name: Building acts-util-apilib
+      run: |
+        npm link acts-util-core acts-util-node
+        npm install
+        npm run build
+        npm link
+      working-directory: ./actsutil/apilib
+
 
     #build common
     - run: npm install
@@ -64,12 +73,11 @@ jobs:
       working-directory: ./common
 
     #build backend
-    - name: Linking backend dependencies
-      run: npm link acts-util-core acts-util-node openprivatecloud-common
-      working-directory: ./backend
-    - run: npm install
-      working-directory: ./backend
-    - run: npm run build-release-package
+    - name: Building OPC backend
+      run: |
+        npm link acts-util-core acts-util-node acts-util-apilib openprivatecloud-common
+        npm install
+        npm run build-release-package
       working-directory: ./backend
 
     #build frontend
