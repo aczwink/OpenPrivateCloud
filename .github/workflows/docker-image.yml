@@ -98,7 +98,7 @@ jobs:
     #build frontend
     - name: Building OPC frontend
       run: |
-        npm link acfrontend openprivatecloud-common
+        npm link acts-util-core acfrontend openprivatecloud-common
         npm install
         npm run generate-api
       working-directory: ./frontend
