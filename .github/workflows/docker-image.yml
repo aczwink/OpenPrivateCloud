@@ -2,7 +2,7 @@ name: Build docker images
 
 on:
   push:
-    branches: [ "main", "pipeline" ]
+    branches: [ "main", "pipeline" ] #TODO: remove pipeline
   pull_request:
     branches: [ "main" ]
 
@@ -75,7 +75,7 @@ jobs:
         npm run compile
         npm run build
         npm link
-      working-directory: ./actsutil/apilib
+      working-directory: ./acfrontend
 
 
     #build common
