@@ -30,13 +30,23 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
-    #build acts-util-node
+    #build acts-util-core
     - name: Checkout ACTS-Util repo
       uses: actions/checkout@v4
       with:
         repository: aczwink/ACTS-Util
         path: actsutil
 
+    - run: npm install
+      working-directory: ./actsutil/core
+    - run: npm run compile
+      working-directory: ./actsutil/core
+    - run: npm link
+      working-directory: ./actsutil/core
+
+    #build acts-util-node
+    - run: npm link acts-util-core
+      working-directory: ./actsutil/node
     - run: npm install
       working-directory: ./actsutil/node
     - run: npm run build
