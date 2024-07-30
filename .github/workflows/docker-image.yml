@@ -37,21 +37,20 @@ jobs:
         repository: aczwink/ACTS-Util
         path: actsutil
 
-    - run: npm install
-      working-directory: ./actsutil/core
-    - run: npm run compile
-      working-directory: ./actsutil/core
-    - run: npm link
+    - name: Building acts-util-core
+      run: |
+        npm install
+        npm run compile
+        npm link
       working-directory: ./actsutil/core
 
     #build acts-util-node
-    - run: npm link acts-util-core
-      working-directory: ./actsutil/node
-    - run: npm install
-      working-directory: ./actsutil/node
-    - run: npm run build
-      working-directory: ./actsutil/node
-    - run: npm link
+    - name: Building acts-util-node
+      run: |
+        npm link acts-util-core
+        npm install
+        npm run build
+        npm link
       working-directory: ./actsutil/node
 
     #build acts-util-apilib
@@ -63,13 +62,28 @@ jobs:
         npm link
       working-directory: ./actsutil/apilib
 
+    #build acfrontend
+    - name: Checkout ACFrontEnd repo
+      uses: actions/checkout@v4
+      with:
+        repository: aczwink/ACFrontEnd
+        path: acfrontend
+
+    - name: Building acfrontend
+      run: |
+        npm install
+        npm run compile
+        npm run build
+        npm link
+      working-directory: ./actsutil/apilib
+
 
     #build common
-    - run: npm install
-      working-directory: ./common
-    - run: npm run build
-      working-directory: ./common
-    - run: npm link
+    - name: Building OPC common
+      run: |
+        npm install
+        npm run build
+        npm link
       working-directory: ./common
 
     #build backend
@@ -81,9 +95,11 @@ jobs:
       working-directory: ./backend
 
     #build frontend
-    - run: npm install
-      working-directory: ./frontend
-    - run: npm run generate-api
+    - name: Building OPC frontend
+      run: |
+        npm link acfrontend
+        npm install
+        npm run generate-api
       working-directory: ./frontend
 
     #publish images      
