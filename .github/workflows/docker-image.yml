@@ -64,7 +64,8 @@ jobs:
       working-directory: ./common
 
     #build backend
-    - run: npm link acts-util-node openprivatecloud-common
+    - name: Linking backend dependencies
+      run: npm link acts-util-core acts-util-node openprivatecloud-common
       working-directory: ./backend
     - run: npm install
       working-directory: ./backend
