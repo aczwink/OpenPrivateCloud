@@ -71,6 +71,7 @@ jobs:
 
     - name: Building acfrontend
       run: |
+        npm link acts-util-core
         npm install
         npm run compile
         npm run build
