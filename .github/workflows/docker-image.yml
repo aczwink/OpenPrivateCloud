@@ -101,6 +101,8 @@ jobs:
         npm link acts-util-core acts-util-apilib acfrontend openprivatecloud-common
         npm install
         npm run generate-api
+        touch ./dist/private.key
+        touch ./dist/public.crt
         npm run build
       working-directory: ./frontend
 
