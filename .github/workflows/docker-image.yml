@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Build docker images
 
 on:
   push:
@@ -7,12 +7,125 @@ on:
     branches: [ "main" ]
 
 jobs:
-
-  build:
+  build-and-push-image:
 
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        node-version: [12.x]
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+    - uses: actions/checkout@v3
+
+    #setup build tools
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    #build acts-util-core
+    - name: Checkout ACTS-Util repo
+      uses: actions/checkout@v4
+      with:
+        repository: aczwink/ACTS-Util
+        path: actsutil
+
+    - name: Building acts-util-core
+      run: |
+        npm install
+        npm run compile
+        npm link
+      working-directory: ./actsutil/core
+
+    #build acts-util-node
+    - name: Building acts-util-node
+      run: |
+        npm link acts-util-core
+        npm install
+        npm run build
+        npm link
+      working-directory: ./actsutil/node
+
+    #build acts-util-apilib
+    - name: Building acts-util-apilib
+      run: |
+        npm link acts-util-core acts-util-node
+        npm install
+        npm run build
+        npm link
+      working-directory: ./actsutil/apilib
+
+    #build acfrontend
+    - name: Checkout ACFrontEnd repo
+      uses: actions/checkout@v4
+      with:
+        repository: aczwink/ACFrontEnd
+        path: acfrontend
+
+    - name: Building acfrontend
+      run: |
+        npm link acts-util-core
+        npm install
+        npm run compile
+        npm run build
+        npm link
+      working-directory: ./acfrontend
+
+
+    #build common
+    - name: Building OPC common
+      run: |
+        npm install
+        npm run build
+        npm link
+      working-directory: ./common
+
+    #build backend
+    - name: Building OPC backend
+      run: |
+        npm link acts-util-core acts-util-node acts-util-apilib openprivatecloud-common
+        npm install
+        npm run build-release-package
+      working-directory: ./backend
+
+    #build frontend
+    - name: Building OPC frontend
+      run: |
+        npm link acts-util-core acts-util-apilib acfrontend openprivatecloud-common
+        npm install
+        npm run generate-api
+        touch ./dist/private.key
+        touch ./dist/public.crt
+        npm run build
+      working-directory: ./frontend
+
+    #publish images      
+    - name: Log in to the Container registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push backend image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ghcr.io/aczwink/openprivatecloud-backend:latest
+
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./frontend
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ghcr.io/aczwink/openprivatecloud-frontend:latest
