@@ -27,6 +27,11 @@ import { UploadedFile } from "acts-util-node/dist/http/UploadedFile";
 import { PermissionsManager } from "../../../services/PermissionsManager";
 import { permissions } from "openprivatecloud-common";
 
+interface EditableFileMetaDataDTO
+{
+    tags: string[];
+}
+
 interface FileCreationDataDTO
 {
     fileId: string;
@@ -42,17 +47,21 @@ interface FileMetaDataOverviewDataDTO
      */
     size: number;
     lastAccessTime: Date;
+    tags: string[];
 }
 
 interface FileMetaDataDTO
 {
     fileName: string;
-    lastAccessTime: Date;
     mediaType: string;
     /**
      * @format byteSize
      */
     size: number;
+
+    accessCounter: number;
+    lastAccessTime: Date;
+    tags: string[];
 }
 
 interface FileRevisionDTO
@@ -60,6 +69,15 @@ interface FileRevisionDTO
     revisionNumber: number;
     creationTimeStamp: Date;
     fileName: string;
+}
+
+interface ObjectStoragesStatisticsDTO
+{
+    totalFileCount: number;
+    /**
+     * @format byteSize
+     */
+    totalBlobSize: number;
 }
 
 interface SnapshotDTO
@@ -98,19 +116,25 @@ class _api_ extends ResourceAPIControllerBase
     @Get("files")
     public async SearchFiles(
         @Common context: ResourceReferenceWithSession,
+        @Query name: string,
+        @Query mediaType: string,
+        @Query tags: string
     )
     {
         const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
         if(!canReadData)
             return Forbidden("access to files denied");
 
-        const files = await this.objectStoragesManager.SearchFiles(context.resourceReference);
+        const files = await this.objectStoragesManager.SearchFiles(context.resourceReference, { name, mediaType, tags: tags.split(",").map(x => x.trim()).filter(x => x.length > 0) });
         return files.Values().Map(async x => {
+            const blobMeta = await this.objectStoragesManager.RequestBlobMetadata(context.resourceReference, x.blobId);
+            const stats = await this.objectStoragesManager.RequestFileAccessStatistics(context.resourceReference, x.id);
             const res: FileMetaDataOverviewDataDTO = {
                 id: x.id,
                 mediaType: x.mediaType,
-                size: x.blobSize,
-                lastAccessTime: new Date(await this.objectStoragesManager.RequestFileAccessTime(context.resourceReference, x.id)),
+                size: blobMeta.size,
+                lastAccessTime: new Date(stats.lastAccessTime),
+                tags: x.tags,
             };
             return res;
         }).PromiseAll();
@@ -143,25 +167,8 @@ class _api_ extends ResourceAPIControllerBase
         if(file === undefined)
             return NotFound("file not found");
         
-        const atime = await this.objectStoragesManager.RequestFileAccessTime(context.resourceReference, fileId);
-        return this.MapRevisionToDTO(file.currentRev, atime);
-    }
-
-    @Get("files/{fileId}/meta")
-    public async QueryFileExtraMetadata(
-        @Common context: ResourceReferenceWithSession,
-        @Path fileId: string
-    )
-    {
-        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
-        if(!canReadData)
-            return Forbidden("access to blob denied");
-
-        const file = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
-        if(file === undefined)
-            return NotFound("file not found");
-
-        return this.objectStoragesManager.RequestExtraMetadata(context.resourceReference, file.currentRev.blobId, file.currentRev.blobSize, file.currentRev.mediaType);
+        const stats = await this.objectStoragesManager.RequestFileAccessStatistics(context.resourceReference, fileId);
+        return this.MapRevisionToDTO(context.resourceReference, file.currentRev, stats.accessCounter, stats.lastAccessTime);
     }
 
     @Put("files/{fileId}")
@@ -207,6 +214,58 @@ class _api_ extends ResourceAPIControllerBase
         return this.objectStoragesManager.CreateFileBlobStreamRequest(context.resourceReference, context.userId, fileId);
     }
 
+    @Get("files/{fileId}/extrameta")
+    public async QueryFileExtraMetadata(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string
+    )
+    {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to file denied");
+
+        const file = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
+        if(file === undefined)
+            return NotFound("file not found");
+
+        return this.objectStoragesManager.RequestBlobMetadata(context.resourceReference, file.currentRev.blobId);
+    }
+
+    @Get("files/{fileId}/meta")
+    public async RequestFileEditableMetadata(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string
+    )
+    {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to file denied");
+
+        const file = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
+        if(file === undefined)
+            return NotFound("file not found");
+
+        const res: EditableFileMetaDataDTO = {
+            tags: file.currentRev.tags
+        };
+
+        return res;
+    }
+
+    @Put("files/{fileId}/meta")
+    public async UpdateFileEditableMetadata(
+        @Common context: ResourceReferenceWithSession,
+        @Path fileId: string,
+        @Body dto: EditableFileMetaDataDTO
+    )
+    {
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.write);
+        if(!canWriteData)
+            return Forbidden("write access denied");
+
+        await this.objectStoragesManager.UpdateFileMetaData(context.resourceReference, fileId, dto.tags);
+    }
+
     @Get("files/{fileId}/thumb")
     public async DownloadFileThumb(
         @Common context: ResourceReferenceWithSession,
@@ -235,7 +294,7 @@ class _api_ extends ResourceAPIControllerBase
 
         const md = await this.objectStoragesManager.RequestFileMetaData(context.resourceReference, fileId);
         const x = md.revisions[revisionNumber];
-        return this.MapRevisionToDTO(x, x.creationTimeStamp);
+        return this.MapRevisionToDTO(context.resourceReference, x, 0, x.creationTimeStamp);
     }
 
     @Get("files/{fileId}/revisions/{revisionNumber}/blob")
@@ -300,6 +359,31 @@ class _api_ extends ResourceAPIControllerBase
         await this.objectStoragesManager.CreateSnapshot(context.resourceReference);
     }
 
+    @Get("stats")
+    public async RequestStatistics(
+        @Common context: ResourceReferenceWithSession,
+    )
+    {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to statistics denied");
+
+        return await this.objectStoragesManager.QueryStatistics(context.resourceReference) as ObjectStoragesStatisticsDTO;
+    }
+
+    @Get("tags")
+    public async RequestTags(
+        @Common context: ResourceReferenceWithSession,
+    )
+    {
+        const canReadData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        if(!canReadData)
+            return Forbidden("access to tags denied");
+
+        const tags = await this.objectStoragesManager.QueryTags(context.resourceReference);
+        return tags.ToArray();
+    }
+
     //TODO: this is only there for getting the FileCreationData type into the openapi.json :S
     @Get("dummy")
     public dummy(
@@ -311,13 +395,16 @@ class _api_ extends ResourceAPIControllerBase
     }
 
     //Private methods
-    private MapRevisionToDTO(revision: FileMetaDataRevision, atime: number): FileMetaDataDTO
+    private async MapRevisionToDTO(resourceReference: ResourceReference, revision: FileMetaDataRevision, accessCounter: number, atime: number): Promise<FileMetaDataDTO>
     {
+        const blobMeta = await this.objectStoragesManager.RequestBlobMetadata(resourceReference, revision.blobId);
         return {
             fileName: revision.fileName,
             lastAccessTime: new Date(atime),
             mediaType: revision.mediaType,
-            size: revision.blobSize
+            size: blobMeta.size,
+            accessCounter,
+            tags: revision.tags
         };
     }
 }

@@ -35,12 +35,12 @@ import { ResourceCheckResult, ResourceCheckType, ResourceState } from "../Resour
 import { HealthStatus } from "../../data-access/HealthController";
 import { LargeFileDownloadService } from "../../services/LargeFileDownloadService";
 import { CodecService, FFProbe_MediaInfo } from "../multimedia-services/CodecService";
+import { StreamToBuffer } from "acts-util-node/dist/fs/Util";
 
 export interface FileMetaDataRevision
 {
     id: string;
     blobId: string;
-    blobSize: number;
     creationTimeStamp: number;
     mediaType: string;
     fileName: string;
@@ -53,24 +53,46 @@ interface ObjectStorageConfig
     keyName: string;
 }
 
-export interface ObjectStorageBlobExtraMetadata
+interface ObjectStorageBlobHashes
 {
-    av?: FFProbe_MediaInfo;
+    md5: string;
+    sha256: string;
+}
+
+interface ObjectStorageBlobIndex
+{
+    size: number;
+
+    hash: ObjectStorageBlobHashes;
+
+    meta: {
+        av?: FFProbe_MediaInfo;
+    };
+}
+
+interface ObjectStorageCache
+{
+    tags: Set<string>;
 }
 
 interface ObjectStorageFileIndex
 {
+    currentRev: FileMetaDataRevision;
+    accessCounter: number;
     lastAccessTime: number;
 }
 
 interface ObjectStorageIndex
 {
-    extraBlobMetadata: Dictionary<ObjectStorageBlobExtraMetadata>;
+    version: 0;
+    blobs: Dictionary<ObjectStorageBlobIndex>;
     files: Dictionary<ObjectStorageFileIndex>;
 }
 
 interface Snapshot
 {
+    version: 0;
+    blobs: Dictionary<ObjectStorageBlobIndex>;
     files: StoredFileMetaData[];
 }
 
@@ -90,6 +112,8 @@ export class ObjectStoragesManager
         private modulesManager: ModulesManager, private avPreviewService: AVPreviewService, private codecService: CodecService)
     {
         this.index = {};
+        this.cache = {};
+        this.indexLock = new Lock;
         this.thumbCreationLock = new Lock;
     }
 
@@ -130,6 +154,7 @@ export class ObjectStoragesManager
         const metaData = await this.RequestFileMetaData(resourceReference, fileId);
         const blobId = metaData.currentRev.blobId;
         const blobPath = path.join(this.GetBlobsPath(resourceReference), blobId);
+        const blobMeta = await this.RequestBlobMetadata(resourceReference, blobId);
 
         await this.UpdateFileAccessTime(resourceReference, fileId);
 
@@ -138,7 +163,7 @@ export class ObjectStoragesManager
             createStreamCallBack: this.ReadBlob.bind(this, resourceReference, blobId),
             readBlockCallBack: (start, end) => this.remoteFileSystemManager.ReadFileBlock(resourceReference.hostId, blobPath, start, end),
             mediaType: metaData.currentRev.mediaType,
-            totalSize: metaData.currentRev.blobSize,
+            totalSize: blobMeta.size,
             userId,
             key: dek
         });
@@ -149,6 +174,8 @@ export class ObjectStoragesManager
         const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetFilesDataPath(resourceReference));
 
         const snapshot: Snapshot = {
+            version: 0,
+            blobs: (await this.GetIndex(resourceReference)).blobs,
             files: []
         };
 
@@ -173,6 +200,9 @@ export class ObjectStoragesManager
 
         const fileMetaDataPath = this.FormFileMetaDataPath(resourceReference, encryptedId);
         await this.remoteFileSystemManager.UnlinkFile(resourceReference.hostId, fileMetaDataPath);
+
+        const index = await this.GetIndex(resourceReference);
+        delete index.files[fileId];
     }
 
     public async DeleteResource(resourceReference: LightweightResourceReference)
@@ -209,7 +239,8 @@ export class ObjectStoragesManager
         await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, this.GetFileIdSaltPath(resourceReference), encryptedSalt);
 
         this.index[resourceReference.id] = {
-            extraBlobMetadata: {},
+            version: 0,
+            blobs: {},
             files: {},
         };
         this.WriteIndex(resourceReference.id);
@@ -220,55 +251,46 @@ export class ObjectStoragesManager
         return ResourceState.Running;
     }
 
-    public async RequestExtraMetadata(resourceReference: LightweightResourceReference, blobId: string, blobSize: number, mediaType: string)
+    public async QueryStatistics(resourceReference: LightweightResourceReference)
     {
         const index = await this.GetIndex(resourceReference);
-        const extra = index.extraBlobMetadata[blobId];
-        if(extra !== undefined)
-            return extra;
-
-        if(mediaType.startsWith("image/") || mediaType.startsWith("video/"))
-        {
-            const locked = await this.thumbCreationLock.Lock();
-            try
-            {
-                await this.AnalyzeMissingMediaData(resourceReference, blobId, blobSize, mediaType);
-            }
-            finally
-            {
-                locked.Release();
-            }
-        }
-        else
-            index.extraBlobMetadata[blobId] = {};
-
-        return index.extraBlobMetadata[blobId]!;
+        return {
+            totalFileCount: index.files.OwnKeys().Count(),
+            totalBlobSize: index.blobs.Values().NotUndefined().Map(x => x.size).Sum()
+        };
     }
 
-    public async RequestFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
+    public async QueryTags(resourceReference: LightweightResourceReference)
     {
-        if(!(resourceReference.id in this.index))
-            this.index[resourceReference.id]! = await this.ReadIndex(resourceReference);
-        const index = this.index[resourceReference.id]!;
+        const cache = await this.GetCache(resourceReference);
+        return cache.tags;
+    }
 
-        const file = index.files[fileId];
-        if(file === undefined)
-        {
-            const md = await this.RequestFileMetaData(resourceReference, fileId);
-            return md.currentRev.creationTimeStamp;
-        }
-        return file.lastAccessTime;
+    public async RequestBlobMetadata(resourceReference: LightweightResourceReference, blobId: string)
+    {
+        const index = await this.GetIndex(resourceReference);
+        return index.blobs[blobId]!;
+    }
+
+    public async RequestFileAccessStatistics(resourceReference: LightweightResourceReference, fileId: string)
+    {
+        const fileMeta = await this.GetFileMetaData(resourceReference, fileId);
+        return {
+            lastAccessTime: fileMeta.lastAccessTime,
+            accessCounter: fileMeta.accessCounter
+        };
     }
 
     public async RequestFileBlob(resourceReference: LightweightResourceReference, fileId: string)
     {
         const metaData = await this.RequestFileMetaData(resourceReference, fileId);
         const blobId = metaData.currentRev.blobId;
+        const blobMeta = await this.RequestBlobMetadata(resourceReference, blobId);
 
         await this.UpdateFileAccessTime(resourceReference, fileId);
 
         return {
-            size: metaData.currentRev.blobSize,
+            size: blobMeta.size,
             stream: await this.ReadBlob(resourceReference, blobId)
         };
     }
@@ -284,9 +306,10 @@ export class ObjectStoragesManager
         const metaData = await this.RequestFileMetaData(resourceReference, fileId);
         const rev = metaData.revisions[revisionNumber];
         const blobId = rev.blobId;
+        const blobMeta = await this.RequestBlobMetadata(resourceReference, blobId);
 
         return {
-            size: rev.blobSize,
+            size: blobMeta.size,
             stream: await this.ReadBlob(resourceReference, blobId)
         };
     }
@@ -315,7 +338,8 @@ export class ObjectStoragesManager
         }
         catch(e: any)
         {
-            this.CreateThumbnailJob(resourceReference, metaData.currentRev.blobId, metaData.currentRev.blobSize, metaData.currentRev.mediaType);
+            const blobMeta = await this.RequestBlobMetadata(resourceReference, metaData.currentRev.blobId);
+            this.CreateThumbnailJob(resourceReference, metaData.currentRev.blobId, blobMeta.size, metaData.currentRev.mediaType);
             return undefined;
         }
         const decryptedThumb = await this.DecryptBuffer(resourceReference, encryptedThumb);
@@ -329,12 +353,11 @@ export class ObjectStoragesManager
 
         const newRevision: FileMetaDataRevision = {
             blobId,
-                blobSize: blob.byteLength,
-                creationTimeStamp: Date.now(),
-                fileName: originalName,
-                id: fileId,
-                mediaType,
-                tags: []
+            creationTimeStamp: Date.now(),
+            fileName: originalName,
+            id: fileId,
+            mediaType,
+            tags: []
         };
 
         const encryptedId = await this.HashFileId(resourceReference, fileId);
@@ -355,27 +378,56 @@ export class ObjectStoragesManager
                 revisions: [],
             };
         }
-        const fileMetaDataBuffer = Buffer.from(JSON.stringify(fileMetaData), "utf-8");
-        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, fileMetaDataPath, await this.EncryptBuffer(resourceReference, fileMetaDataBuffer));
+        await this.WriteFileMetaData(resourceReference, fileMetaData);
+
+        const index = await this.GetIndex(resourceReference);
+        const fileMeta = index.files[fileId];
+        if(fileMeta === undefined)
+        {
+            index.files[fileId] = {
+                accessCounter: 0,
+                currentRev: newRevision,
+                lastAccessTime: newRevision.creationTimeStamp
+            };
+        }
+        else
+            fileMeta.currentRev = newRevision;
+        await this.WriteIndex(resourceReference.id);
     }
 
-    public async SearchFiles(resourceReference: LightweightResourceReference)
+    public async SearchFiles(resourceReference: LightweightResourceReference, searchCriteria: { name: string, mediaType: string, tags: string[]})
     {
-        const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, this.GetFilesDataPath(resourceReference));
+        const nameFilter = searchCriteria.name.toLowerCase();
+        const tagsSet = new Set(searchCriteria.tags);
 
-        const result = [];
-        for (const child of children)
-        {
-            const parts = child.split(".");
-            const md = await this.RequestFileMetaDataInternal(resourceReference, parts[0]);
-            result.push(md.currentRev);
-        }
-        return result;
+        const index = await this.GetIndex(resourceReference);
+        return index.files.Values().NotUndefined().Map(x => x.currentRev).Filter(x => {
+            const nameMatch = x.id.toLowerCase().includes(nameFilter) || x.fileName.toLowerCase().includes(nameFilter);
+            const mediaTypeMatch = x.mediaType.includes(searchCriteria.mediaType);
+            const tagsMatch = new Set(x.tags).IsSuperSetOf(tagsSet);
+
+            return nameMatch && mediaTypeMatch && tagsMatch;
+        }).ToArray();
+    }
+
+    public async UpdateFileMetaData(resourceReference: LightweightResourceReference, fileId: string, tags: string[])
+    {
+        const encryptedId = await this.HashFileId(resourceReference, fileId);
+        const md = await this.RequestFileMetaDataInternal(resourceReference, encryptedId);
+        md.currentRev.tags = tags;
+
+        const fd = await this.GetFileMetaData(resourceReference, fileId);
+        fd.currentRev.tags = tags;
+
+        await this.WriteFileMetaData(resourceReference, md);
+        await this.WriteIndex(resourceReference.id);
     }
 
     //Private state
+    private cache: NumberDictionary<ObjectStorageCache>;
     private index: NumberDictionary<ObjectStorageIndex>;
     private indexWriteTimer?: NodeJS.Timeout;
+    private indexLock: Lock;
     private thumbCreationLock: Lock;
 
     //Private methods
@@ -403,16 +455,14 @@ export class ObjectStoragesManager
 
             //check extra meta data
             const index = await this.GetIndex(resourceReference);
-            let extra = index.extraBlobMetadata[blobId];
+            let blobData = index.blobs[blobId]!;
 
-            if(extra === undefined)
+            if(blobData.meta.av === undefined)
             {
-                extra = index.extraBlobMetadata[blobId] = {
-                    av: await this.codecService.AnalyzeMediaFile(resourceReference.hostId, blobPath)
-                }
+                blobData.meta.av = await this.codecService.AnalyzeMediaFile(resourceReference.hostId, blobPath)
                 this.ScheduleIndexWrite(resourceReference);
             }
-            const mediaInfo = extra.av!;
+            const mediaInfo = blobData.meta.av!;
 
             //thumbs
             const isImage = mediaType.startsWith("image/");
@@ -426,7 +476,7 @@ export class ObjectStoragesManager
 
                 const previewFilePath = isImage
                     ? await this.avPreviewService.CreateImageThumb(blobPath, mediaInfo)
-                    : await this.avPreviewService.CreateVideoPreview(blobPath, extra.av!, thumbType);
+                    : await this.avPreviewService.CreateVideoPreview(blobPath, mediaInfo, thumbType);
 
                 const thumb = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, previewFilePath);
                 await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, thumbPath + MapType(thumbType), await this.EncryptBuffer(resourceReference, thumb));
@@ -436,6 +486,19 @@ export class ObjectStoragesManager
         {
             await this.avPreviewService.ReleaseWorkspace();
         }
+    }
+
+    private ComputeBlobHashes(blob: Buffer): ObjectStorageBlobHashes
+    {
+        function hashit(algorithm: "md5" | "sha256")
+        {
+            return crypto.createHash(algorithm).update(blob).digest("hex");
+        }
+
+        return {
+            md5: hashit("md5"),
+            sha256: hashit("sha256"),
+        };
     }
 
     private async CreateThumbnailJob(resourceReference: LightweightResourceReference, blobId: string, blobSize: number, mediaType: string)
@@ -513,6 +576,21 @@ export class ObjectStoragesManager
         return path.join(root, "blobs");
     }
 
+    private async GetCache(resourceReference: LightweightResourceReference)
+    {
+        const cache = this.cache[resourceReference.id];
+        if(cache === undefined)
+        {
+            const index = await this.GetIndex(resourceReference);
+            const cache = this.cache[resourceReference.id] = {
+                tags: index.files.Values().NotUndefined().Map(x => x.currentRev.tags.Values()).Flatten().ToSet()
+            };
+
+            return cache;
+        }
+        return cache;
+    }
+
     private GetDataEncryptionKeyPath(resourceReference: LightweightResourceReference)
     {
         const root = this.resourcesManager.BuildResourceStoragePath(resourceReference);
@@ -523,6 +601,13 @@ export class ObjectStoragesManager
     {
         const root = this.resourcesManager.BuildResourceStoragePath(resourceReference);
         return path.join(root, "salt");
+    }
+
+    private async GetFileMetaData(resourceReference: LightweightResourceReference, fileId: string)
+    {
+        const index = await this.GetIndex(resourceReference);
+        const fileMetaData = index.files[fileId]!;
+        return fileMetaData;
     }
 
     private GetFilesDataPath(resourceReference: LightweightResourceReference)
@@ -536,7 +621,17 @@ export class ObjectStoragesManager
         const index = this.index[resourceReference.id];
         if(index === undefined)
         {
+            const lock = await this.indexLock.Lock();
+
+            const indexSecondTry = this.index[resourceReference.id];
+            if(indexSecondTry !== undefined)
+            {
+                lock.Release();
+                return indexSecondTry;
+            }
+
             const index = this.index[resourceReference.id] = await this.ReadIndex(resourceReference);
+            lock.Release();
             return index;
         }
         return index;
@@ -572,8 +667,7 @@ export class ObjectStoragesManager
         const decrypted = await this.DecryptBuffer(resourceReference, encrypted);
 
         const indexData = JSON.parse(decrypted.toString("utf-8")) as ObjectStorageIndex;
-        if(indexData.extraBlobMetadata === undefined)
-            indexData.extraBlobMetadata = {};
+        await this.TransformIndexData(resourceReference, indexData);
         return indexData;
     }
 
@@ -593,6 +687,10 @@ export class ObjectStoragesManager
         return fileMetaData;
     }
 
+    private async TransformIndexData(resourceReference: LightweightResourceReference, indexData: ObjectStorageIndex)
+    {
+    }
+
     private ScheduleIndexWrite(resourceReference: LightweightResourceReference)
     {
         if(this.indexWriteTimer === undefined)
@@ -601,15 +699,11 @@ export class ObjectStoragesManager
 
     private async UpdateFileAccessTime(resourceReference: LightweightResourceReference, fileId: string)
     {
-        if(!(resourceReference.id in this.index))
-            this.index[resourceReference.id]! = await this.ReadIndex(resourceReference);
-        const index = this.index[resourceReference.id]!;
+        const index = await this.GetIndex(resourceReference);
+        const fileMetaData = index.files[fileId]!;
 
-        const files = index.files;
-        if(fileId in files)
-            files[fileId]!.lastAccessTime = Date.now();
-        else
-            files[fileId] = { lastAccessTime: Date.now() };
+        fileMetaData.lastAccessTime = Date.now();
+        fileMetaData.accessCounter++;
 
         this.ScheduleIndexWrite(resourceReference);
     }
@@ -625,7 +719,25 @@ export class ObjectStoragesManager
 
         await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, blobPath, await this.EncryptBuffer(resourceReference, blob));
 
+        const index = await this.GetIndex(resourceReference);
+        index.blobs[blobId] = {
+            hash: this.ComputeBlobHashes(blob),
+            meta: {
+            },
+            size: blob.byteLength
+        };
+        //don't write index here. it is written at the end of file save
+
         return blobId;
+    }
+
+    private async WriteFileMetaData(resourceReference: LightweightResourceReference, fileMetaData: StoredFileMetaData)
+    {
+        const encryptedId = await this.HashFileId(resourceReference, fileMetaData.currentRev.id);
+        const fileMetaDataPath = this.FormFileMetaDataPath(resourceReference, encryptedId);
+
+        const fileMetaDataBuffer = Buffer.from(JSON.stringify(fileMetaData), "utf-8");
+        await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, fileMetaDataPath, await this.EncryptBuffer(resourceReference, fileMetaDataBuffer));
     }
 
     private async WriteIndex(resourceId: number)

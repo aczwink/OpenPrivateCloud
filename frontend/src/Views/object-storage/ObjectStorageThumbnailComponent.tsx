@@ -18,7 +18,7 @@
 
 import { BootstrapIcon, Component, Injectable, JSX_CreateElement, PopupManager } from "acfrontend";
 import { APIService } from "../../Services/APIService";
-import { FFProbe_VideoStreamInfo, FileMetaDataOverviewDataDTO, ObjectStorageBlobExtraMetadata } from "../../../dist/api";
+import { FFProbe_VideoStreamInfo, FileMetaDataOverviewDataDTO, ObjectStorageBlobIndex } from "../../../dist/api";
 
 @Injectable
 export class ObjectStorageThumbnailComponent extends Component<{ resourceGroupName: string; resourceName: string; fileMetadata: FileMetaDataOverviewDataDTO }>
@@ -61,7 +61,7 @@ export class ObjectStorageThumbnailComponent extends Component<{ resourceGroupNa
     }
 
     //Private state
-    private extraMetadata: ObjectStorageBlobExtraMetadata | null;
+    private extraMetadata: ObjectStorageBlobIndex | null;
     private thumb: string | null;
     private tile: string | null;
     private preview: string | null;
@@ -146,7 +146,7 @@ export class ObjectStorageThumbnailComponent extends Component<{ resourceGroupNa
                 reader.onloadend = () => this.thumb = this.GetDataAs(reader.result, "image/jpg");
             }
 
-            const response2 = await this.apiService.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.meta.get(this.input.resourceGroupName, this.input.resourceName, this.input.fileMetadata.id);
+            const response2 = await this.apiService.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.extrameta.get(this.input.resourceGroupName, this.input.resourceName, this.input.fileMetadata.id);
             if(response2.statusCode === 200)
                 this.extraMetadata = response2.data;
         }
@@ -173,10 +173,10 @@ export class ObjectStorageThumbnailComponent extends Component<{ resourceGroupNa
 
     private RenderBadge()
     {
-        if((this.extraMetadata === null) || (this.extraMetadata.av === undefined))
+        if((this.extraMetadata === null) || (this.extraMetadata.meta.av === undefined))
             return null;
 
-        const videoStream = this.extraMetadata.av.streams.find(x => x.codec_type === "video") as FFProbe_VideoStreamInfo;
+        const videoStream = this.extraMetadata.meta.av.streams.find(x => x.codec_type === "video") as FFProbe_VideoStreamInfo;
         const content = this.ComputeBestResolution(videoStream);
         return <span className={"position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-" + content.color}>
             {content.content}
@@ -204,6 +204,8 @@ export class ObjectStorageThumbnailComponent extends Component<{ resourceGroupNa
                 return <BootstrapIcon>filetype-json</BootstrapIcon>;
             case "application/octet-stream":
                 return <BootstrapIcon>file-binary</BootstrapIcon>;
+            case "text/plain":
+                return <BootstrapIcon>filetype-txt</BootstrapIcon>;
         }
 
         if(this.input.fileMetadata.mediaType.startsWith("image/"))

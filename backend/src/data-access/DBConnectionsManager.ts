@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -35,6 +35,19 @@ export class DBConnectionsManager
         this.pool = null;
     }
 
+    public async CollectConnectionInfo()
+    {
+        const configPath = "/etc/OpenPrivateCloud/dbpw";
+        const dbpw = await fs.promises.readFile(configPath, "utf-8");
+
+        return {
+            host: process.env.OPC_DBHOST!,
+            user: process.env.OPC_DBUSER!,
+            password: dbpw.trim(),
+            dbName: "openprivatecloud"
+        };
+    }
+
     public async CreateAnyConnectionQueryExecutor()
     {
         const instance = await this.GetPoolInstance();
@@ -55,18 +68,15 @@ export class DBConnectionsManager
     {
         if(this.pool === null)
         {
+            const info = await this.CollectConnectionInfo();
             const factory = new DBFactory;
-
-            const configPath = "/etc/OpenPrivateCloud/config.json";
-            const data = await fs.promises.readFile(configPath, "utf-8");
-            const config = JSON.parse(data);
 
             this.pool = await factory.CreateConnectionPool({
                 type: "mysql",
-                host: "localhost",
-                username: config.database.userName,
-                password: config.database.password,
-                defaultDatabase: "openprivatecloud"
+                host: info.host,
+                username: info.user,
+                password: info.password,
+                defaultDatabase: info.dbName
             });
         }
         return this.pool;

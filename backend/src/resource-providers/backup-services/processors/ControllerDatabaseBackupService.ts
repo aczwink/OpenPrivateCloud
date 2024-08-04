@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,17 +21,18 @@ import { Injectable } from "acts-util-node";
 import { ProcessTracker } from "../../../services/ProcessTrackerManager";
 import { BackupVaultRetentionConfig } from "../models";
 import { RemoteRootFileSystemManager } from "../../../services/RemoteRootFileSystemManager";
-import { CreateGPGEncryptionCommandOrPipe, DeleteSingleFileSnapshotsThatAreOlderThanRetentionPeriod, ParseReplacedName, ReplaceSpecialCharacters } from "./Shared";
+import { CreateGPGEncryptionCommandOrPipe, DeleteSingleFileSnapshotsThatAreOlderThanRetentionPeriod, ReplaceSpecialCharacters } from "./Shared";
 import { TempFilesManager } from "../../../services/TempFilesManager";
 import { TargetFileSystemType } from "../BackupTargetMountService";
 import { LocalCommandExecutor } from "../../../services/LocalCommandExecutor";
 import { RemoteCommandExecutor } from "../../../services/RemoteCommandExecutor";
+import { DBConnectionsManager } from "../../../data-access/DBConnectionsManager";
 
 @Injectable
 export class ControllerDatabaseBackupService
 {
     constructor(private remoteRootFileSystemManager: RemoteRootFileSystemManager, private tempFilesManager: TempFilesManager, private localCommandExecutor: LocalCommandExecutor, 
-        private remoteCommandExecutor: RemoteCommandExecutor)
+        private remoteCommandExecutor: RemoteCommandExecutor, private dbConnectionsManager: DBConnectionsManager)
     {
     }
 
@@ -59,11 +60,9 @@ export class ControllerDatabaseBackupService
     //Private methods
     private async DoDatabaseExportAndStoreFile(hostId: number, encryptionKeyKeyVaultReference: string | undefined, targetPath: string)
     {
-        const configPath = "/etc/OpenPrivateCloud/config.json";
-        const data = await fs.promises.readFile(configPath, "utf-8");
-        const config = JSON.parse(data);
+        const info = await this.dbConnectionsManager.CollectConnectionInfo();
 
-        const result = await this.localCommandExecutor.ExecuteCommandWithoutEncoding(['MYSQL_PWD="' + config.database.password + '"', "mysqldump", "-u", config.database.userName, "openprivatecloud", "|", "gzip"]);
+        const result = await this.localCommandExecutor.ExecuteCommandWithoutEncoding(['MYSQL_PWD="' + info.password + '"', "mysqldump", "-u", info.user, "-h", info.host, info.dbName, "|", "gzip"]);
         const tempDumpPath = await this.tempFilesManager.CreateFile(hostId, result);
 
         try

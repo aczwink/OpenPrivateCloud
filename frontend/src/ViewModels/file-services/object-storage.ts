@@ -15,16 +15,15 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { CollectionViewModel, MultiPageViewModel, ObjectViewModel } from "../../UI/ViewModel";
+import { CollectionViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../../UI/ViewModel";
 import { resourceProviders } from "openprivatecloud-common";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../shared/resourcegeneral";
-import { FileCreationDataDTO, FileMetaDataDTO, FileMetaDataOverviewDataDTO, FileRevisionDTO, ObjectStorageBlobExtraMetadata, SnapshotDTO } from "../../../dist/api";
+import { FileMetaDataDTO, FileRevisionDTO, ObjectStorageBlobIndex, ObjectStoragesStatisticsDTO, SnapshotDTO } from "../../../dist/api";
 import { ListViewModel } from "../../UI/ListViewModel";
 import { ExtractDataFromResponseOrShowErrorMessageOnError } from "../../UI/ResponseHandler";
 import { DownloadFileUsingProgressPopup } from "../../Views/object-storage/DownloadProgressPopup";
-import { ObjectStorageThumbnailComponent } from "../../Views/object-storage/ObjectStorageThumbnailComponent";
-import { JSX_CreateElement } from "acfrontend";
 import { ObjectStoragePreviewComponent } from "../../Views/object-storage/ObjectStoragePreviewComponent";
+import { ObjectStorageSearchComponent } from "../../Views/object-storage/ObjectStorageSearchComponent";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 type FileId = ResourceAndGroupId & { fileId: string };
@@ -43,13 +42,13 @@ const fileOverviewViewModel: ObjectViewModel<FileMetaDataDTO, FileId> = {
     schemaName: "FileMetaDataDTO"
 };
 
-const fileExtraMetaDataViewModel: ObjectViewModel<ObjectStorageBlobExtraMetadata, FileId> = {
+const fileExtraMetaDataViewModel: ObjectViewModel<ObjectStorageBlobIndex, FileId> = {
     type: "object",
     actions: [
     ],
     formTitle: _ => "Metadata",
-    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.meta.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
-    schemaName: "ObjectStorageBlobExtraMetadata"
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.extrameta.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
+    schemaName: "ObjectStorageBlobIndex"
 };
 
 const fileRevisionViewModel: ObjectViewModel<FileMetaDataDTO, FileId & { revisionNumber: number; }> = {
@@ -103,6 +102,12 @@ const fileViewModel: MultiPageViewModel<FileId> = {
             title: "Download"
         },
         {
+            type: "edit",
+            propertiesSchemaName: "EditableFileMetaDataDTO",
+            requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.meta.get(ids.resourceGroupName, ids.resourceName, ids.fileId),
+            updateResource: (service, ids, dto) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.meta.put(ids.resourceGroupName, ids.resourceName, ids.fileId, dto),
+        },
+        {
             type: "delete",
             deleteResource: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.delete(ids.resourceGroupName, ids.resourceName, ids.fileId),
         },
@@ -140,32 +145,21 @@ const fileViewModel: MultiPageViewModel<FileId> = {
     formTitle: ids => ids.fileId,
 };
 
-const filesViewModel: CollectionViewModel<FileMetaDataOverviewDataDTO, ResourceAndGroupId, FileCreationDataDTO> = {
-    type: "collection",
-    actions: [
+const fileExplorerViewModel: RoutingViewModel = {
+    type: "routing",
+    entries: [
         {
-            type: "create",
-            createResource: (service, ids, data) => service.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.put(ids.resourceGroupName, ids.resourceName, data.fileId, { file: data.fileData }),
-            schemaName: "FileCreationDataDTO"
-        }
-    ],
-    child: fileViewModel,
-    displayName: "Files",
-    extractId: x => x.id,
-    idKey: "fileId",
-    requestObjects: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.files.get(ids.resourceGroupName, ids.resourceName),
-    schemaName: "FileMetaDataOverviewDataDTO",
-
-    renderInfo: {
-        id: "id",
-        order: ["mediaType"],
-        properties: {
-            mediaType: {
-                render: (obj, ids) => <ObjectStorageThumbnailComponent fileMetadata={obj} resourceGroupName={ids.resourceGroupName} resourceName={ids.resourceName} />,
-                title: "",
+            key: "files/:fileId",
+            viewModel: fileViewModel,
+        },
+        {
+            key: "",
+            viewModel: {
+                type: "component",
+                component: ObjectStorageSearchComponent
             }
         }
-    }
+    ]
 };
 
 const snapshotsViewModel: ListViewModel<SnapshotDTO, ResourceAndGroupId> = {
@@ -182,6 +176,14 @@ const snapshotsViewModel: ListViewModel<SnapshotDTO, ResourceAndGroupId> = {
     schemaName: "SnapshotDTO"
 };
 
+const statisticsViewModel: ObjectViewModel<ObjectStoragesStatisticsDTO, ResourceAndGroupId> = {
+    type: "object",
+    actions: [],
+    formTitle: _ => "Statistics",
+    requestObject: (service, ids) => service.resourceProviders._any_.fileservices.objectstorage._any_.stats.get(ids.resourceGroupName, ids.resourceName),
+    schemaName: "ObjectStoragesStatisticsDTO"
+};
+
 export const objectStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
     actions: [
         ...BuildCommonResourceActions(BuildResourceId),
@@ -192,13 +194,18 @@ export const objectStorageViewModel: MultiPageViewModel<ResourceAndGroupId> = {
             entries: [
                 {
                     key: "file-explorer",
-                    child: filesViewModel,
+                    child: fileExplorerViewModel,
                     displayName: "File explorer"
                 },
                 {
                     key: "snapshots",
                     child: snapshotsViewModel,
                     displayName: "Snapshots"
+                },
+                {
+                    key: "stats",
+                    child: statisticsViewModel,
+                    displayName: "Statistics"
                 },
             ]
         },

@@ -21,6 +21,7 @@ import { Injectable } from "acts-util-node";
 import { GenerateRandomUUID } from "../common/crypto/randomness";
 import { Readable } from "stream";
 import { OPCFormat_Header, OPCFormat_MaxHeaderLength, OPCFormat_ReadHeader, OPCFormat_SupportsRandomAccess, OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricDecryptSlice, SymmetricKey } from "../common/crypto/symmetric";
+import { ClusterEventsManager } from "./ClusterEventsManager";
 
 interface RequestEntry
 {
@@ -48,10 +49,15 @@ interface RequestParameters
 @Injectable
 export class LargeFileDownloadService
 {
-    constructor()
+    constructor(clusterEventsManager: ClusterEventsManager)
     {
         this.idMap = {};
         this.userIdMap = {};
+
+        clusterEventsManager.RegisterListener(event => {
+            if(event.type === "userLogOut")
+                this.DeleteRequest(event.userId);
+        })
     }
 
     public async CreateRequest(params: RequestParameters)
@@ -160,4 +166,3 @@ export class LargeFileDownloadService
         return request.buffer.subarray(offset, offset + count);
     }
 }
-//TODO: session logout event

@@ -70,7 +70,13 @@ export class SessionsManager
         delete this.sessions[token];
 
         if(session !== undefined)
+        {
             this.userWalletManager.Lock(session.userId);
+            this.clusterEventsManager.PublishEvent({
+                type: "userLogOut",
+                userId: session.userId
+            });
+        }
     }
 
     public async PasswordBasedLogin(userId: number, password: string)

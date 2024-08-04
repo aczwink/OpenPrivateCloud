@@ -30,6 +30,12 @@ interface UserLogInEvent
     password: string; //required for managing single sign on scenarios
 }
 
+interface UserLogOutEvent
+{
+    type: "userLogOut";
+    userId: number;
+}
+
 interface UserPasswordChanged
 {
     type: "userPasswordChanged";
@@ -43,7 +49,7 @@ interface UserSambaPasswordChangedEvent
     userId: number;
 }
 
-type ClusterEvent = NoDataEvent | UserLogInEvent | UserPasswordChanged | UserSambaPasswordChangedEvent;
+type ClusterEvent = NoDataEvent | UserLogInEvent | UserLogOutEvent | UserPasswordChanged | UserSambaPasswordChangedEvent;
 
 type EventCallback = (event: ClusterEvent) => void;
   

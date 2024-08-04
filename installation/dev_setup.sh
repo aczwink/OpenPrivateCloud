@@ -18,13 +18,7 @@ sudo mysql -u root -p openprivatecloud < ../db.sql
 sudo mysql -u root -p openprivatecloud < ../db_roledefinitions.sql
 sudo mysql -u root -p -e "INSERT INTO openprivatecloud.users (emailAddress, pwHash, pwSalt, sambaPW) VALUES ('<your email address>', 'ea3925fcddd37ebcdaddf02f991f28b37debfb0ea677b5b2a532ce03628d9983', '00000000000000000000000000000000', '');" #TODO: insert your email here, standard pw is "root"
 
-export config="{
-	\"database\": {
-		\"userName\": \"opc\",
-		\"password\": \"opc\"
-	}
-}"
-sudo -E sh -c 'echo "$config" > /etc/OpenPrivateCloud/config.json'
+sudo -E sh -c 'echo "opc" > /etc/OpenPrivateCloud/dbpw'
 
 #setup frontend
 mkdir -p ../frontend/dist/

@@ -30,8 +30,9 @@ export class ObjectStoragePreviewComponent extends Component
         this.tile = null;
         this.fullImage = null;
         this.loading = true;
-        this.videoMediaType = null;
-        this.videoStreamId = "";
+        this.mediaType = "";
+        this.videoStreamId = null;
+        this.textData = null;
     }
 
     protected override Render(): RenderValue
@@ -39,11 +40,11 @@ export class ObjectStoragePreviewComponent extends Component
         if(this.loading)
             return <ProgressSpinner />;
 
-        if(this.videoMediaType !== null)
+        if(this.videoStreamId !== null)
         {            
             const src = `https://${BACKEND_HOST}/public/largeFile/${this.videoStreamId}`;
             return <video controls poster={this.tile!}>
-                <source src={src} type={this.videoMediaType} />
+                <source src={src} type={this.mediaType} />
             </video>;
         }
         if(this.fullImage !== null)
@@ -52,6 +53,10 @@ export class ObjectStoragePreviewComponent extends Component
                 <div className="col d-flex justify-content-center flex-grow-1"><img src={this.fullImage} /></div>
             </div>;
         }
+        if(this.textData !== null)
+        {
+            return <textarea className="form-control" cols="80" rows="12" readOnly>{this.textData}</textarea>
+        }
         return "No preview available";
     }
 
@@ -59,8 +64,9 @@ export class ObjectStoragePreviewComponent extends Component
     private tile: string | null;
     private fullImage: string | null;
     private loading: boolean;
-    private videoMediaType: string | null;
-    private videoStreamId: string;
+    private mediaType: string;
+    private videoStreamId: string | null;
+    private textData: string | null;
 
     //Private methods
     private GetDataAs(base64: string | ArrayBuffer | null, mime: string)
@@ -82,6 +88,7 @@ export class ObjectStoragePreviewComponent extends Component
         if(!result.ok)
             return;
         const fileMetadata = result.value;
+        this.mediaType = fileMetadata.mediaType;
 
         if(fileMetadata.mediaType.startsWith("image/"))
         {
@@ -104,14 +111,20 @@ export class ObjectStoragePreviewComponent extends Component
             }
 
             if(this.SupportsStreaming(fileMetadata.mediaType))
-            {
-                this.videoMediaType = fileMetadata.mediaType;
-    
+            {    
                 const response3 = await this.apiService.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.createBlobStream.get(resourceGroupName, resourceName, fileId);
                 if(response3.statusCode === 200)
                 {
                     this.videoStreamId = response3.data;
                 }
+            }
+        }
+        else if(fileMetadata.mediaType === "text/plain")
+        {
+            const response = await this.apiService.resourceProviders._any_.fileservices.objectstorage._any_.files._any_.blob.get(resourceGroupName, resourceName, fileId);
+            if(response.statusCode === 200)
+            {
+                this.textData = await response.data.text();
             }
         }
     }
