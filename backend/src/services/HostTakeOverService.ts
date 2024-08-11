@@ -16,9 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import crypto from "crypto";
-import fs from "fs";
 import { Injectable } from "acts-util-node";
-import { LocalCommandExecutor } from "./LocalCommandExecutor";
 import { SSHConnection, SSHService } from "./SSHService";
 import { HostsController } from "../data-access/HostsController";
 import { ModulesManager } from "./ModulesManager";
@@ -30,7 +28,7 @@ import { HostsManager } from "./HostsManager";
 @Injectable
 export class HostTakeOverService
 {
-    constructor(private localCommandExecutor: LocalCommandExecutor, private modulesManager: ModulesManager, private hostFirewallSettingsManager: HostFirewallSettingsManager,
+    constructor(private modulesManager: ModulesManager, private hostFirewallSettingsManager: HostFirewallSettingsManager,
         private sshService: SSHService, private hostsController: HostsController, private sshCommandExecutor: SSHCommandExecutor, private hostsManager: HostsManager)
     {
     }
@@ -103,7 +101,7 @@ export class HostTakeOverService
         }); //TODO: hostid
     }
 
-    private async CopyPublicKeyToHost(keyName: string, hostName: string)
+    /*private async CopyPublicKeyToHost(keyName: string, hostName: string)
     {
         //await this.localCommandExecutor.ExecuteCommand(["ssh-copy-id", "-i", "$HOME/.ssh/" + keyName + ".pub", "opc@" + hostName]);
         const pubKey = await fs.promises.readFile("/home/opc-controller/.ssh/" + keyName + ".pub", "utf-8");
@@ -119,5 +117,5 @@ export class HostTakeOverService
     private async GenerateKeyPair(keyName: string)
     {
         await this.localCommandExecutor.ExecuteCommand(["ssh-keygen", "-f", "$HOME/.ssh/" + keyName, "-N", '""']);
-    }
+    }*/
 }

@@ -19,7 +19,6 @@
 import { MailerSettings, PublicClusterSettings } from "../../dist/api";
 import { ComponentViewModel, MultiPageViewModel, ObjectViewModel, RoutingViewModel } from "../UI/ViewModel";
 import { ClusterKeyStoreComponent } from "../Views/cluster/ClusterKeyStoreComponent";
-import { SoftwareUpdateComponent } from "../Views/cluster/SoftwareUpdateComponent";
 
 const notificationSettingsViewModel: ObjectViewModel<MailerSettings, {}> = {
     type: "object",
@@ -56,11 +55,6 @@ const publicSettingsViewModel: ObjectViewModel<PublicClusterSettings, {}> = {
     schemaName: "PublicClusterSettings"
 };
 
-const softwareUpdateViewModel: ComponentViewModel = {
-    type: "component",
-    component: SoftwareUpdateComponent
-};
-
 const clusterViewModel: MultiPageViewModel<{}> = {
     type: "multiPage",
     actions: [],
@@ -86,15 +80,6 @@ const clusterViewModel: MultiPageViewModel<{}> = {
                     key: "publicsettings",
                     child: publicSettingsViewModel,
                     displayName: "Public settings",
-                },
-                {
-                    key: "softwareUpdate",
-                    child: softwareUpdateViewModel,
-                    displayName: "Software update",
-                    icon: {
-                        name: "arrow-clockwise",
-                        type: "bootstrap"
-                    }
                 },
             ]
         }

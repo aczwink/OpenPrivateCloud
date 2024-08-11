@@ -22,22 +22,7 @@ import { NotificationsManager } from "../services/NotificationsManager";
 import { SessionsManager } from "../services/SessionsManager";
 import { ClusterKeyStoreManager } from "../services/ClusterKeyStoreManager";
 import { UserWalletManager } from "../services/UserWalletManager";
-import { OPCUpdateService } from "../services/OPCUpdateService";
 import { ClusterConfigManager, PublicClusterSettings } from "../services/ClusterConfigManager";
-
-@APIController("cluster/update")
-class _api1_
-{
-    constructor(private opcUpdateService: OPCUpdateService)
-    {
-    }
-
-    @Put()
-    public async ExecuteSoftwareUpdate()
-    {
-        await this.opcUpdateService.ExecuteSoftwareUpdate();
-    }
-}
 
 @APIController("cluster/keystore")
 class _api_
