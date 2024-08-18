@@ -16,12 +16,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
+import { DateTime, Injectable } from "acts-util-node";
 import { TimeSchedule } from "../common/TimeSchedule";
 
 interface Task
 {
-    nextScheduleTime: Date;
+    nextScheduleTime: DateTime;
     task: () => void;
     timerId: NodeJS.Timeout;
 }
@@ -41,34 +41,28 @@ export class TaskScheduler
     //Public methods
     public ScheduleAfterHours(n: number, task: () => void)
     {
-        const oneHour = 60 * 60 * 1000;
-        const next = Date.now() + n * oneHour;
-        return this.ScheduleAtTimeOrNow(new Date(next), task);
+        return this.ScheduleAtTimeOrNow(DateTime.Now().AddHours(n), task);
     }
 
-    public ScheduleWithOverdueProtection(lastScheduleTime: Date, schedule: TimeSchedule, task: () => void)
+    public ScheduleWithOverdueProtection(lastScheduleTime: DateTime, schedule: TimeSchedule, task: () => void)
     {
         //the overdue protection is inspired by anacron. When a task is overdue, it is scheduled immediately
 
-        const oneDay = 24 * 60 * 60 * 1000;
-        const oneWeek = 7 * oneDay;
-
+        const utc = lastScheduleTime.ToUTC();
         switch(schedule.type)
         {
             case "daily":
             {
-                const day = lastScheduleTime.getUTCDate() + (lastScheduleTime.getUTCHours() < schedule.atHour ? 0 : 1);
-                const nextScheduleTime = new Date(lastScheduleTime.getUTCFullYear(), lastScheduleTime.getUTCMonth(), day, schedule.atHour, Math.random() * 60, 0, 0);
+                const randomMinutes = Math.random() * 59;
+                const minutes = Math.floor(randomMinutes);
+
+                const day = utc.dayOfMonth + (utc.hours < schedule.atHour ? 0 : 1);
+                const nextScheduleTime = DateTime.ConstructUTC(utc.year, utc.month, day, schedule.atHour, minutes, 0);
 
                 return this.ScheduleAtTimeOrNow(nextScheduleTime, task);
             }
-            break;
             case "weekly":
-            {
-                const next = lastScheduleTime.valueOf() + oneWeek * schedule.counter;
-                return this.ScheduleAtTimeOrNow(new Date(next), task);
-            }
-            break;
+                return this.ScheduleAtTimeOrNow(utc.AddWeeks(schedule.counter), task);
         }
     }
 
@@ -88,9 +82,9 @@ export class TaskScheduler
     private tasks: Map<number, Task>;
 
     //Private methods
-    private ComputeDelay(scheduleTime: Date)
+    private ComputeDelay(scheduleTime: DateTime)
     {
-        let diff = scheduleTime.valueOf() - Date.now();
+        let diff = scheduleTime.millisecondsSinceEpoch - DateTime.Now().millisecondsSinceEpoch;
         if(diff < 0)
             diff = 0;
 
@@ -101,21 +95,21 @@ export class TaskScheduler
         return diff;
     }
 
-    private ComputeNextScheduleTime(referenceDate: Date, interval: number)
+    private ComputeNextScheduleTime(referenceDate: DateTime)
     {
-        const d = new Date( referenceDate.valueOf() + interval );
-        if(d.valueOf() < Date.now())
-            return new Date();
-        return d;
+        const now = DateTime.Now();
+        if(referenceDate.IsBefore(now))
+            return now;
+        return referenceDate;
     }
 
-    private ScheduleAtTimeOrNow(startTime: Date, task: () => void)
+    private ScheduleAtTimeOrNow(startTime: DateTime, task: () => void)
     {
         const taskNumber = this.taskCounter++;
 
-        const nextScheduleTime = this.ComputeNextScheduleTime(startTime, 0);
+        const nextScheduleTime = this.ComputeNextScheduleTime(startTime);
         this.tasks.set(taskNumber, {
-            nextScheduleTime: nextScheduleTime,
+            nextScheduleTime,
             task,
             timerId: this.StartClock(taskNumber, nextScheduleTime),
         });
@@ -123,7 +117,7 @@ export class TaskScheduler
         return taskNumber;
     }
 
-    private StartClock(taskId: number, nextScheduleTime: Date)
+    private StartClock(taskId: number, nextScheduleTime: DateTime)
     {
         return setTimeout(this.OnSchedulerInterrupt.bind(this, taskId), this.ComputeDelay(nextScheduleTime));
     }
@@ -134,7 +128,7 @@ export class TaskScheduler
         let task = this.tasks.get(taskId);
         if(task === undefined)
             return; //task was already stopped
-        if(task.nextScheduleTime.valueOf() > Date.now())
+        if(task.nextScheduleTime.IsAfter(DateTime.Now()))
         {
             //clock came to early, reschedule
             task.timerId = this.StartClock(taskId, task.nextScheduleTime);

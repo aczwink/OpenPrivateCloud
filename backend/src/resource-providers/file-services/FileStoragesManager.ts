@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import path from "path";
-import { Injectable } from "acts-util-node";
+import { DateTime, Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { RemoteCommandExecutor } from "../../services/RemoteCommandExecutor";
@@ -152,7 +152,7 @@ export class FileStoragesManager implements ResourceEventListener
         const snapshots = await this.QuerySnapshotsOrdered(resourceReference);
         for (const snapshot of snapshots)
         {
-            const snapshotDay = snapshot.creationDate.valueOf() / msToDay;
+            const snapshotDay = snapshot.creationDate.millisecondsSinceEpoch / msToDay;
             if((snapshotDay + config.snapshotRetentionDays) < currentDay)
             {
                 await this.DeleteSnapshot(resourceReference, snapshot.snapshotName);
@@ -214,7 +214,7 @@ export class FileStoragesManager implements ResourceEventListener
         const snapshots = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, snapsPath);
         return snapshots.Values().OrderBy(x => x).Map(x => ({
             snapshotName: x,
-            creationDate: new Date(x)
+            creationDate: DateTime.ConstructFromISOString(x)
         }));
     }
 

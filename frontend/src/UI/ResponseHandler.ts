@@ -58,6 +58,7 @@ export async function ExtractDataFromResponseOrShowErrorMessageOnError<ObjectTyp
     {
         const imm = RootInjector.Resolve(InfoMessageManager);
         imm.ShowMessage(result.error, {
+            type: "danger",
             duration: 10000
         });
     }

@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
+import { DateTime, Injectable } from "acts-util-node";
 import { HealthController, HealthStatus } from "../data-access/HealthController";
 import { ResourcesController } from "../data-access/ResourcesController";
 import { UserGroupsController } from "../data-access/UserGroupsController";
@@ -151,7 +151,7 @@ export class ResourceHealthManager
     private async ScheduleResourceCheck(resourceId: number, checkType: ResourceCheckType)
     {
         const hd = await this.healthController.QueryResourceHealthData(resourceId);
-        const lastSuccessfulCheck = hd.find(x => x.checkType === checkType)?.lastSuccessfulCheck ?? new Date(0);
+        const lastSuccessfulCheck = hd.find(x => x.checkType === checkType)?.lastSuccessfulCheck ?? DateTime.ConstructFromUnixTimeStamp(0);
 
         let schedule: TimeSchedule | null;
         switch(checkType)

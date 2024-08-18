@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,6 +28,7 @@ import { ResourceReference, ResourceReferenceWithSession } from "../../../common
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { PermissionsManager } from "../../../services/PermissionsManager";
 import { permissions } from "openprivatecloud-common";
+import { DateTime } from "acts-util-node";
 
 interface DeploymentDataDto
 {
@@ -49,7 +50,7 @@ interface FileEntry
 
 interface SnapshotDto
 {
-    date: Date;
+    date: DateTime;
 }
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_fileServicesResourceProviderName}/${c_fileStorageResourceTypeName}/{resourceName}`)

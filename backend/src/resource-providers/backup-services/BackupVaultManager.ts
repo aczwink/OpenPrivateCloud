@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
+import { DateTime, Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { TaskSchedulingManager } from "../../services/TaskSchedulingManager";
 import { BackupProcessService } from "./BackupProcessService";
@@ -34,7 +34,7 @@ interface BackupVaultConfig
     retention: BackupVaultRetentionConfig;
 
     state: {
-        lastScheduleTime?: Date;
+        lastScheduleTime?: DateTime;
     };
 }
 
@@ -85,7 +85,7 @@ export class BackupVaultManager
         const config = await this.ReadConfig(resourceId);
         if(config.trigger.type === "automatic")
         {
-            const lastScheduleTime = config.state.lastScheduleTime ?? new Date(0);
+            const lastScheduleTime = config.state.lastScheduleTime ?? DateTime.ConstructFromUnixTimeStamp(0);
             this.taskSchedulingManager.ScheduleForInstance(resourceId, lastScheduleTime, config.trigger.schedule, this.OnAutomaticBackupTrigger.bind(this, resourceId));
         }
     }
@@ -127,7 +127,7 @@ export class BackupVaultManager
         else
         {
             if(config.state.lastScheduleTime !== undefined)
-                config.state.lastScheduleTime = new Date(config.state.lastScheduleTime);
+                config.state.lastScheduleTime = DateTime.ConstructFromISOString(config.state.lastScheduleTime as any);
         }
 
         return config;
@@ -234,7 +234,7 @@ export class BackupVaultManager
             trigger: config.trigger,
             retention: config.retention,
             state: {
-                lastScheduleTime: (config.state.lastScheduleTime === undefined) ? undefined : config.state.lastScheduleTime.toISOString()
+                lastScheduleTime: (config.state.lastScheduleTime === undefined) ? undefined : config.state.lastScheduleTime.ToISOString()
             }
         };
         await this.resourceConfigController.UpdateOrInsertConfig(resourceId, obj);
@@ -266,7 +266,7 @@ export class BackupVaultManager
         await this.StartBackupProcess(resourceId);
 
         const config = await this.ReadConfig(resourceId);
-        config.state.lastScheduleTime = new Date();
+        config.state.lastScheduleTime = DateTime.Now();
         await this.WriteConfig(resourceId, config);
         
         this.EnsureBackupTimerIsRunningIfConfigured(resourceId);

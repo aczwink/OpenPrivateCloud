@@ -53,7 +53,7 @@ export class ResourceListComponent extends Component
                     {this.resources.map(this.RenderInstance.bind(this))}
                 </tbody>
             </table>
-            {this.resourceGroupName === null ? null : <RouterButton className="btn btn-primary" route={"/resourceGroups/" + this.resourceGroupName + "/add"}><BootstrapIcon>plus</BootstrapIcon></RouterButton>}
+            {this.resourceGroupName === null ? null : <RouterButton color="primary" route={"/resourceGroups/" + this.resourceGroupName + "/add"}><BootstrapIcon>plus</BootstrapIcon></RouterButton>}
         </fragment>;
     }
 

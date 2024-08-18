@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@
  * */
 
 import { Dictionary } from "acts-util-core";
-import { Injectable } from "acts-util-node";
+import { DateTime, Injectable } from "acts-util-node";
 import { TimeSchedule } from "../common/TimeSchedule";
 import { TaskScheduler } from "./TaskScheduler";
 
@@ -30,7 +30,7 @@ export class TaskSchedulingManager
     }
 
     //Public methods
-    public ScheduleForInstance(resourceId: number, lastScheduleTime: Date, schedule: TimeSchedule, task: () => void)
+    public ScheduleForInstance(resourceId: number, lastScheduleTime: DateTime, schedule: TimeSchedule, task: () => void)
     {
         const oldTaskId = this.scheduled[resourceId];
         if(oldTaskId !== undefined)

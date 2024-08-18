@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -47,7 +47,7 @@ export class DeleteObjectComponent extends Component<DeleteObjectComponentInput>
             <br />
             <div className="btn-group">
                 <button type="button" className="btn btn-danger" onclick={this.OnDelete.bind(this)}>Delete</button>
-                <RouterButton className="btn btn-secondary" route={this.postDeleteURL}>Cancel</RouterButton>
+                <RouterButton color="secondary" route={this.postDeleteURL}>Cancel</RouterButton>
             </div>
         </fragment>;
     }

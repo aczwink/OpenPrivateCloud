@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import {App, RootInjector, Routes} from "acfrontend";
+import { BootstrapApp, RootInjector, Routes} from "acfrontend";
 import { AuthGuard } from "./AuthGuard";
 import { DashboardComponent } from "./Views/DashboardComponent";
 import { LoginComponent } from "./LoginComponent";
@@ -62,7 +62,7 @@ async function LoadViewModels()
 
 function RunApp(routes: Routes)
 {
-    const app = new App({
+    BootstrapApp({
         mountPoint: document.body,
         rootComponentClass: RootComponent,
         routes,
@@ -71,11 +71,11 @@ function RunApp(routes: Routes)
     });
 }
 
-async function BootstrapApp()
+async function LaunchApp()
 {
     await LoadViewModels();
     const routes = BuildRoutes();
     RunApp(routes);
 }
 
-BootstrapApp();
+LaunchApp();

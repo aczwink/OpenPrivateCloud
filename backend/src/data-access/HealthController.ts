@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { DBExpression, Injectable } from "acts-util-node";
+import { CreateDatabaseExpression, DateTime, Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 import { ResourceCheckType } from "../resource-providers/ResourceProvider";
 
@@ -42,7 +42,7 @@ export interface ResourceHealthData
      * @format multi-line
      */
     log: string;
-    lastSuccessfulCheck: Date;
+    lastSuccessfulCheck: DateTime;
 }
 
 export interface HealthStats
@@ -95,7 +95,7 @@ export class HealthController
         };
     }
 
-    public async QueryResourceHealthData(resourceId: number): Promise<ResourceHealthData[]>
+    public async QueryResourceHealthData(resourceId: number)
     {
         const query = `
         SELECT checkType, status, log, lastSuccessfulCheck
@@ -103,14 +103,8 @@ export class HealthController
         WHERE resourceId = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, resourceId);
-
-        return rows.map(row => ({
-            checkType: row.checkType,
-            status: row.status,
-            log: row.log,
-            lastSuccessfulCheck: this.dbConnMgr.ParseDateTime(row.lastSuccessfulCheck),
-        }));
+        const rows = await conn.Select<ResourceHealthData>(query, resourceId);
+        return rows;
     }
 
     public async QueryResourcesHealthStats()
@@ -148,10 +142,11 @@ export class HealthController
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
 
+        const now = CreateDatabaseExpression({ type: "CurrentDateTime" });
         const result = await conn.UpdateRows("resources_health", {
             checkType,
             status,
-            lastSuccessfulCheck: (status === HealthStatus.Up) ? DBExpression("NOW()") : undefined,
+            lastSuccessfulCheck: (status === HealthStatus.Up) ? now : undefined,
             log,
         }, "resourceId = ? AND checkType = ?", resourceId, checkType);
 
@@ -161,7 +156,7 @@ export class HealthController
                 resourceId,
                 checkType,
                 status,
-                lastSuccessfulCheck: (status === HealthStatus.Up) ? DBExpression("NOW()") : "0000-00-00 00:00:00",
+                lastSuccessfulCheck: (status === HealthStatus.Up) ? now : "0000-00-00 00:00:00",
                 log,
             });
         }

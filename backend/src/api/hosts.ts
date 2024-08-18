@@ -31,6 +31,7 @@ import { HostTakeOverService } from "../services/HostTakeOverService";
 import { HealthController } from "../data-access/HealthController";
 import { NetworkTraceSimulator } from "../services/NetworkTraceSimulator";
 import { IPv4 } from "../common/IPv4";
+import { DateTime } from "acts-util-node";
 
 interface AddHostDTO
 {
@@ -70,7 +71,7 @@ interface ProcessDto
 {
     hostName: string;
     id: number;
-    startTime: Date;
+    startTime: DateTime;
     status: number;
     title: string;
 }

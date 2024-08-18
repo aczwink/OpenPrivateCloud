@@ -219,7 +219,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         switch(action.type)
         {
             case "create":
-                return <RouterButton className="btn btn-primary" route={this.ReplaceRouteParams(route)}><BootstrapIcon>plus</BootstrapIcon></RouterButton>;
+                return <RouterButton color="primary" route={this.ReplaceRouteParams(route)}><BootstrapIcon>plus</BootstrapIcon></RouterButton>;
         }
     }
 

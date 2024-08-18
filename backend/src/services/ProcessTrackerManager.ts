@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@
  * */
 
 import { Dictionary } from "acts-util-core";
-import { GlobalInjector, Injectable } from "acts-util-node";
+import { DateTime, GlobalInjector, Injectable } from "acts-util-node";
 import { HostsController } from "../data-access/HostsController";
 import { ErrorService } from "./ErrorService";
 
@@ -35,7 +35,7 @@ interface ProcessTrackerReadOnly
      */
     readonly fullText: string;
     readonly hostName: string;
-    readonly startTime: Date;
+    readonly startTime: DateTime;
     readonly status: Status;
     readonly title: string;
 }
@@ -56,7 +56,7 @@ class ProcessTrackerImpl implements ProcessTracker
 {
     constructor(private _hostName: string, private _title: string, private finalizer: () => void)
     {
-        this._startTime = new Date;
+        this._startTime = DateTime.Now();
         this._status = Status.Running;
         this.entries = [];
     }
@@ -72,7 +72,7 @@ class ProcessTrackerImpl implements ProcessTracker
         return this._hostName;
     }
 
-    public get startTime(): Date
+    public get startTime(): DateTime
     {
         return this._startTime;
     }
@@ -111,7 +111,7 @@ class ProcessTrackerImpl implements ProcessTracker
     }
 
     //Private variables
-    private _startTime: Date;
+    private _startTime: DateTime;
     private _status: Status;
     private entries: { timeStamp: Date; text: string; }[];
 }

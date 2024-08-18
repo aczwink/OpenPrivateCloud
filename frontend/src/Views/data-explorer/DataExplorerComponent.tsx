@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable, Component, Textarea, JSX_CreateElement, FormField, ProgressSpinner, NumberSpinner, DatePicker, DateTimePicker } from "acfrontend";
+import { Injectable, Component, JSX_CreateElement, FormField, ProgressSpinner, NumberSpinner, DatePicker, DateTimePicker, TextArea } from "acfrontend";
 import { APIService } from "../../Services/APIService";
 import { DataQueryKeyEntry, DataQueryResponse, DataSourceSchema, SourceQueryOptions } from "../../../dist/api";
 import { QueryLanguageParser } from "./QueryLanguageParser";
@@ -45,7 +45,7 @@ export class DataExplorerComponent extends Component<{ query?: string; }>
 
         return <fragment>
             <FormField title="Query">
-                <Textarea value={this.query} onChanged={newValue => this.query = newValue} rows={8} />
+                <TextArea value={this.query} onChanged={newValue => this.query = newValue} rows={8} />
             </FormField>
             <div className="row">
                 <div className="col">

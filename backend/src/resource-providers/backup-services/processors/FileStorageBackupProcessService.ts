@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
+import { DateTime, Injectable } from "acts-util-node";
 import path from "path";
 import { ProcessTracker } from "../../../services/ProcessTrackerManager";
 import { TargetFileSystemType } from "../BackupTargetMountService";
@@ -186,11 +186,11 @@ export class FileStorageBackupProcessService
         }
     }
 
-    private IsSnapshotTooOldForBackup(creationDate: Date, retention: BackupVaultRetentionConfig)
+    private IsSnapshotTooOldForBackup(creationDate: DateTime, retention: BackupVaultRetentionConfig)
     {
         const msToDay = 1000 * 60 * 60 * 24;
 
-        const snapshotDay = creationDate.valueOf() / msToDay;
+        const snapshotDay = creationDate.millisecondsSinceEpoch / msToDay;
         const currentDay = Date.now() / msToDay;
 
         return (snapshotDay + retention.numberOfDays) < currentDay;
@@ -213,7 +213,7 @@ export class FileStorageBackupProcessService
             const snapshotName = SplitExtensionAway(x);
             return {
                 snapshotName,
-                creationDate: new Date(snapshotName),
+                creationDate: DateTime.ConstructFromISOString(snapshotName),
                 fileName: x,
             };
         });

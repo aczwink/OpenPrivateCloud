@@ -18,14 +18,14 @@
 import crypto from "crypto";
 
 import { Dictionary } from "acts-util-core";
-import { Injectable } from "acts-util-node";
+import { DateTime, Injectable } from "acts-util-node";
 import { UserWalletManager } from "./UserWalletManager";
 import { ClusterKeyStoreManager } from "./ClusterKeyStoreManager";
 import { ClusterEventsManager } from "./ClusterEventsManager";
 
 interface Session
 {
-    expiryDateTime: Date;
+    expiryDateTime: DateTime;
     timerId?: NodeJS.Timeout;
     userId: number;
 }
@@ -106,7 +106,7 @@ export class SessionsManager
         if(session === undefined)
             return;
 
-        if(new Date() >= session.expiryDateTime)
+        if(DateTime.Now().IsAfter(session.expiryDateTime))
             this.LogOut(token);
         else
             this.SetAutoLogOutTimer(token, session);
@@ -115,9 +115,7 @@ export class SessionsManager
     private CreateExpiryTime()
     {
         const minutes = 10;
-        const t = minutes * 60 * 1000;
-
-        return new Date( Date.now() + t );
+        return DateTime.Now().AddMinutes(minutes);
     }
 
     private CreateToken()
@@ -134,6 +132,6 @@ export class SessionsManager
 
     private SetAutoLogOutTimer(token: string, session: Session)
     {
-        session.timerId = setTimeout(this.AutoLogOut.bind(this, token), session.expiryDateTime.valueOf() - Date.now());
+        session.timerId = setTimeout(this.AutoLogOut.bind(this, token), session.expiryDateTime.millisecondsSinceEpoch - Date.now());
     }
 }
