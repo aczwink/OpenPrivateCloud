@@ -94,8 +94,7 @@ async function SetupWebServer()
 
     const requestHandlerChain = Factory.CreateRequestHandlerChain();
     requestHandlerChain.AddCORSHandler([
-        "https://localhost:8079",
-        "https://" + os.hostname() + ":8079",
+        process.env.OPC_ALLOWED_ORIGINS!
     ]);
     requestHandlerChain.AddBodyParser();
 
