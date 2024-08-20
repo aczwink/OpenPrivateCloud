@@ -412,6 +412,8 @@ export class ObjectStoragesManager
 
     public async UpdateFileMetaData(resourceReference: LightweightResourceReference, fileId: string, tags: string[])
     {
+        tags.SortBy(x => x);
+
         const encryptedId = await this.HashFileId(resourceReference, fileId);
         const md = await this.RequestFileMetaDataInternal(resourceReference, encryptedId);
         md.currentRev.tags = tags;
@@ -479,7 +481,7 @@ export class ObjectStoragesManager
                     : await this.avPreviewService.CreateVideoPreview(blobPath, mediaInfo, thumbType);
 
                 const thumb = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, previewFilePath);
-                await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, thumbPath + MapType(thumbType), await this.EncryptBuffer(resourceReference, thumb));
+                await this.remoteFileSystemManager.WriteFile(resourceReference.hostId, thumbPath, await this.EncryptBuffer(resourceReference, thumb));
             }
         }
         finally
