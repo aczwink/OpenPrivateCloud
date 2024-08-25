@@ -368,6 +368,7 @@ export class ObjectStoragesManager
         if(exists)
         {
             fileMetaData = await this.RequestFileMetaDataInternal(resourceReference, encryptedId);
+            newRevision.tags = fileMetaData.currentRev.tags;
             fileMetaData.revisions.push(fileMetaData.currentRev);
             fileMetaData.currentRev = newRevision;
         }

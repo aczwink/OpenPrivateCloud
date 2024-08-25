@@ -115,7 +115,7 @@ export class SessionsManager
     private CreateExpiryTime()
     {
         const minutes = 10;
-        return DateTime.Now().AddMinutes(minutes);
+        return DateTime.Now().Add({ count: minutes, unit: "minutes" });
     }
 
     private CreateToken()

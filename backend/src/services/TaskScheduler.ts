@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,7 @@ export class TaskScheduler
     //Public methods
     public ScheduleAfterHours(n: number, task: () => void)
     {
-        return this.ScheduleAtTimeOrNow(DateTime.Now().AddHours(n), task);
+        return this.ScheduleAtTimeOrNow(DateTime.Now().Add({ count: n, unit: "hours" }), task);
     }
 
     public ScheduleWithOverdueProtection(lastScheduleTime: DateTime, schedule: TimeSchedule, task: () => void)
@@ -62,7 +62,7 @@ export class TaskScheduler
                 return this.ScheduleAtTimeOrNow(nextScheduleTime, task);
             }
             case "weekly":
-                return this.ScheduleAtTimeOrNow(utc.AddWeeks(schedule.counter), task);
+                return this.ScheduleAtTimeOrNow(utc.Add({ count: schedule.counter, unit: "weeks" }), task);
         }
     }
 

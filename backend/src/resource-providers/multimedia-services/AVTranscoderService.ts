@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2022-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2022-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -65,6 +65,7 @@ export class AVTranscoderService
                     case AVTranscoderQuality.Standard:
                         return "128k";
                 }
+
             case "h264":
                 switch(quality)
                 {
@@ -73,6 +74,7 @@ export class AVTranscoderService
                     case AVTranscoderQuality.Standard:
                         return 23;
                 }
+
             case "h265":
                 switch(quality)
                 {
@@ -112,6 +114,7 @@ export class AVTranscoderService
                     "-acodec", "aac",
                     "-b:a", this.ComputeQuality("aac", targetFormat.quality).toString()
                 ];
+
             case "mp3":
                 if(audioStreams.Map(x => x.codec_name === "mp3").All())
                     return ["-acodec", "copy"];
@@ -120,6 +123,7 @@ export class AVTranscoderService
                     "-acodec", "libmp3lame",
                     "-q:a", this.ComputeQuality("mp3", targetFormat.quality).toString()
                 ];
+
             case "opus":
                 if(audioStreams.Map(x => x.codec_name === "opus").All())
                     return ["-acodec", "copy"];
@@ -128,6 +132,18 @@ export class AVTranscoderService
                     "-acodec", "libopus",
                     "-b:a", this.ComputeQuality("opus", targetFormat.quality).toString()
                 ];
+        }
+    }
+
+    private GetContainerFormatParameters(targetFormat: AVTranscoderFormat)
+    {
+        switch(targetFormat.containerFormat)
+        {
+            case "mkv":
+                return [];
+
+            case "mp4":
+                return ["-movflags", "+faststart"];
         }
     }
 
@@ -147,6 +163,19 @@ export class AVTranscoderService
                     "-preset", "medium",
                     "-crf", this.ComputeQuality("h264", targetFormat.quality).toString(),
                 ];
+                
+            case "h264-high":
+                if(videoStreams.Map(x => (x.codec_name === "h264") && (x.profile === "High")).All())
+                    return ["-vcodec", "copy"];
+
+                return [
+                    "-vcodec", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-profile:v", "high",
+                    "-preset", "medium",
+                    "-crf", this.ComputeQuality("h264", targetFormat.quality).toString(),
+                ];
+
             case "h265":
                 if(videoStreams.Map(x => x.codec_name === "hevc").All())
                     return ["-vcodec", "copy"];
@@ -174,6 +203,7 @@ export class AVTranscoderService
 
         const vcodecParams = this.GetVideoCodecParameters(targetFormat, mediaInfo.streams.Values().Filter(x => x.codec_type === "video"));
         const acodecParams = this.GetAudioCodecParameters(targetFormat, mediaInfo.streams.Values().Filter(x => x.codec_type === "audio"));
+        const formatParams = this.GetContainerFormatParameters(targetFormat);
 
         const fileName = path.basename(filePath);
         const targetPath = path.join(instanceDir, "tmp", fileName.substring(0, fileName.length - path.extname(fileName).length) + "." + targetFormat.containerFormat);
@@ -183,6 +213,7 @@ export class AVTranscoderService
             "-y", //overwrite file if exists (file is in tmp folder so no problem overwriting it. Files may remain in temp if there were problems moving it for example)
             ...vcodecParams,
             ...acodecParams,
+            ...formatParams,
             targetPath
         ];
         await this.remoteCommandExecutor.ExecuteCommand(command, hostId);

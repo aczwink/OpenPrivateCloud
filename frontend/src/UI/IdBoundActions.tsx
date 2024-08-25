@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -97,10 +97,10 @@ export function RenderBoundAction(baseRoute: string, routeParams: Dictionary<str
             }
             return <a onclick={ConfirmAction.bind(undefined, action)} role="button" className="d-flex align-items-center text-decoration-none"><MatIcon>{action.matIcon}</MatIcon> {action.title}</a>;
         case "delete":
-            return <Anchor class="d-flex align-items-center text-decoration-none link-danger" route={route}><MatIcon>delete_forever</MatIcon> Delete</Anchor>;
+            return <Anchor className="d-flex align-items-center text-decoration-none link-danger" route={route}><MatIcon>delete_forever</MatIcon> Delete</Anchor>;
         case "edit":
-            return <Anchor class="d-flex align-items-center text-decoration-none" route={route}><MatIcon>edit</MatIcon> Edit</Anchor>;
+            return <Anchor className="d-flex align-items-center text-decoration-none" route={route}><MatIcon>edit</MatIcon> Edit</Anchor>;
         case "custom_edit":
-            return <Anchor class="d-flex align-items-center text-decoration-none" route={route}><BootstrapIcon>{action.icon}</BootstrapIcon> {action.title}</Anchor>;
+            return <Anchor className="d-flex align-items-center text-decoration-none" route={route}><BootstrapIcon>{action.icon}</BootstrapIcon> {action.title}</Anchor>;
     }
 }

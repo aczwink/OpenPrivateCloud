@@ -113,7 +113,7 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
                 audioCodec: "aac-lc",
                 containerFormat: "mp4",
                 quality: AVTranscoderQuality.Transparent,
-                videoCodec: "h264-baseline",
+                videoCodec: "h264-high",
             },
             source: {
                 sourceFileStorageExternalId: instanceProperties.sourceFileStorageExternalId,

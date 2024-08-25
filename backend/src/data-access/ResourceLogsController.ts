@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable } from "acts-util-node";
+import { CreateDatabaseExpression, DateTime, Injectable } from "acts-util-node";
 import { ProcessTracker } from "../services/ProcessTrackerManager";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
@@ -25,6 +25,7 @@ interface ResourceLogOverviewData
     logId: number;
     startTime: Date;
     endTime: Date;
+    status: number;
 }
 
 interface InstanceLog
@@ -46,13 +47,13 @@ export class ResourceLogsController
     }
 
     //Public methods
-    public async AddInstanceLog(instanceId: number, processTracker: ProcessTracker)
+    public async AddResourceLog(instanceId: number, processTracker: ProcessTracker)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         await conn.InsertRow("instances_logs", {
             instanceId,
             startTime: processTracker.startTime,
-            endTime: "NOW()",
+            endTime: CreateDatabaseExpression({ type: "CurrentDateTime" }),
             log: processTracker.fullText,
             status: processTracker.status,
             title: processTracker.title
@@ -64,6 +65,13 @@ export class ResourceLogsController
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
 
         await conn.DeleteRows("instances_logs", "instanceId = ?", instanceId);
+    }
+
+    public async DeleteResourceLogsOlderThan(resourceId: number, timeStamp: DateTime)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+
+        await conn.DeleteRows("instances_logs", "instanceId = ? AND endTime < ?", resourceId, timeStamp);
     }
 
     public async QueryInstanceLog(logId: number)
@@ -82,7 +90,7 @@ export class ResourceLogsController
     public async QueryResourceLogs(resourceId: number)
     {
         const query = `
-        SELECT il.logId, il.startTime, il.endTime
+        SELECT il.logId, il.startTime, il.endTime, il.status
         FROM instances_logs il
         WHERE il.instanceId = ?
         `;

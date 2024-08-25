@@ -18,11 +18,11 @@
 
 import { APIController, Body, Common, Get, Path, Put, Query } from "acts-util-apilib";
 import { c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { ResourcesManager } from "../../services/ResourcesManager";
-import { OpenVPNServerConfig } from "./models";
-import { OpenVPNGatewayManager, OpenVPNGatewayPublicEndpointConfig } from "./OpenVPNGatewayManager";
-import { ResourceAPIControllerBase } from "../ResourceAPIControllerBase";
-import { ResourceReference } from "../../common/ResourceReference";
+import { ResourcesManager } from "../../../services/ResourcesManager";
+import { OpenVPNServerConfig } from "../models";
+import { OpenVPNGatewayManager, OpenVPNGatewayPublicEndpointConfig } from "../OpenVPNGatewayManager";
+import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { ResourceReference } from "../../../common/ResourceReference";
 
 interface OpenVPNGatewayInfo
 {
@@ -93,9 +93,10 @@ class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
         @Common resourceReference: ResourceReference,
     )
     {
+        const conf = await this.openVPNGatwayManager.ReadConfig(resourceReference.id);
         const config: OpenVPNGatewayExternalConfig = {
-            publicEndpointConfig: (await this.openVPNGatwayManager.ReadConfig(resourceReference.id)).publicEndpoint,
-            serverConfig: await this.openVPNGatwayManager.ReadServerConfig(resourceReference.hostId, resourceReference.id)
+            publicEndpointConfig: conf.publicEndpoint,
+            serverConfig: conf.server,
         }
         return config;
     }
@@ -106,10 +107,7 @@ class OpenVPNGatewayAPIController extends ResourceAPIControllerBase
         @Body config: OpenVPNGatewayExternalConfig
     )
     {
-        await this.openVPNGatwayManager.UpdateServerConfig(resourceReference.hostId, resourceReference.id, config.serverConfig);
-        await this.openVPNGatwayManager.UpdatePublicEndpointConfig(resourceReference.id, config.publicEndpointConfig);
-
-        await this.openVPNGatwayManager.RestartServer(resourceReference.hostId, resourceReference.id);
+        await this.openVPNGatwayManager.UpdateServiceConfiguration(resourceReference, config.serverConfig, config.publicEndpointConfig);
     }
 
     @Get("info")

@@ -23,10 +23,7 @@ import { OpenVPNServerConfig } from "./models";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { ConfigParser, KeyValueEntry } from "../../common/config/ConfigParser";
 import { ConfigDialect } from "../../common/config/ConfigDialect";
-import { ConfigModel } from "../../common/config/ConfigModel";
-import { ConfigWriter } from "../../common/config/ConfigWriter";
 import path from "path";
 import { Dictionary } from "acts-util-core";
 import { CIDRRange } from "../../common/CIDRRange";
@@ -66,6 +63,8 @@ export interface OpenVPNGatewayPublicEndpointConfig
 
 export interface OpenVPNGatewayInternalConfig
 {
+    server: OpenVPNServerConfig;
+
     /**
      * @title Key-Vault
      * @format instance-same-host[security-services/key-vault]
@@ -112,6 +111,9 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
                 }
             }
             break;
+            case ResourceCheckType.ServiceHealth:
+                await this.DeployHostConfiguration(resourceReference);
+            break;
         }
 
         return HealthStatus.Up;
@@ -130,21 +132,6 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
-    public async DeployHostConfiguration(resourceReference: LightweightResourceReference)
-    {
-        await this.sysCtlConfService.SetIPForwardingState(resourceReference.hostId, true);
-
-        const config = await this.ReadConfig(resourceReference.id);
-        const keyRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.keyVaultExternalId);
-
-        const caPaths = this.keyVaultManager.GetCAPaths(keyRef!);
-        const serverCertPaths = await this.keyVaultManager.QueryCertificatePaths(keyRef!, config.publicEndpoint.domainName);
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-
-        await this.CreateServerConfig(resourceReference.hostId, resourceDir, resourceReference.id, this.CreateDefaultConfig(), caPaths, serverCertPaths);
-        await this.AutoStartServer(resourceReference.hostId, resourceReference.id);
-    }
-
     public async GenerateClientConfig(resourceReference: LightweightResourceReference, clientName: string)
     {
         const hostId = resourceReference.hostId;
@@ -156,8 +143,7 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
         const cert = await this.keyVaultManager.ReadCertificateWithPrivateKey(keyRef!, clientName);
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        const serverConfig = await this.ReadServerConfig(hostId, resourceReference.id);
-
+        const serverConfig = config.server;
 
         const caCertData = await this.remoteFileSystemManager.ReadTextFile(hostId, caPaths.caCertPath);
         const taData = await this.remoteFileSystemManager.ReadTextFile(hostId, resourceDir + "/ta.key");
@@ -223,11 +209,10 @@ ${taData}
     public async ProvideData(hostId: number, zoneName: string): Promise<FirewallZoneData>
     {
         const resourceId = parseInt(zoneName.substring(this.matchingZonePrefix.length));
-        const ref = await this.resourcesManager.CreateResourceReference(resourceId);
-        const config = await this.ReadServerConfig(ref!.hostId, ref!.id);
+        const config = await this.ReadConfig(resourceId);
 
         return {
-            addressSpace: new CIDRRange(config.virtualServerAddressRange),
+            addressSpace: new CIDRRange(config.server.virtualServerAddressRange),
             inboundRules: [],
             outboundRules: [],
             portForwardingRules: []
@@ -239,6 +224,7 @@ ${taData}
         const resourceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
 
         await this.UpdateConfig(context.resourceReference.id, {
+            server: this.CreateDefaultConfig(),
             keyVaultExternalId: instanceProperties.keyVaultExternalId,
             publicEndpoint: instanceProperties.publicEndpoint,
         });
@@ -256,9 +242,11 @@ ${taData}
         return ResourceState.Running;
     }
 
-    public async ReadConfig(instanceId: number): Promise<OpenVPNGatewayInternalConfig>
+    public async ReadConfig(resourceId: number): Promise<OpenVPNGatewayInternalConfig>
     {
-        const config = await this.resourceConfigController.QueryConfig<OpenVPNGatewayInternalConfig>(instanceId);
+        const config = await this.resourceConfigController.QueryConfig<OpenVPNGatewayInternalConfig>(resourceId);
+        if(config?.server === undefined)
+            config!.server = this.CreateDefaultConfig(); //TODO REMOVE THIS
         return config!;
     }
 
@@ -303,24 +291,6 @@ ${taData}
         return clients;
     }
 
-    public async ReadServerConfig(hostId: number, resourceId: number): Promise<OpenVPNServerConfig>
-    {
-        const parsed = await this.ParseConfig(hostId, resourceId);
-        const mdl = new ConfigModel(parsed);
-
-        const data = mdl.WithoutSectionAsDictionary() as any;
-        const server = data.server.split(" ");
-
-        return {
-            authenticationAlgorithm: data.auth,
-            cipher: data.cipher,
-            port: data.port,
-            protocol: data.proto,
-            verbosity: data.verb,
-            virtualServerAddressRange: CIDRRange.FromAddressAndSubnetMask(server[0], server[1]).ToString()
-        };
-    }
-
     public async ReceiveResourceEvent(event: ResourceEvent): Promise<void>
     {
         if(event.type === "keyVault/certificateRevoked")
@@ -334,50 +304,16 @@ ${taData}
         }
     }
 
-    public async RestartServer(hostId: number, resourceId: number)
+    public async UpdateServiceConfiguration(resourceReference: LightweightResourceReference, serverConfig: OpenVPNServerConfig, publicEndpointConfig: OpenVPNGatewayPublicEndpointConfig)
     {
-        const serviceName = this.DeriveSystemDServiceName(resourceId);
-        await this.systemServicesManager.RestartService(hostId, serviceName);
-    }
-
-    public async UpdatePublicEndpointConfig(instanceId: number, publicEndpointConfig: OpenVPNGatewayPublicEndpointConfig)
-    {
-        const config = await this.ReadConfig(instanceId);
+        const config = await this.ReadConfig(resourceReference.id);
 
         config.publicEndpoint = publicEndpointConfig;
+        config.server = serverConfig;
 
-        await this.UpdateConfig(instanceId, config);
-    }
-
-    public async UpdateServerConfig(hostId: number, resourceId: number, config: OpenVPNServerConfig)
-    {
-        const range = new CIDRRange(config.virtualServerAddressRange);
-
-        const parsed = await this.ParseConfig(hostId, resourceId);
-        const mdl = new ConfigModel(parsed);
-        mdl.SetProperties("", {
-            auth: config.authenticationAlgorithm,
-            cipher: config.cipher,
-            port: config.port,
-            proto: config.protocol,
-            verb: config.verbosity,
-            server: range.netAddress.ToString() + " " + range.GenerateSubnetMask().ToString(),
-        });
-
-        class OpenVPNConfigWriter extends ConfigWriter
-        {
-            protected KeyValueEntryToString(entry: KeyValueEntry)
-            {
-                if(entry.value === null)
-                    return entry.key;
-                return entry.key + " " + entry.value;
-            }
-        }
-
-        const configPath = this.BuildConfigPath(resourceId);
-
-        const writer = new OpenVPNConfigWriter(openVPNConfigDialect, (filePath, content) => this.remoteRootFileSystemManager.WriteTextFile(hostId, filePath, content));
-        await writer.Write(configPath, parsed);
+        await this.UpdateConfig(resourceReference.id, config);
+        await this.DeployHostConfiguration(resourceReference);
+        await this.RestartServer(resourceReference.hostId, resourceReference.id);
     }
 
     //Private methods
@@ -446,6 +382,21 @@ crl-verify ${caFilePaths.crlPath}
         await this.systemServicesManager.Reload(hostId);
     }
 
+    private async DeployHostConfiguration(resourceReference: LightweightResourceReference)
+    {
+        await this.sysCtlConfService.SetIPForwardingState(resourceReference.hostId, true);
+
+        const config = await this.ReadConfig(resourceReference.id);
+        const keyRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.keyVaultExternalId);
+
+        const caPaths = this.keyVaultManager.GetCAPaths(keyRef!);
+        const serverCertPaths = await this.keyVaultManager.QueryCertificatePaths(keyRef!, config.publicEndpoint.domainName);
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+
+        await this.CreateServerConfig(resourceReference.hostId, resourceDir, resourceReference.id, config.server, caPaths, serverCertPaths);
+        await this.AutoStartServer(resourceReference.hostId, resourceReference.id);
+    }
+
     private DeriveServerName(resourceId: number)
     {
         return "opc-rovpng-" + resourceId;
@@ -457,39 +408,10 @@ crl-verify ${caFilePaths.crlPath}
         return "openvpn-server@" + name;
     }
 
-    private ParseConfig(hostId: number, resourceId: number)
+    private async RestartServer(hostId: number, resourceId: number)
     {
-        class OpenVPNConfigParser extends ConfigParser
-        {
-            protected ParseKeyValue(line: string): KeyValueEntry
-            {
-                const parts = line.split(" ");
-                if(parts.length === 1)
-                    return {
-                        type: "KeyValue",
-                        key: parts[0],
-                        value: null
-                    };
-                if(parts.length === 2)
-                    return {
-                        type: "KeyValue",
-                        key: parts[0],
-                        value: parts[1],
-                    };
-                else if(parts.length === 3)
-                    return {
-                        type: "KeyValue",
-                        key: parts[0],
-                        value: parts[1] + " " + parts[2]
-                    }
-                throw new Error("Can't parse line: " + line);
-            }
-        }
-
-        const configPath = this.BuildConfigPath(resourceId);
-
-        const cfgParser = new OpenVPNConfigParser(openVPNConfigDialect);
-        return cfgParser.Parse(hostId, configPath);
+        const serviceName = this.DeriveSystemDServiceName(resourceId);
+        await this.systemServicesManager.RestartService(hostId, serviceName);
     }
 
     private async StopServer(hostId: number, resourceId: number)

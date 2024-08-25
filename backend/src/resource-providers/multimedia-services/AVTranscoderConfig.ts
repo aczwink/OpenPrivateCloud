@@ -26,9 +26,23 @@ export enum AVTranscoderQuality
 
 export interface AVTranscoderFormat
 {
+    /**
+     * mp4 is supported by most devices for playback.
+     * mkv is good for storing master files but not for distributing content as most devices don't support playback.
+     */
     containerFormat: "mkv" | "mp4";
+    /**
+     * aac and mp3 are supported on most devices - few support for opus.
+     * Quality wise: opus > mp3 > aac
+     */
     audioCodec: "aac-lc" | "mp3" | "opus";
-    videoCodec: "h264-baseline" | "h265";
+    /**
+     * h264-high is recommended as it is supported by most modern devices. For legacy devices choose h264-baseline.
+     * h265 is currently not recommended because of bad playback support.
+     * Compression: h265 > h264-high > h264-baseline
+     * Example: h264 high profile 5.1 is supported on iOS devices since iPhone 6s. h265 can for example not even be played on firefox desktop (as of 2024).
+     */
+    videoCodec: "h264-baseline" | "h264-high" | "h265";
     quality: AVTranscoderQuality;
 }
 

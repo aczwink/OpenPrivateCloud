@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Injectable, Component, JSX_CreateElement, FormField, ProgressSpinner, NumberSpinner, DatePicker, DateTimePicker, TextArea } from "acfrontend";
+import { Injectable, Component, JSX_CreateElement, FormField, ProgressSpinner, NumberSpinner, DateTimePicker, TextArea } from "acfrontend";
 import { APIService } from "../../Services/APIService";
 import { DataQueryKeyEntry, DataQueryResponse, DataSourceSchema, SourceQueryOptions } from "../../../dist/api";
 import { QueryLanguageParser } from "./QueryLanguageParser";
@@ -35,7 +35,7 @@ export class DataExplorerComponent extends Component<{ query?: string; }>
         };
         this.options = {
             startTime: Date.now() - (1000 * 60 * 60 * 24),
-            endTime: Date.now(),
+            endTime: Date.now() + (60 * 1000),
             maxRecordCount: 1000
         };
     }

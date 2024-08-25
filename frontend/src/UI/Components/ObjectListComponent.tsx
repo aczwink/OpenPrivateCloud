@@ -149,7 +149,7 @@ export class ObjectListComponent<ObjectType> extends Component<ObjectListInput<O
         switch(action.type)
         {
             case "delete":
-                return <Anchor class="link-danger" route={this.ReplaceRouteParams(route)}><MatIcon>delete_forever</MatIcon></Anchor>;
+                return <Anchor className="link-danger" route={this.ReplaceRouteParams(route)}><MatIcon>delete_forever</MatIcon></Anchor>;
         }
         return null;
     }
