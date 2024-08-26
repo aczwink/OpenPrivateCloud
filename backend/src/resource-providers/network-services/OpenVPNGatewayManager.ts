@@ -109,10 +109,26 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
                         return { status: HealthStatus.Corrupt, context: "service does not exist" };
                     return { status: HealthStatus.Down, context: "service is not active" };
                 }
+
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
             }
             break;
             case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    await this.CorrectFileOwnership(resourceReference);
+                }
                 await this.DeployHostConfiguration(resourceReference);
+            }
             break;
         }
 
@@ -141,12 +157,11 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
 
         const caPaths = this.keyVaultManager.GetCAPaths(keyRef!);
         const cert = await this.keyVaultManager.ReadCertificateWithPrivateKey(keyRef!, clientName);
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
         const serverConfig = config.server;
 
         const caCertData = await this.remoteFileSystemManager.ReadTextFile(hostId, caPaths.caCertPath);
-        const taData = await this.remoteFileSystemManager.ReadTextFile(hostId, resourceDir + "/ta.key");
+        const taData = await this.remoteFileSystemManager.ReadTextFile(hostId, this.GetTaKeyPath(resourceReference));
         
         return `
 client
@@ -221,7 +236,7 @@ ${taData}
 
     public async ProvideResource(instanceProperties: OpenVPNGatewayProperties, context: DeploymentContext)
     {
-        const resourceDir = await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
+        await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
 
         await this.UpdateConfig(context.resourceReference.id, {
             server: this.CreateDefaultConfig(),
@@ -232,7 +247,7 @@ ${taData}
         const keyRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.keyVaultExternalId);
         await this.resourceDependenciesController.EnsureResourceDependencyExists(keyRef!.id, context.resourceReference.id);
 
-        await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", resourceDir + "/ta.key"], context.hostId);
+        await this.remoteCommandExecutor.ExecuteCommand(["/usr/sbin/openvpn", "--genkey", "--secret", this.GetTaKeyPath(context.resourceReference)], context.hostId);
 
         await this.DeployHostConfiguration(context.resourceReference);
     }
@@ -245,8 +260,6 @@ ${taData}
     public async ReadConfig(resourceId: number): Promise<OpenVPNGatewayInternalConfig>
     {
         const config = await this.resourceConfigController.QueryConfig<OpenVPNGatewayInternalConfig>(resourceId);
-        if(config?.server === undefined)
-            config!.server = this.CreateDefaultConfig(); //TODO REMOVE THIS
         return config!;
     }
 
@@ -331,6 +344,14 @@ ${taData}
         return "/etc/openvpn/server/" + name + ".conf";
     }
 
+    private async CorrectFileOwnership(resourceReference: LightweightResourceReference)
+    {
+        const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const allPaths = [rootPath, this.GetTaKeyPath(resourceReference)];
+        for (const path of allPaths)
+            await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path, recursive: false }]);
+    }
+
     private CreateDefaultConfig(): OpenVPNServerConfig
     {
         return {
@@ -343,10 +364,12 @@ ${taData}
         };
     }
 
-    private async CreateServerConfig(hostId: number, serverDir: string, resourceId: number, data: OpenVPNServerConfig, caFilePaths: CA_FilePaths, serverCertKeyFilePaths: CertKeyPaths)
+    private async CreateServerConfig(resourceReference: LightweightResourceReference, data: OpenVPNServerConfig, caFilePaths: CA_FilePaths, serverCertKeyFilePaths: CertKeyPaths)
     {
-        const nicName = "opc-ovpn" + resourceId;
+        const nicName = "opc-ovpn" + resourceReference.id;
         const range = new CIDRRange(data.virtualServerAddressRange);
+
+        const serverDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
         const config = `
 dev ${nicName}
@@ -360,7 +383,7 @@ persist-tun
 remote-cert-tls client
 
 ifconfig-pool-persist ${serverDir}/ipp.txt
-tls-auth ${serverDir}/ta.key 0
+tls-auth ${this.GetTaKeyPath(resourceReference)} 0
 status ${serverDir}/openvpn-status.log
 
 server ${range.netAddress.ToString()} ${range.GenerateSubnetMask().ToString()}
@@ -377,9 +400,9 @@ dh ${caFilePaths.dhPath}
 crl-verify ${caFilePaths.crlPath}
         `;
 
-        await this.remoteRootFileSystemManager.WriteTextFile(hostId, this.BuildConfigPath(resourceId), config);
+        await this.remoteRootFileSystemManager.WriteTextFile(resourceReference.hostId, this.BuildConfigPath(resourceReference.id), config);
 
-        await this.systemServicesManager.Reload(hostId);
+        await this.systemServicesManager.Reload(resourceReference.hostId);
     }
 
     private async DeployHostConfiguration(resourceReference: LightweightResourceReference)
@@ -391,9 +414,8 @@ crl-verify ${caFilePaths.crlPath}
 
         const caPaths = this.keyVaultManager.GetCAPaths(keyRef!);
         const serverCertPaths = await this.keyVaultManager.QueryCertificatePaths(keyRef!, config.publicEndpoint.domainName);
-        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        await this.CreateServerConfig(resourceReference.hostId, resourceDir, resourceReference.id, config.server, caPaths, serverCertPaths);
+        await this.CreateServerConfig(resourceReference, config.server, caPaths, serverCertPaths);
         await this.AutoStartServer(resourceReference.hostId, resourceReference.id);
     }
 
@@ -406,6 +428,12 @@ crl-verify ${caFilePaths.crlPath}
     {
         const name = this.DeriveServerName(resourceId);
         return "openvpn-server@" + name;
+    }
+
+    private GetTaKeyPath(resourceReference: LightweightResourceReference)
+    {
+        const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(resourceDir, "ta.key");
     }
 
     private async RestartServer(hostId: number, resourceId: number)
