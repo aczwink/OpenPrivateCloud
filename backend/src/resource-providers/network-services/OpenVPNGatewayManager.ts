@@ -23,7 +23,6 @@ import { OpenVPNServerConfig } from "./models";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { SystemServicesManager } from "../../services/SystemServicesManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
-import { ConfigDialect } from "../../common/config/ConfigDialect";
 import path from "path";
 import { Dictionary } from "acts-util-core";
 import { CIDRRange } from "../../common/CIDRRange";
@@ -51,14 +50,19 @@ export interface OpenVPNGatewayConnectedClientEntry
     "Data Channel Cipher": string;
 }
 
-export interface OpenVPNGatewayPublicEndpointConfig
+interface PublicEndpoint
 {
     domainName: string;
-    dnsServerAddress: string;
     /**
      * @default 1194
      */
     port: number;
+}
+
+export interface OpenVPNGatewayPublicEndpointConfig
+{
+    dnsServerAddress: string;
+    endpoints: PublicEndpoint[];
 }
 
 export interface OpenVPNGatewayInternalConfig
@@ -72,10 +76,6 @@ export interface OpenVPNGatewayInternalConfig
     keyVaultExternalId: string;
 
     publicEndpoint: OpenVPNGatewayPublicEndpointConfig;
-}
-
-const openVPNConfigDialect: ConfigDialect = {
-    commentInitiators: ["#"]
 }
 
 @Injectable
@@ -162,6 +162,8 @@ export class OpenVPNGatewayManager implements FirewallZoneDataProvider, Resource
 
         const caCertData = await this.remoteFileSystemManager.ReadTextFile(hostId, caPaths.caCertPath);
         const taData = await this.remoteFileSystemManager.ReadTextFile(hostId, this.GetTaKeyPath(resourceReference));
+
+        const endpoints = config.publicEndpoint.endpoints.map(x => "remote " + x.domainName + " " + x.port).join("\n");
         
         return `
 client
@@ -174,7 +176,7 @@ remote-cert-tls server
 key-direction 1
 
 proto ${serverConfig.protocol}
-remote ${config.publicEndpoint.domainName} ${config.publicEndpoint.port}
+${endpoints}
 cipher ${serverConfig.cipher}
 verb ${serverConfig.verbosity}
 auth ${serverConfig.authenticationAlgorithm}
@@ -413,7 +415,7 @@ crl-verify ${caFilePaths.crlPath}
         const keyRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(config.keyVaultExternalId);
 
         const caPaths = this.keyVaultManager.GetCAPaths(keyRef!);
-        const serverCertPaths = await this.keyVaultManager.QueryCertificatePaths(keyRef!, config.publicEndpoint.domainName);
+        const serverCertPaths = await this.keyVaultManager.QueryCertificatePaths(keyRef!, config.publicEndpoint.endpoints[0].domainName);
 
         await this.CreateServerConfig(resourceReference, config.server, caPaths, serverCertPaths);
         await this.AutoStartServer(resourceReference.hostId, resourceReference.id);

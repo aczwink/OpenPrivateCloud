@@ -65,7 +65,7 @@ export class EasyRSAManager
 
     public async CreateClientKeyPair(hostId: number, cadir: string, clientName: string)
     {
-        await this.remoteCommandExecutor.ExecuteCommand(["./easyrsa", "--batch", "--req-cn=" + clientName, "build-client-full", clientName, "nopass"], hostId, {
+        await this.remoteCommandExecutor.ExecuteCommand(["./easyrsa", "--batch", "build-client-full", clientName, "nopass"], hostId, {
             workingDirectory: cadir
         });
     }
