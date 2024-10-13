@@ -35,6 +35,13 @@ export class RootComponent extends Component
     {
         if(!this.isLoggedIn)
             return <RouterComponent />;
+        if(this.authenticationService.IsClusterLocked())
+        {
+            return <div className="container text-center">
+                <SessionComponent />
+                <h1>Cluster is locked!</h1>
+            </div>;
+        }
             
         return <fragment>
             {this.RenderNav()}

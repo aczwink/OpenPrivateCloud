@@ -25,6 +25,7 @@ import { AuthMethod, PublicUserData } from "../../dist/api";
 interface LoginInfo
 {
     expiryDateTime: Date;
+    isClusterLocked: boolean;
     token: string;
     user: PublicUserData;
 }
@@ -61,6 +62,11 @@ export class AuthenticationService
         return new Duration(Math.max(li.expiryDateTime.valueOf() - Date.now(), 0));
     }
 
+    public IsClusterLocked()
+    {
+        return this.loginInfo.Get()?.isClusterLocked;
+    }
+
     public IsLoggedIn()
     {
         return this._loginInfo.Get() !== undefined;
@@ -77,7 +83,7 @@ export class AuthenticationService
         if(response.statusCode === 200)
         {
             const result = response.data;
-            await this.SetSession(result.token, result.expiryDateTime)
+            await this.SetSession(result.token, result.expiryDateTime);
 
             return true;
         }
@@ -130,10 +136,12 @@ export class AuthenticationService
     {
         this.apiService.token = token;
 
+        const lockedResponse = await this.apiService.cluster.keystore.locked.get();
         const userResponse = await this.apiService.user.get();
         this._loginInfo.Set({
-            expiryDateTime: expiryDateTime,
-            token: token,
+            expiryDateTime,
+            isClusterLocked: lockedResponse.data,
+            token,
             user: userResponse.data
         });
         this.SaveSession(userResponse.data.emailAddress, token, expiryDateTime);

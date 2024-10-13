@@ -31,6 +31,12 @@ class _api_
     {
     }
 
+    @Get("locked")
+    public QueryLockedStatus()
+    {
+        return this.clusterKeyStoreManager.IsLocked();
+    }
+
     @Get()
     public QueryMasterKey()
     {

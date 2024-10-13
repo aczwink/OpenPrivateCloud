@@ -52,6 +52,7 @@ class _api_
 
         if(method === "client-secret")
             await this.sessionsManager.PasswordBasedLogin(userId, password);
+
         return session;
     }
 
