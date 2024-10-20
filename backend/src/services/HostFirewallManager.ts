@@ -55,6 +55,17 @@ export class HostFirewallManager
         const externalNIC = await this.hostNetworkInterfaceCardsManager.FindExternalNetworkInterface(hostId);
         const zones = await this.hostFirewallZonesManager.QueryZones(hostId);
 
+        const externalNet = await this.hostNetworkInterfaceCardsManager.QueryExternalIPv4Subnet(hostId)
+        const forwardingZones = zones.customZones.concat([
+            { //port forwarding to external (i.e. to itself is allowed)
+                addressSpace: externalNet.range,
+                inboundRules: zones.external.inboundRules,
+                interfaceNames: zones.external.interfaceNames,
+                name: "external",
+                outboundRules: zones.external.outboundRules
+            }
+        ]);
+
         const externalZoneInputChainName = "ENTER_zone_external";
         const externalZoneOutputChainName = "EXIT_zone_external";
 
@@ -198,7 +209,7 @@ export class HostFirewallManager
                         name: "FORWARD",
                         rules: [
                             ...this.AddTracingRule(hostId, "FORWARD"),
-                            ...zones.external.portForwardingRules.map(this.GenerateIncomingDestinationNAT_ForwardRule.bind(this, externalNIC, zones.customZones)),
+                            ...zones.external.portForwardingRules.map(this.GenerateIncomingDestinationNAT_ForwardRule.bind(this, externalNIC, forwardingZones)),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateInboundForwardRule(y, x.addressSpace, x.name)).Values()).Flatten().ToArray(),
                             ...zones.customZones.Values().Map(x => x.interfaceNames.map(y => this.CreateOutboundForwardRule(y, x.addressSpace, x.name)).Values()).Flatten().ToArray(),
                             {
@@ -786,7 +797,9 @@ export class HostFirewallManager
     private GenerateIncomingDestinationNAT_ForwardRule(externalNIC: string, zones: FirewallZone[], portForwardingRule: PortForwardingRule): NetfilterRuleCreationData
     {
         const targetAddr = new IPv4(portForwardingRule.targetAddress);
-        const targetZone = zones.find(x => x.addressSpace.Includes(targetAddr))!;
+        const targetZone = zones.find(x => x.addressSpace.Includes(targetAddr));
+        if(targetZone === undefined)
+            throw new Error("Can't find a zone for the port forwarding address: " + portForwardingRule.targetAddress)
 
         return {
             conditions: [

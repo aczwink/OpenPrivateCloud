@@ -32,6 +32,7 @@ import { HealthController } from "../data-access/HealthController";
 import { NetworkTraceSimulator } from "../services/NetworkTraceSimulator";
 import { IPv4 } from "../common/IPv4";
 import { DateTime } from "acts-util-node";
+import { CIDRRange } from "../common/CIDRRange";
 
 interface AddHostDTO
 {
@@ -54,6 +55,7 @@ interface NetworkInterfaceDTO
     name: string;
     zone: string;
     ip: string;
+    subnet: string;
 }
 
 interface NetworkTraceSimPacketDataDTO
@@ -183,10 +185,12 @@ class HostAPIController
         return Promise.all(interfaces.map(async x => {
             const zone = await this.hostFirewallZonesManager.DetermineAssignedZoneForNetworkInterface(hostId, x);
             const iface = addresses.find(y => y.ifname === x);
+            const ipv4 = iface!.addr_info.find(x => x.family === "inet")!;
             const res: NetworkInterfaceDTO = {
                 name: x,
                 zone,
-                ip: iface!.addr_info.find(x => x.family === "inet")?.local ?? ""
+                ip: ipv4.local,
+                subnet: CIDRRange.FromIP(new IPv4(ipv4.local), ipv4.prefixlen).ToString()
             };
             return res;
         }));
