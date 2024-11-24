@@ -18,7 +18,7 @@
 
 import { Injectable } from "acts-util-node";
 import { HostNetworkInterfaceCardsManager } from "./HostNetworkInterfaceCardsManager";
-import { Observer, Subject } from "acts-util-core";
+import { ObjectExtensions, Observer, Subject } from "acts-util-core";
 import { CIDRRange } from "../common/CIDRRange";
 
 export interface FirewallRule
@@ -114,6 +114,8 @@ export class HostFirewallZonesManager
             return "docker-container-nic";
         if(nicName === "docker_gwbridge")
             return "docker_gwbridge";
+        if(nicName === "docker0")
+            return "docker0";
 
         if(nicName.startsWith("opc-"))
         {
@@ -147,11 +149,11 @@ export class HostFirewallZonesManager
             //container or vm nics
             "docker-container-nic", "qemu-vm-nic",
             //docker
-            "docker_gwbridge"
+            "docker_gwbridge", "docker0"
         ];
 
         return {
-            customZones: await zoneInterfaces.Entries().Filter(kv => !nonCustomZones.includes(kv.key.toString())).Map(kv => this.BuildZoneData(hostId, kv.key.toString(), kv.value!)).PromiseAll(),
+            customZones: await ObjectExtensions.Entries(zoneInterfaces).Filter(kv => !nonCustomZones.includes(kv.key.toString())).Map(kv => this.BuildZoneData(hostId, kv.key.toString(), kv.value!)).PromiseAll(),
 
             external: {
                 interfaceNames: zoneInterfaces["external"]!,
@@ -200,8 +202,9 @@ export class HostFirewallZonesManager
 
     private FetchZoneData(hostId: number, zoneName: string)
     {
-        const provider = this.dataProviders.find(x => zoneName.startsWith(x.matchingZonePrefix))!;
-
+        const provider = this.dataProviders.find(x => zoneName.startsWith(x.matchingZonePrefix));
+        if(provider === undefined)
+            throw new Error("Could not find zone '" + zoneName + "'. Known prefixes are: " + this.dataProviders.map(x => x.matchingZonePrefix).join(", "));
         return provider.ProvideData(hostId, zoneName);
     }
 }

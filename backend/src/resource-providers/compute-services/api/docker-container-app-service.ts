@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,6 +24,7 @@ import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { ContainerAppServiceConfigDTO } from "./DTOs";
 import { KeyVaultManager } from "../../security-services/KeyVaultManager";
+import { ObjectExtensions } from "acts-util-core";
 
 
 interface DockerContainerInfo
@@ -100,7 +101,7 @@ class _api_ extends ResourceAPIControllerBase
         const result: DockerContainerInfo = {
             hostName: resourceReference.hostName,
             state: await this.dockerContainerManager.QueryContainerStatus(resourceReference),
-            ipAddresses: (data === undefined) ? [] : data.NetworkSettings.Networks.Values().NotUndefined().Map(x => x.IPAddress).ToArray()
+            ipAddresses: (data === undefined) ? [] : ObjectExtensions.Values(data.NetworkSettings.Networks).NotUndefined().Map(x => x.IPAddress).ToArray()
         };
         return result;
     }
@@ -150,7 +151,13 @@ class _api_ extends ResourceAPIControllerBase
                 certificateName: certRef!.objectName,
                 keyVaultId: certRef!.kvRef.id,
                 privateKeyMountPoint: dto.certificate.privateKeyMountPoint
-            }
+            },
+            volumes: await dto.volumes.Values().Map(async x => ({
+                containerPath: x.containerPath,
+                fileStoragePath: x.fileStoragePath,
+                fileStorageResourceId: (await this.resourcesManager.CreateResourceReferenceFromExternalId(x.fileStorageResourceId))!.id,
+                readOnly: x.readOnly
+            })).PromiseAll()
         }
     }
 
@@ -175,6 +182,12 @@ class _api_ extends ResourceAPIControllerBase
                 };
             }).PromiseAll(),
             vnetResourceId: vnetRef!.externalId,
+            volumes: (config.volumes === undefined) ? [] : await config.volumes.Values().Map(async x => ({
+                containerPath: x.containerPath,
+                fileStoragePath: x.fileStoragePath,
+                fileStorageResourceId: (await this.resourcesManager.CreateResourceReference(x.fileStorageResourceId))!.externalId,
+                readOnly: x.readOnly
+            })).PromiseAll()
         }
     }
 }

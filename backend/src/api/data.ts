@@ -19,6 +19,7 @@
 import { APIController, Body, Patch } from "acts-util-apilib";
 import { DataQueryExecutor, DataQueryRequest } from "../services/DataQueryExecutor";
 import { DataSourceSchema } from "../services/ClusterDataProvider";
+import { ObjectExtensions } from "acts-util-core";
 
 interface DataQueryKeyEntry
 {
@@ -46,7 +47,7 @@ class _api_
     {
         const result = await this.executor.ExecuteQuery(query);
         return {
-            keys: result.keys.Entries().Map(kv => ({ name: kv.key.toString(), schema: kv.value! })).ToArray(),
+            keys: ObjectExtensions.Entries(result.keys).Map(kv => ({ name: kv.key.toString(), schema: kv.value! })).ToArray(),
             values: result.values.Take(500).ToArray()
         };
     }

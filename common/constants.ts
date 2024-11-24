@@ -30,9 +30,6 @@ export const c_fileServicesResourceProviderName = "file-services";
 export const c_fileStorageResourceTypeName = "file-storage";
 export const c_objectStorageResourceTypeName = "object-storage";
 
-export const c_integrationServicesResourceProviderName = "integration-services";
-export const c_managedActiveDirectoryResourceTypeName = "managed-ad";
-
 export const c_multimediaServicesResourceProviderName = "multimedia-services";
 export const c_avTranscoderResourceTypeName = "av-transcoder";
 

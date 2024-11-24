@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Dictionary } from "acts-util-core";
+import { Dictionary, ObjectExtensions } from "acts-util-core";
 import { EnumeratorBuilder } from "acts-util-core/dist/Enumeration/EnumeratorBuilder";
 import { Injectable } from "acts-util-node";
 
@@ -75,7 +75,7 @@ export class ClusterDataProvider
 
     public QueryRootNamespaces()
     {
-        return this.providers.OwnKeys();
+        return ObjectExtensions.OwnKeys(this.providers);
     }
 
     public async QuerySourceData(name: string, queryOptions: SourceQueryOptions): Promise<DataSourceQueryResult>
@@ -99,7 +99,7 @@ export class ClusterDataProvider
                     dataType: "string"
                 }
             },
-            values: (await provider.QueryChildren()).OwnKeys().Map(k => ({ name: k })),
+            values: ObjectExtensions.OwnKeys(await provider.QueryChildren()).Map(k => ({ name: k })),
         };
     }
 

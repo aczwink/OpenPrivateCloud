@@ -17,7 +17,6 @@
  * */
 import fs from "fs";
 import * as https from "https";
-import * as os from "os";
 import { OpenAPI } from "acts-util-core";
 import { Factory, GlobalInjector, HTTP } from "acts-util-node";
 import { APIRegistry } from "acts-util-apilib";
@@ -100,7 +99,7 @@ async function SetupWebServer()
 
     const backendStructure: any = await import("../dist/openapi-structure.json");
     requestHandlerChain.AddRequestHandler(GlobalInjector.Resolve(HTTPAuthHandler));
-    requestHandlerChain.AddRequestHandler(new HTTP.RouterRequestHandler(openAPIDef, backendStructure, APIRegistry.endPointTargets));
+    requestHandlerChain.AddRequestHandler(new HTTP.RouterRequestHandler(openAPIDef, backendStructure, APIRegistry.endPointTargets, false));
 
     const keyPath = "/etc/OpenPrivateCloud/private.key";
     const certPath = "/etc/OpenPrivateCloud/public.crt";

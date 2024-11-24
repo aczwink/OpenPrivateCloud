@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,6 @@ import { BackupVaultProperties } from "./backup-services/BackupVaultProperties";
 import { ComputeServicesProperties } from "./compute-services/Properties";
 import { MariadbProperties } from "./database-services/MariaDB/MariadbProperties";
 import { FileServicesProperties } from "./file-services/properties";
-import { IntegrationServicesProperties } from "./integration-services/properties";
 import { AVTranscoderProperties } from "./multimedia-services/AVTranscoderProperties";
 import { NetworkServicesProperties } from "./network-services/properties";
 import { SecurityServicesProperties } from "./security-services/properties";
@@ -31,7 +30,6 @@ export type AnyResourceProperties =
     | BackupVaultProperties
     | ComputeServicesProperties
     | FileServicesProperties
-    | IntegrationServicesProperties
     | MariadbProperties
     | NetworkServicesProperties
     | SecurityServicesProperties

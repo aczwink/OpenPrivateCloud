@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -37,6 +37,19 @@ interface ContainerAppServiceSecretDTO
     mountPointSecretName: string;
 }
 
+interface ContainerAppServiceVolumeDTO
+{
+    /**
+     * @title File storage
+     * @format resource-same-host[file-services/file-storage]
+     */
+    fileStorageResourceId: string;
+
+    fileStoragePath: string;
+    containerPath: string;
+    readOnly: boolean;
+}
+
 export interface ContainerAppServiceConfigDTO
 {
     certificate?: {
@@ -68,4 +81,6 @@ export interface ContainerAppServiceConfigDTO
      * @format resource-same-host[network-services/virtual-network]
      */
     vnetResourceId: string;
+
+    volumes: ContainerAppServiceVolumeDTO[];
 }

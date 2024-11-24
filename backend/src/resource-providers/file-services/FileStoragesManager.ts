@@ -170,10 +170,10 @@ export class FileStoragesManager implements ResourceEventListener
         }
     }
 
-    public GetDataPath(resourceReference: LightweightResourceReference)
+    public GetFullHostPathTo(resourceReference: LightweightResourceReference, targetPath: string)
     {
-        const resourcePath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
-        return path.join(resourcePath, "data");
+        const dataPath = this.GetDataPath(resourceReference);
+        return path.join(dataPath, targetPath);
     }
 
     public async GetSMBConnectionInfo(resourceReference: ResourceReference, userId: number)
@@ -185,6 +185,15 @@ export class FileStoragesManager implements ResourceEventListener
     {
         const resourcePath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
         return path.join(resourcePath, "snapshots");
+    }
+
+    public async ListDirectoryContentsAbsolute(resourceReference: LightweightResourceReference, localPath: string)
+    {
+        const dataPath = this.GetDataPath(resourceReference);
+        const dirPath = path.join(dataPath, localPath);
+        
+        const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, dirPath);
+        return children.map(x => path.join(dirPath, x));
     }
 
     public async ProvideResource(context: DeploymentContext)
@@ -281,6 +290,12 @@ export class FileStoragesManager implements ResourceEventListener
         const snapshotsPath = this.GetSnapshotsPath(resourceReference);
         const snapshotPath = path.join(snapshotsPath, snapshotName);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "btrfs", "subvolume", "delete", snapshotPath], resourceReference.hostId);
+    }
+
+    private GetDataPath(resourceReference: LightweightResourceReference)
+    {
+        const resourcePath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        return path.join(resourcePath, "data");
     }
 
     private async WriteConfig(instanceId: number, config: FileStorageConfig)

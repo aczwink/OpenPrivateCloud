@@ -20,6 +20,7 @@ import { LightweightResourceReference } from "../../common/ResourceReference";
 import { DockerContainerConfig, DockerContainerNetworkJoinOptions, DockerManager } from "./DockerManager";
 import { VNetManager } from "../network-services/VNetManager";
 import { HealthStatus } from "../../data-access/HealthController";
+import { ObjectExtensions } from "acts-util-core";
 
 export interface ContainerInfo
 {
@@ -90,7 +91,7 @@ export class ManagedDockerContainerManager
         }
 
         return {
-            ipAddresses: containerInfo.NetworkSettings.Networks.Values().NotUndefined().Map(x => x.IPAddress).ToArray()
+            ipAddresses: ObjectExtensions.Values(containerInfo.NetworkSettings.Networks).NotUndefined().Map(x => x.IPAddress).ToArray()
         };
     }
 

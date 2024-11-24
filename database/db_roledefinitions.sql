@@ -1,8 +1,9 @@
--- MariaDB dump 10.19  Distrib 10.11.2-MariaDB, for debian-linux-gnu (x86_64)
+/*!999999\- enable the sandbox mode */ 
+-- MariaDB dump 10.19  Distrib 10.11.8-MariaDB, for debian-linux-gnu (x86_64)
 --
 -- Host: localhost    Database: openprivatecloud
 -- ------------------------------------------------------
--- Server version	10.11.2-MariaDB-1
+-- Server version	10.11.8-MariaDB-0ubuntu0.24.04.1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -24,8 +25,6 @@ INSERT INTO `roles` VALUES
 (100093036582666240,'Data Reader'),
 (100093036582666241,'Data Contributor'),
 (100093036582666242,'Reader'),
-(100555031685627904,'Active Directory User'),
-(100555031685627905,'Active Directory Admin'),
 (100777916731752448,'Owner');
 /*!40000 ALTER TABLE `roles` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -41,9 +40,6 @@ INSERT INTO `roles_permissions` VALUES
 (100093036582666241,'/data/read'),
 (100093036582666241,'/data/write'),
 (100093036582666242,'/read'),
-(100555031685627904,'/AD/use'),
-(100555031685627905,'/AD/manage'),
-(100555031685627905,'/AD/use'),
 (100777916731752448,'/read'),
 (100777916731752448,'/roleAssignments/write');
 /*!40000 ALTER TABLE `roles_permissions` ENABLE KEYS */;
@@ -57,4 +53,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-03-31 22:32:35
+-- Dump completed on 2024-11-24 21:52:01

@@ -2,9 +2,11 @@
     "type": "openapi",
     "source": "./src",
     "destination": "./dist/openapi",
+    "globalSecurityRequirement": [
+        {"bearerAuth":[]}
+    ],
     "securitySchemes": {
         "bearerAuth": {
-            "global": true,
             "type": "http",
             "scheme": "bearer"
         }

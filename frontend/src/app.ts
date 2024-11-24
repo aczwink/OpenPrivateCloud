@@ -15,67 +15,43 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { BootstrapApp, RootInjector, Routes} from "acfrontend";
-import { AuthGuard } from "./AuthGuard";
-import { DashboardComponent } from "./Views/DashboardComponent";
-import { LoginComponent } from "./LoginComponent";
-import { PageNotFoundComponent } from "./PageNotFoundComponent";
-import { RootComponent } from "./RootComponent";
-import { ViewModelsManager } from "./UI/ViewModelsManager";
-import { ViewProcessComponent } from "./Views/activitymonitor/ViewProcessComponent";
-import { DataExplorerComponent } from "./Views/data-explorer/DataExplorerComponent";
 
-function BuildRoutes()
-{
-    const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
-    
-    const staticRoutes : Routes = [
-        { path: "activitymonitor/:processId", guards: [AuthGuard], component: ViewProcessComponent },
-        { path: "dataExplorer", guards: [AuthGuard], component: DataExplorerComponent },
-        { path: "login", component: LoginComponent},
-        { path: "", component: DashboardComponent, guards: [AuthGuard] },
-        { path: "*", component: PageNotFoundComponent},
-    ];
-    
-    return viewModelRegistry.BuildRoutes().concat(staticRoutes);
-}
+import { BootstrapApp } from "acfrontendex";
+import { dashboardRoute } from "./routes/dashboard";
+import { loginRoute } from "./routes/login";
+import { clusterRoute } from "./routes/cluster";
+import { hostsRoute } from "./routes/hosts";
+import root from "../dist/openapi.json";
+import { OpenAPI } from "acts-util-core";
+import { activityMonitorRoute } from "./routes/activity-monitor";
+import { usersAndGroupsRoute } from "./routes/usersandgroups";
+import { dataExplorerRoute } from "./routes/data-explorer";
+import { resourcesRoute } from "./routes/resources";
+import { resourceGroupsRoute } from "./routes/resource-groups";
+import { RegisterCustomFormats } from "./components/custom-formats/custom-formats";
+import { userSettingsViewModel } from "./routes/usersettings";
+import { clusterLockedRoute } from "./routes/cluster-locked";
 
-async function LoadViewModels()
-{
-    const viewModelRegistry = RootInjector.Resolve(ViewModelsManager);
+RegisterCustomFormats();
 
-    const modules = [
-        import("./ViewModels/hosts"),
-        import("./ViewModels/resourceGroups"),
-        import("./ViewModels/resources"),
-        import("./ViewModels/cluster"),
-        import("./ViewModels/usersandgroups"),
-        import("./ViewModels/usersettings"),
-    ];
+BootstrapApp({
+    additionalRoutes: [activityMonitorRoute, clusterLockedRoute, loginRoute],
 
-    for (const module of modules)
-    {
-        const imported = await module
-        viewModelRegistry.Register(imported.default);
-    }
-}
+    features: {
+        openAPI: root as OpenAPI.Root
+    },
 
-function RunApp(routes: Routes)
-{
-    BootstrapApp({
-        mountPoint: document.body,
-        rootComponentClass: RootComponent,
-        routes,
-        title: "OpenPrivateCloud",
-        version: "0.1 beta"
-    });
-}
+    layout: {
+        navbar: [
+            [dashboardRoute, resourcesRoute, resourceGroupsRoute, dataExplorerRoute],
+            [usersAndGroupsRoute, hostsRoute, clusterRoute],
+            [userSettingsViewModel] //TODO: should go to user layout part as soon as oauth2 integration is done
+        ],
+        user: [],
+    },
 
-async function LaunchApp()
-{
-    await LoadViewModels();
-    const routes = BuildRoutes();
-    RunApp(routes);
-}
+    mountPoint: document.body,
 
-LaunchApp();
+    title: "OpenPrivateCloud",
+    version: "0.1 beta"
+});

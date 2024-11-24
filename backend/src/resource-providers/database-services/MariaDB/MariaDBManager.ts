@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,6 +24,7 @@ import { MariaDBHostManager } from "./MariaDBHostManager";
 import { MariaDBInterface } from "./MariaDBInterface";
 import { MariadbProperties } from "./MariadbProperties";
 import { ResourceReference } from "../../../common/ResourceReference";
+import { ObjectExtensions } from "acts-util-core";
 
 interface MariaDBConfig
 {
@@ -122,7 +123,7 @@ export class MariaDBManager
         const result = [];
         for (const permission of permissions)
         {
-            const parsed = this.ParsePermission(permission.Values().First());
+            const parsed = this.ParsePermission(ObjectExtensions.Values(permission).First());
             if(parsed !== null)
                 result.push(parsed);
         }

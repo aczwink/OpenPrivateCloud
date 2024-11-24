@@ -25,6 +25,7 @@ import { LargeFileDownloadService } from "../services/LargeFileDownloadService";
 import { Ok, PartialContent } from "acts-util-apilib/dist/Responses";
 
 @APIController("public")
+@Security()
 class _api_
 {
     constructor(private authenticationManager: AuthenticationManager, private clusterConfigManager: ClusterConfigManager, private usersController: UsersController, private sessionsManager: SessionsManager,
@@ -32,7 +33,6 @@ class _api_
     {
     }
 
-    @Security()
     @Post("auth")
     public async Create(
         @BodyProp emailAddress: string,
@@ -56,7 +56,6 @@ class _api_
         return session;
     }
 
-    @Security()
     @Get("authMethods")
     public async QueryAuthenticationMethods(
         @Query userName: string
@@ -69,7 +68,6 @@ class _api_
         return this.authenticationManager.RequestAuthenticationMethods(userId);
     }
 
-    @Security()
     @Get("clusterSettings")
     public async QueryClusterConfig()
     {
@@ -77,7 +75,6 @@ class _api_
         return settings;
     }
 
-    @Security()
     @Post("preAuth")
     public async ExecutePreAuthenticationStep(
         @BodyProp userName: string,
@@ -91,7 +88,6 @@ class _api_
         return this.authenticationManager.ExecutePreAuthenticationStep(userId, authMethod);
     }
 
-    @Security()
     @Get("largeFile/{id}")
     public async DownloadLargeFile(
         @Path id: string,

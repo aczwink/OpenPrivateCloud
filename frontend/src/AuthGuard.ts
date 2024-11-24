@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@
 import { AbsURL } from "acts-util-core";
 import { RouteGuard, Injectable, Router, RouterState } from "acfrontend";
 
-import { AuthenticationService } from "./Services/AuthenticationService";
+import { AuthenticationService } from "./services/AuthenticationService";
 
 @Injectable
 export class AuthGuard implements RouteGuard
@@ -32,6 +32,7 @@ export class AuthGuard implements RouteGuard
     {
         if(this.authenticationService.IsLoggedIn())
             return true;
+        this.authenticationService.TryAutoLogin();
         return false;
     }
 

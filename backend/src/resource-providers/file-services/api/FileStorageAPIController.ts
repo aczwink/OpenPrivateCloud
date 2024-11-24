@@ -99,8 +99,7 @@ class FileStorageAPIController extends ResourceAPIControllerBase
         if(!hasPermission)
             return Forbidden("access denied");
 
-        const dataPath = this.fileStoragesManager.GetDataPath(context.resourceReference);
-        const remotePath = path.join(dataPath, dirPath);
+        const remotePath = this.fileStoragesManager.GetFullHostPathTo(context.resourceReference, dirPath);
         if(remotePath.length < context.resourceReference.hostStoragePath.length)
             return Forbidden("access denied");
 

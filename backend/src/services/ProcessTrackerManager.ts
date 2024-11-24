@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Dictionary } from "acts-util-core";
+import { Dictionary, ObjectExtensions } from "acts-util-core";
 import { DateTime, GlobalInjector, Injectable } from "acts-util-node";
 import { HostsController } from "../data-access/HostsController";
 import { ErrorService } from "./ErrorService";
@@ -128,7 +128,7 @@ export class ProcessTrackerManager
     //Properties
     public get processes()
     {
-        return this.trackers.Entries().Map(kv => {
+        return ObjectExtensions.Entries(this.trackers).Map(kv => {
             const x = kv.value!;
             const res: ProcessTrackerReadOnlyWithId = {
                 id: kv.key as number,

@@ -44,10 +44,9 @@ export class AVTranscoderService
 
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
 
-        const files = await this.ReadInputFiles(sourceResourceRef, config.source.sourcePath);
+        const files = await this.fileStoragesManager.ListDirectoryContentsAbsolute(sourceResourceRef, config.source.sourcePath)
 
-        const dataPath = this.fileStoragesManager.GetDataPath(sourceResourceRef);
-        const targetPath = path.join(dataPath, config.targetPath);
+        const targetPath = this.fileStoragesManager.GetFullHostPathTo(sourceResourceRef, config.targetPath);
         for (const file of files)
             await this.TranscodeFile(sourceResourceRef.hostId, file, config.format, resourceDir, targetPath);
     }
@@ -186,15 +185,6 @@ export class AVTranscoderService
                     "-crf", this.ComputeQuality("h265", targetFormat.quality).toString(),
                 ];
         }
-    }
-
-    private async ReadInputFiles(resourceReference: LightweightResourceReference, localPath: string)
-    {
-        const dataPath = this.fileStoragesManager.GetDataPath(resourceReference);
-        const dirPath = path.join(dataPath, localPath);
-
-        const children = await this.remoteFileSystemManager.ListDirectoryContents(resourceReference.hostId, dirPath);
-        return children.map(x => path.join(dirPath, x));
     }
 
     private async TranscodeFile(hostId: number, filePath: string, targetFormat: AVTranscoderFormat, instanceDir: string, targetDirPath: string)

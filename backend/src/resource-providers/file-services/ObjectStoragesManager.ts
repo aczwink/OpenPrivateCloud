@@ -21,7 +21,7 @@ import { Injectable, Lock } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { Dictionary, NumberDictionary } from "acts-util-core";
+import { Dictionary, NumberDictionary, ObjectExtensions } from "acts-util-core";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ObjectStorageProperties } from "./properties";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
@@ -255,8 +255,8 @@ export class ObjectStoragesManager
     {
         const index = await this.GetIndex(resourceReference);
         return {
-            totalFileCount: index.files.OwnKeys().Count(),
-            totalBlobSize: index.blobs.Values().NotUndefined().Map(x => x.size).Sum()
+            totalFileCount: ObjectExtensions.OwnKeys(index.files).Count(),
+            totalBlobSize: ObjectExtensions.Values(index.blobs).NotUndefined().Map(x => x.size).Sum()
         };
     }
 
@@ -402,7 +402,7 @@ export class ObjectStoragesManager
         const tagsSet = new Set(searchCriteria.tags);
 
         const index = await this.GetIndex(resourceReference);
-        return index.files.Values().NotUndefined().Map(x => x.currentRev).Filter(x => {
+        return ObjectExtensions.Values(index.files).NotUndefined().Map(x => x.currentRev).Filter(x => {
             const nameMatch = x.id.toLowerCase().includes(nameFilter) || x.fileName.toLowerCase().includes(nameFilter);
             const mediaTypeMatch = x.mediaType.includes(searchCriteria.mediaType);
             const tagsMatch = new Set(x.tags).IsSuperSetOf(tagsSet);
@@ -586,7 +586,7 @@ export class ObjectStoragesManager
         {
             const index = await this.GetIndex(resourceReference);
             const cache = this.cache[resourceReference.id] = {
-                tags: index.files.Values().NotUndefined().Map(x => x.currentRev.tags.Values()).Flatten().ToSet()
+                tags: ObjectExtensions.Values(index.files).NotUndefined().Map(x => x.currentRev.tags.Values()).Flatten().ToSet()
             };
 
             return cache;

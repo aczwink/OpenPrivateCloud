@@ -27,6 +27,7 @@ import { DockerContainerProperties } from "./Properties";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
+import { FileStoragesManager } from "../file-services/FileStoragesManager";
 
 interface Certificate
 {
@@ -49,6 +50,14 @@ interface Secret
     mountPointSecretName: string;
 }
 
+interface Volume
+{
+    fileStorageResourceId: number;
+    fileStoragePath: string;
+    containerPath: string;
+    readOnly: boolean;
+}
+
 export interface ContainerAppServiceConfig
 {
     cert?: Certificate;
@@ -56,13 +65,15 @@ export interface ContainerAppServiceConfig
     imageName: string;
     secrets: Secret[];
     vnetResourceId: number;
+    volumes?: Volume[];
 }
 
 @Injectable
 export class ContainerAppServiceManager
 {
-    constructor(private dockerManager: DockerManager, private instanceConfigController: ResourceConfigController, private vnetManager: VNetManager, private resourcesManager: ResourcesManager,
-        private resourceDependenciesController: ResourceDependenciesController, private keyVaultManager: KeyVaultManager, private remoteFileSystemManager: RemoteFileSystemManager)
+    constructor(private dockerManager: DockerManager, private resourceConfigController: ResourceConfigController, private vnetManager: VNetManager, private resourcesManager: ResourcesManager,
+        private resourceDependenciesController: ResourceDependenciesController, private keyVaultManager: KeyVaultManager, private remoteFileSystemManager: RemoteFileSystemManager,
+        private fileStoragesManager: FileStoragesManager)
     {
     }
 
@@ -124,7 +135,7 @@ export class ContainerAppServiceManager
 
     public async QueryContainerConfig(resourceId: number): Promise<ContainerAppServiceConfig>
     {
-        const config = await this.instanceConfigController.QueryConfig<ContainerAppServiceConfig>(resourceId);
+        const config = await this.resourceConfigController.QueryConfig<ContainerAppServiceConfig>(resourceId);
         return config!;
     }
 
@@ -169,11 +180,13 @@ export class ContainerAppServiceManager
 
     public async UpdateContainerConfig(resourceId: number, config: ContainerAppServiceConfig)
     {
-        await this.instanceConfigController.UpdateOrInsertConfig(resourceId, config);
+        await this.resourceConfigController.UpdateOrInsertConfig(resourceId, config);
 
         const dependencies = [config.vnetResourceId, ...config.secrets.map(x => x.keyVaultId)];
         if(config.cert !== undefined)
             dependencies.push(config.cert.keyVaultId);
+        if(config.volumes !== undefined)
+            dependencies.push(...config.volumes?.map(x => x.fileStorageResourceId));
         await this.resourceDependenciesController.SetResourceDependencies(resourceId, dependencies);
     }
 
@@ -220,7 +233,7 @@ export class ContainerAppServiceManager
                 return true;
         }
 
-        const expectedMountsCount = (config.cert === undefined ? 0 : 2) + (config.secrets.length > 0 ? 1 : 0) + 1; //the 1 at the end is the local volume that is created for every container but is not persisted
+        const expectedMountsCount = (config.volumes?.length ?? 0) + (config.cert === undefined ? 0 : 2) + (config.secrets.length > 0 ? 1 : 0) + 1; //the 1 at the end is the local volume that is created for every container but is not persisted
         return !(
             (containerData.Config.Image === config.imageName)
             &&
@@ -294,6 +307,19 @@ export class ContainerAppServiceManager
                 hostPath: secretsDir,
                 readOnly: true
             });
+        }
+        if(config.volumes !== undefined)
+        {
+            for (const volume of config.volumes)
+            {
+                const fileStorageRef = await this.resourcesManager.CreateResourceReference(volume.fileStorageResourceId);
+
+                volumes.push({
+                    containerPath: volume.containerPath,
+                    hostPath: this.fileStoragesManager.GetFullHostPathTo(fileStorageRef!, volume.fileStoragePath),
+                    readOnly: volume.readOnly
+                });
+            }
         }
 
         const dockerConfig: DockerContainerConfig = {

@@ -17,6 +17,7 @@
  * */
 import { Injectable } from "acts-util-node";
 import { ClusterDataProvider, DataSourceQueryResult, SourceQueryOptions } from "./ClusterDataProvider";
+import { ObjectExtensions } from "acts-util-core";
 
 interface ColumnNameFilterOperand
 {
@@ -134,7 +135,7 @@ export class DataQueryExecutor
 
             case "projection":
                 return {
-                    keys: prevResult.keys.Entries().Filter(x => query.columnNames.includes(x.key.toString())).ToDictionary(kv => kv.key, kv => kv.value!),
+                    keys: ObjectExtensions.Entries(prevResult.keys).Filter(x => query.columnNames.includes(x.key.toString())).ToDictionary(kv => kv.key, kv => kv.value!),
                     values: prevResult.values.Map(x => x.Entries().Filter( (kv: any) => query.columnNames.includes(kv.key.toString())).ToDictionary( (kv: any) => kv.key, (kv: any) => kv.value) )
                 };
 

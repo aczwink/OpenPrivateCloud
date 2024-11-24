@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Dictionary } from "acts-util-core";
+import { Dictionary, ObjectExtensions } from "acts-util-core";
 import { Injectable } from "acts-util-node";
 import { ConfigDialect } from "../common/config/ConfigDialect";
 import { ConfigModel } from "../common/config/ConfigModel";
@@ -47,7 +47,7 @@ export class SystemServicesManager
     //Public methods
     public async CreateOrUpdateService(hostId: number, props: ServiceProperties)
     {
-        const env = props.environment.Entries().Map(x => "Environment=" + x.key + "=" + x.value).Join("\n");
+        const env = ObjectExtensions.Entries(props.environment).Map(x => "Environment=" + x.key + "=" + x.value).Join("\n");
         const before = (props.before.length === 0) ? "" : ("Before=" + props.before.join(" "))
         const text = `
 [Unit]
