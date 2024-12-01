@@ -78,6 +78,14 @@ jobs:
         npm link
       working-directory: ./acfrontend
 
+    - name: Building acfrontendex
+      run: |
+        npm link acfrontend
+        npm install
+        npm run compile
+        npm link
+      working-directory: ./acfrontend/extended
+
 
     #build common
     - name: Building OPC common
@@ -98,7 +106,7 @@ jobs:
     #build frontend
     - name: Building OPC frontend
       run: |
-        npm link acts-util-core acts-util-apilib acfrontend openprivatecloud-common
+        npm link acts-util-core acts-util-apilib acfrontend acfrontendex openprivatecloud-common
         npm install
         npm run generate-api
         touch ./dist/private.key
