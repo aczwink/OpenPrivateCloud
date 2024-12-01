@@ -104,7 +104,10 @@ export class BackupVaultManager
             return {
                 sources: {
                     databases: [],
-                    controllerDB: { enable: false },
+                    controllerDB: {
+                        enable: false,
+                        enableODIP: false,
+                    },
                     fileStorages: [],
                     keyVaults: [],
                     objectStorages: []

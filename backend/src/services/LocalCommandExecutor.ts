@@ -46,6 +46,7 @@ export class LocalCommandExecutor
         });
 
         const buffers: Buffer[] = [];
+        childProcess.stderr.on("data", x => console.error(x.toString("utf-8")));
         childProcess.stdout.on("data", buffer => buffers.push(buffer));
 
         const exitCode = await this.ChildProcessToPromise(childProcess);

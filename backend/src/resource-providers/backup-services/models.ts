@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,11 @@ export interface BackupVaultControllerDatabaseConfig
      * Important: The controller database includes credentials to all hosts and should never backed up to an untrusted source without encryption!
      */
     enable: boolean;
+
+    /**
+     * In case you are hosting ODIP on the same database server, it can also be backed up. This contains amongst many other data user information and should therefore never backed up to an untrusted source without encryption!
+     */
+    enableODIP?: boolean;
 }
 
 export interface BackupVaultFileStorageConfig

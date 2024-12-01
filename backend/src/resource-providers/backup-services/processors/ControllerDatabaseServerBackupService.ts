@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import fs from "fs";
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { ProcessTracker } from "../../../services/ProcessTrackerManager";
@@ -29,7 +28,7 @@ import { RemoteCommandExecutor } from "../../../services/RemoteCommandExecutor";
 import { DBConnectionsManager } from "../../../data-access/DBConnectionsManager";
 
 @Injectable
-export class ControllerDatabaseBackupService
+export class ControllerDatabaseServerBackupService
 {
     constructor(private remoteRootFileSystemManager: RemoteRootFileSystemManager, private tempFilesManager: TempFilesManager, private localCommandExecutor: LocalCommandExecutor, 
         private remoteCommandExecutor: RemoteCommandExecutor, private dbConnectionsManager: DBConnectionsManager)
@@ -37,32 +36,33 @@ export class ControllerDatabaseBackupService
     }
 
     //Public methods
-    public async Backup(hostId: number, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionKeyKeyVaultReference: string | undefined, processTracker: ProcessTracker)
+    public async BackupDatabase(hostId: number, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionKeyKeyVaultReference: string | undefined, processTracker: ProcessTracker, shortName: "opc" | "oidp")
     {
-        const targetResourcePath = path.join(backupTargetPath, "opc-controller-database");
+        const targetResourcePath = path.join(backupTargetPath, shortName + "-controller-database");
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetResourcePath);
 
         const snapshotFileName = new Date().toISOString() + ".sql.gz" + (encryptionKeyKeyVaultReference === undefined ? "" : ".gpg");
         const targetSnapshotFileName = ReplaceSpecialCharacters(snapshotFileName, targetFileSystemType);
         const targetPath = path.join(targetResourcePath, targetSnapshotFileName);
 
-        processTracker.Add("Backing up Controller database");
+        processTracker.Add("Backing up database from controller database server: " + shortName);
 
-        await this.DoDatabaseExportAndStoreFile(hostId, encryptionKeyKeyVaultReference, targetPath);
+        await this.DoDatabaseExportAndStoreFile(hostId, encryptionKeyKeyVaultReference, targetPath, shortName);
     }
 
-    public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId: number, backupTargetPath: string, retention: BackupVaultRetentionConfig, processTracker: ProcessTracker)
+    public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId: number, backupTargetPath: string, retention: BackupVaultRetentionConfig, processTracker: ProcessTracker, shortName: "opc" | "oidp")
     {
-        const targetResourcePath = path.join(backupTargetPath, "opc-controller-database");
-        await DeleteSingleFileSnapshotsThatAreOlderThanRetentionPeriod(hostId, targetResourcePath, "controller database", retention, processTracker);
+        const targetResourcePath = path.join(backupTargetPath, shortName + "-controller-database");
+        await DeleteSingleFileSnapshotsThatAreOlderThanRetentionPeriod(hostId, targetResourcePath, shortName + " controller database", retention, processTracker);
     }
 
     //Private methods
-    private async DoDatabaseExportAndStoreFile(hostId: number, encryptionKeyKeyVaultReference: string | undefined, targetPath: string)
+    private async DoDatabaseExportAndStoreFile(hostId: number, encryptionKeyKeyVaultReference: string | undefined, targetPath: string, shortName: "opc" | "oidp")
     {
         const info = await this.dbConnectionsManager.CollectConnectionInfo();
 
-        const result = await this.localCommandExecutor.ExecuteCommandWithoutEncoding(['MYSQL_PWD="' + info.password + '"', "mysqldump", "-u", info.user, "-h", info.host, info.dbName, "|", "gzip"]);
+        const dbName = (shortName === "oidp") ? "openidentityprovider" : info.dbName;
+        const result = await this.localCommandExecutor.ExecuteCommandWithoutEncoding(['MYSQL_PWD="' + info.password + '"', "mysqldump", "-u", info.user, "-h", info.host, dbName, "|", "gzip"]);
         const tempDumpPath = await this.tempFilesManager.CreateFile(hostId, result);
 
         try
