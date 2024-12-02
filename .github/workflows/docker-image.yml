@@ -11,18 +11,8 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [12.x]
-
     steps:
     - uses: actions/checkout@v3
-
-    #setup build tools
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
@@ -78,6 +68,14 @@ jobs:
         npm link
       working-directory: ./acfrontend
 
+    - name: Building acfrontendex
+      run: |
+        npm link acfrontend
+        npm install
+        npm run compile
+        npm link
+      working-directory: ./acfrontend/extended
+
 
     #build common
     - name: Building OPC common
@@ -98,7 +96,7 @@ jobs:
     #build frontend
     - name: Building OPC frontend
       run: |
-        npm link acts-util-core acts-util-apilib acfrontend openprivatecloud-common
+        npm link acts-util-core acts-util-apilib acfrontend acfrontendex openprivatecloud-common
         npm install
         npm run generate-api
         touch ./dist/private.key
