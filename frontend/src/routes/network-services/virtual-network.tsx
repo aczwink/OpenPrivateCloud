@@ -19,9 +19,10 @@ import { resourceProviders } from "openprivatecloud-common";
 import { FirewallRule, VNetInfoDTO } from "../../../dist/api";
 import { RouteSetup } from "acfrontendex";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../resources-shared/resource-general";
-import { Use } from "acfrontend";
+import { JSX_CreateElement, Use } from "acfrontend";
 import { APIService } from "../../services/APIService";
 import { OpenAPISchema } from "../../api-info";
+import { ResourceListComponent } from "../../components/resources/ResourceListComponent";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -87,6 +88,16 @@ function BuildFirewallViewModel(direction: "Inbound" | "Outbound")
     return firewallViewModel;
 }
 
+const resourcesViewModel: RouteSetup<ResourceAndGroupId> = {
+    content: {
+        type: "element",
+        element: ids => <ResourceListComponent query={apiService => apiService.resourceProviders._any_.networkservices.virtualnetwork._any_.resources.get(ids.resourceGroupName, ids.resourceName)} />,
+    },
+    displayText: "Resources",
+    icon: "collection",
+    routingKey: "resources",
+};
+
 export const vnetViewModel: RouteSetup<ResourceAndGroupId> = {
     content: {
         type: "multiPage",
@@ -99,7 +110,8 @@ export const vnetViewModel: RouteSetup<ResourceAndGroupId> = {
                 entries: [
                     settingsViewModel,
                     BuildFirewallViewModel("Inbound"),
-                    BuildFirewallViewModel("Outbound")
+                    BuildFirewallViewModel("Outbound"),
+                    resourcesViewModel,
                 ]
             },
             BuildResourceGeneralPageGroupEntry(BuildResourceId),

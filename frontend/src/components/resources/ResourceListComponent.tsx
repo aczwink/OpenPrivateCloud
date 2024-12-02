@@ -16,14 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Anchor, BootstrapIcon, Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterButton, RouterState } from "acfrontend";
+import { Anchor, APIResponse, BootstrapIcon, Component, Injectable, JSX_CreateElement, ProgressSpinner, Router, RouterButton, RouterState } from "acfrontend";
 import { resourceProviders } from "openprivatecloud-common/resourceProviders";
 import { HealthStatus, ResourceOverviewDataDTO, ResourceState } from "../../../dist/api";
 import { APIService } from "../../services/APIService";
  
   
 @Injectable
-export class ResourceListComponent extends Component
+export class ResourceListComponent extends Component<{ query: (apiService: APIService) => Promise<APIResponse<ResourceOverviewDataDTO[]>>}>
 {
     constructor(private apiService: APIService, routerState: RouterState, private router: Router)
     {
@@ -57,7 +57,7 @@ export class ResourceListComponent extends Component
         </fragment>;
     }
 
-    //Private variables
+    //State
     private resourceGroupName: string | null;
     private resources: ResourceOverviewDataDTO[] | null;
 
@@ -149,23 +149,11 @@ export class ResourceListComponent extends Component
     //Event handlers
     override async OnInitiated(): Promise<void>
     {
-        let data;
-        if(this.resourceGroupName === null)
-        {
-            const response = await this.apiService.resources.get();
-            data = response.data;
-        }
-        else
-        {
-            const response = await this.apiService.resourceGroups._any_.resources.get(this.resourceGroupName);
-            if(response.statusCode === 404)
-            {
-                alert("Resource group not found");
-                this.router.RouteTo("/resourceGroups");
-                return;
-            }
-            data = response.data;
-        }
+        const response = await this.input.query(this.apiService);
+
+        if(response.data === undefined)
+            throw new Error("TODO: implement me");
+        const data = response.data;
 
         data.SortBy(x => x.name);
         this.resources = data;

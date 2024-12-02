@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,19 @@ export class ResourceDependenciesController
         await conn.Query("INSERT IGNORE INTO resources_dependencies (resourceId, dependantResourceId) VALUES (?, ?)", [resourceId, dependantResourceId]);
     }
 
-    public async QueryResourcesThatDependOn(resourceProviderName: string, resourceType: string, resourceId: number)
+    public async QueryResourcesThatDependOn(resourceId: number)
+    {
+        const query = `
+        SELECT rd.dependantResourceId
+        FROM resources_dependencies rd
+        WHERE rd.resourceId = ?
+        `;
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const rows = await conn.Select(query, resourceId);
+        return rows.map(x => x.dependantResourceId as number);
+    }
+
+    public async QuerySpecificResourcesThatDependOn(resourceProviderName: string, resourceType: string, resourceId: number)
     {
         const query = `
         SELECT rd.dependantResourceId

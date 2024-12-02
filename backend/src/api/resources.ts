@@ -66,6 +66,17 @@ class _api_
         return this.resourceQueryService.QueryOverviewData(resourceIds);
     }
 
+    @Get("host")
+    public async QueryHostResources(
+        @Query hostName: string
+    )
+    {
+        const resourceIds = await this.resourceQueryService.QueryHostResourceIds(hostName);
+        if(resourceIds === undefined)
+            return NotFound("host does not exist");
+        return this.resourceQueryService.QueryOverviewData(resourceIds.Values());
+    }
+
     @Get("search")
     public async SearchForResource(
         @Query resourceProviderName: string,

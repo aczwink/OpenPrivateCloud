@@ -32,6 +32,7 @@ import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInte
 import { ModulesManager } from "../../services/ModulesManager";
 import { DistroInfoService } from "../../services/DistroInfoService";
 import { HealthStatus } from "../../data-access/HealthController";
+import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 
 interface VNetSettings
 {
@@ -58,7 +59,7 @@ export class VNetManager implements FirewallZoneDataProvider
 {
     constructor(private resourceConfigController: ResourceConfigController, private remoteCommandExecutor: RemoteCommandExecutor, private sysCtlConfService: SysCtlConfService, private modulesManager: ModulesManager,
         private resourcesManager: ResourcesManager, private hostFirewallManager: HostFirewallManager, private dnsmasqManager: dnsmasqManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager,
-        private distroInfoService: DistroInfoService)
+        private distroInfoService: DistroInfoService, private resourceDependenciesController: ResourceDependenciesController)
     {
     }
 
@@ -261,6 +262,12 @@ export class VNetManager implements FirewallZoneDataProvider
     {
         const config = await this.resourceConfigController.QueryConfig<VNetConfig>(resourceReference.id);
         return config!;
+    }
+
+    public async QueryDependentResources(resourceReference: LightweightResourceReference)
+    {
+        const resourceIds = await this.resourceDependenciesController.QueryResourcesThatDependOn(resourceReference.id);
+        return resourceIds;
     }
 
     public async QueryResourceState(resourceReference: LightweightResourceReference): Promise<ResourceState>

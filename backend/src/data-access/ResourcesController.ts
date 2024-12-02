@@ -113,7 +113,7 @@ export class ResourcesController
         return await conn.SelectOne<Resource>(query, name, resourceProviderName, resourceType, resourceGroupName);
     }
 
-    public async QueryInstanceIdsAssociatedWithHost(hostId: number)
+    public async QueryResourceIdsAssociatedWithHost(hostId: number)
     {
         const query = `
         SELECT i.id

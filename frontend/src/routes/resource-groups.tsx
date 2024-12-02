@@ -18,7 +18,7 @@
 
 import { RouteSetup } from "acfrontendex";
 import { AuthGuard } from "../AuthGuard";
-import { Use } from "acfrontend";
+import { JSX_CreateElement, Use } from "acfrontend";
 import { APIService } from "../services/APIService";
 import { ResourceGroupDTO, RoleAssignment } from "../../dist/api";
 import { APISchemaOf } from "../api-info";
@@ -56,8 +56,8 @@ const groupRouting: RouteSetup = {
             },
             {
                 content: {
-                    type: "component",
-                    component: ResourceListComponent
+                    type: "element",
+                    element: ids => <ResourceListComponent query={apiService => apiService.resourceGroups._any_.resources.get(ids.resourceGroupName)} />
                 },
                 displayText: "Show resources",
                 icon: "collection",

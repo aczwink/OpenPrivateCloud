@@ -29,6 +29,7 @@ import { HostFirewallTracingComponent } from "../components/host/HostFirewallTra
 import { NetworkTraceSimulationComponent } from "../components/host/NetworkTraceSimulationComponent";
 import { ShowSMARTInfoComponent } from "../components/host/ShowSMARTInfoComponent";
 import { ClusterLockedGuard } from "../ClusterLockedGuard";
+import { ResourceListComponent } from "../components/resources/ResourceListComponent";
 
 const addHostRoute: RouteSetup<{}, AddHostDTO> = {
     content: {
@@ -416,7 +417,16 @@ const hostViewModel: RouteSetup<HostId> = {
                         icon: "signpost-split",
                         routingKey: "networksim",
                     },
-                    storageDevicesViewModel
+                    storageDevicesViewModel,
+                    {
+                        content: {
+                            type: "element",
+                            element: ids => <ResourceListComponent query={apiService => apiService.resources.host.get({ hostName: ids.hostName })} />,
+                        },
+                        displayText: "Resources",
+                        icon: "collection",
+                        routingKey: "resources",
+                    }
                 ]
             },
             {

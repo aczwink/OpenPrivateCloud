@@ -38,6 +38,7 @@ import { nextcloudViewModel } from "./web-services/nextcloud";
 import { nodeAppServiceViewodel } from "./web-services/nodeAppService";
 import { staticWebsiteViewModel } from "./web-services/staticWebsite";
 import { ClusterLockedGuard } from "../ClusterLockedGuard";
+import { JSX_CreateElement } from "acfrontend";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -69,8 +70,8 @@ export const resourcesRoute: RouteSetup<{}> = {
             ...resourceTypesRoutes,
             {
                 content: {
-                    type: "component",
-                    component: ResourceListComponent
+                    type: "element",
+                    element: () => <ResourceListComponent query={apiService => apiService.resources.get()} />
                 },
                 displayText: "Resources",
                 icon: "collection",

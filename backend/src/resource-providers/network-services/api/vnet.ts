@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,6 +24,7 @@ import { ResourceReference } from "../../../common/ResourceReference";
 import { VNetManager } from "../VNetManager";
 import { FirewallRule } from "../../../services/HostFirewallZonesManager";
 import { CIDRRange } from "../../../common/CIDRRange";
+import { ResourceQueryService } from "../../../services/ResourceQueryService";
 
 interface VNetInfoDTO
 {
@@ -44,7 +45,7 @@ interface VNetInfoDTO
 @APIController(`resourceProviders/{resourceGroupName}/${c_networkServicesResourceProviderName}/${c_virtualNetworkResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
-    constructor(resourcesManager: ResourcesManager, private vnetManager: VNetManager)
+    constructor(resourcesManager: ResourcesManager, private vnetManager: VNetManager, private resourceQueryService: ResourceQueryService)
     {
         super(resourcesManager, c_networkServicesResourceProviderName, c_virtualNetworkResourceTypeName);
     }
@@ -137,5 +138,14 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         await this.vnetManager.SetFirewallRule(resourceReference, direction, rule);
+    }
+
+    @Get("resources")
+    public async RequestUsingResources(
+        @Common resourceReference: ResourceReference,
+    )
+    {
+        const resourceIds = await this.vnetManager.QueryDependentResources(resourceReference);
+        return this.resourceQueryService.QueryOverviewData(resourceIds.Values());
     }
 }

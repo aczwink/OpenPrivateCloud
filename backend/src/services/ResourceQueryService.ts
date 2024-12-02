@@ -29,6 +29,7 @@ import { ResourceHealthManager } from "./ResourceHealthManager";
 import { ResourceReference } from "../common/ResourceReference";
 import { HealthStatus } from "../data-access/HealthController";
 import { ResourceProviderManager } from "./ResourceProviderManager";
+import { HostsController } from "../data-access/HostsController";
 
 interface ResourceOverviewDataDTO
 {
@@ -45,11 +46,22 @@ interface ResourceOverviewDataDTO
 export class ResourceQueryService
 {
     constructor(private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private resourceHealthManager: ResourceHealthManager, private permissionsManager: PermissionsManager, 
-        private resourceGroupsController: ResourceGroupsController, private permissionsController: PermissionsController, private resourceProviderManager: ResourceProviderManager)
+        private resourceGroupsController: ResourceGroupsController, private permissionsController: PermissionsController, private resourceProviderManager: ResourceProviderManager,
+        private hostsController: HostsController)
     {
     }
     
     //Public methods
+    public async QueryHostResourceIds(hostName: string)
+    {
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return undefined;
+
+        const resourceIds = await this.resourcesController.QueryResourceIdsAssociatedWithHost(hostId);
+        return resourceIds;
+    }
+
     public async QueryResourceIds(userId: number)
     {
         const cluster = await this.permissionsManager.HasUserClusterWidePermission(userId, permissions.read);

@@ -310,7 +310,7 @@ ${taData}
     {
         if(event.type === "keyVault/certificateRevoked")
         {
-            const resourceIds = await this.resourceDependenciesController.QueryResourcesThatDependOn(resourceProviders.networkServices.name, resourceProviders.networkServices.openVPNGatewayResourceType.name, event.keyVaultResourceId);
+            const resourceIds = await this.resourceDependenciesController.QuerySpecificResourcesThatDependOn(resourceProviders.networkServices.name, resourceProviders.networkServices.openVPNGatewayResourceType.name, event.keyVaultResourceId);
             for (const resourceId of resourceIds)
             {
                 const ref = await this.resourcesManager.CreateResourceReference(resourceId);

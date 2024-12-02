@@ -67,7 +67,7 @@ export class HostAvailabilityManager
             available[hostId] = await this.CheckHostAvailability(hostId);
         for (const hostId of hostIds)
         {
-            const resourceIds = await this.instancesController.QueryInstanceIdsAssociatedWithHost(hostId);
+            const resourceIds = await this.instancesController.QueryResourceIdsAssociatedWithHost(hostId);
             if(available[hostId])
             {
                 for (const resourceId of resourceIds)
