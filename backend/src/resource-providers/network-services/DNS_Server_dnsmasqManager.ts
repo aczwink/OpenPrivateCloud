@@ -23,15 +23,25 @@ import { HostNetworkInterfaceCardsManager } from "../../services/HostNetworkInte
 import { DNS_ServerSettings, DNS_Zone } from "./models_dns";
 import { dnsmasqManager } from "./dnsmasqManager";
 import { HealthStatus } from "../../data-access/HealthController";
+import { ResourcesManager } from "../../services/ResourcesManager";
 
 @Injectable
 export class DNS_Server_dnsmasqManager
 {
-    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private dnsmasqManager: dnsmasqManager)
+    constructor(private remoteFileSystemManager: RemoteFileSystemManager, private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private dnsmasqManager: dnsmasqManager,
+        private resourcesManager: ResourcesManager
+    )
     {
     }
 
     //Public methods
+    public async CorrectFileOwnership(resourceReference: LightweightResourceReference, configDir: string)
+    {
+        const allPaths = [configDir, this.BuildHostsPath(configDir), this.dnsmasqManager.BuildConfigFilePath(configDir)];
+        for (const path of allPaths)
+            await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path, recursive: false }]);
+    }
+
     public async QueryHealthStatus(resourceReference: LightweightResourceReference): Promise<HealthStatus>
     {
         const running = await this.dnsmasqManager.IsServiceRunning(resourceReference);
@@ -48,7 +58,7 @@ export class DNS_Server_dnsmasqManager
     public async WriteConfigFile(resourceReference: LightweightResourceReference, serverSettings: DNS_ServerSettings, zones: DNS_Zone[], configDir: string)
     {
         const nic = await this.hostNetworkInterfaceCardsManager.FindExternalNetworkInterface(resourceReference.hostId);
-        const hostsPath = path.join(configDir, "hosts");
+        const hostsPath = this.BuildHostsPath(configDir);
 
         const domains = zones.map(x => "domain=" + x.name + "\nlocal=/" + x.name + "/").join("\n");
         const forwarders = serverSettings.forwarders.map(x => "server=" + x).join("\n");
@@ -75,6 +85,11 @@ ${forwarders}
     }
 
     //Private methods
+    private BuildHostsPath(configDir: string)
+    {
+        return path.join(configDir, "hosts");
+    }
+
     private GenerateHostsConfig(zones: DNS_Zone[])
     {
         const lines = [];

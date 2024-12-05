@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -37,6 +37,11 @@ export class dnsmasqManager
     }
 
     //Public methods
+    public BuildConfigFilePath(configDirPath: string)
+    {
+        return path.join(configDirPath, "dnsmasq.conf");
+    }
+
     public async DeleteService(resourceReference: LightweightResourceReference)
     {
         const serviceName = this.DeriveServiceName(resourceReference);
@@ -56,7 +61,7 @@ export class dnsmasqManager
 
     public async UpdateService(resourceReference: LightweightResourceReference, config: dnsmasqConfig)
     {
-        const configFilePath = path.join(config.configDirPath, "dnsmasq.conf");
+        const configFilePath = this.BuildConfigFilePath(config.configDirPath);
         const pidPath = path.join(config.configDirPath, "dnsmasq.pid");
 
         const configFileContent = `

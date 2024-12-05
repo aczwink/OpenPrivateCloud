@@ -18,7 +18,7 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { DNS_ServerProperties } from "./properties";
-import { DeploymentContext } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType } from "../ResourceProvider";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { ResourcesManager } from "../../services/ResourcesManager";
@@ -27,6 +27,7 @@ import { EqualsAny } from "acts-util-core";
 import { BindContainerManager } from "./BindContainerManager";
 import { DNS_Record, DNS_ServerSettings, DNS_Zone } from "./models_dns";
 import { DNS_Server_dnsmasqManager } from "./DNS_Server_dnsmasqManager";
+import { HealthStatus } from "../../data-access/HealthController";
 
 interface DNS_ServerConfig
 {
@@ -86,6 +87,36 @@ export class DNS_ServerManager
         this.UpdateServerState(resourceReference);
 
         return true;
+    }
+
+    public async CheckResourceHealth(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
+    {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
+            }
+            break;
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    await this.CorrectFileOwnership(resourceReference);
+                }
+            }
+            break;
+        }
+
+        return HealthStatus.Up;
     }
 
     public async DeleteResource(resourceReference: LightweightResourceReference)
@@ -221,6 +252,20 @@ export class DNS_ServerManager
             bindConfigDir: path.join(resourceDir, "bind9config"),
             dnsmasqConfigDir: path.join(resourceDir, "dnsmasqconfig")
         };
+    }
+
+    private async CorrectFileOwnership(resourceReference: LightweightResourceReference)
+    {
+        const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const paths = this.BuildPaths(resourceReference);
+
+        const allPaths = [rootPath, paths.bindConfigDir];
+        for (const path of allPaths)
+            await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path, recursive: false }]);
+
+        const config = await this.ReadConfig(resourceReference.id);
+        if(config.serverSettings.backend === "dnsmasq")
+            await this.dnsmasqManager.CorrectFileOwnership(resourceReference, paths.dnsmasqConfigDir);
     }
 
     private async ReadConfig(resourceId: number): Promise<DNS_ServerConfig>

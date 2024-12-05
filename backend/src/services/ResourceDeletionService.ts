@@ -26,13 +26,14 @@ import { ResourceConfigController } from "../data-access/ResourceConfigControlle
 import { HealthController } from "../data-access/HealthController";
 import { ResourceLogsController } from "../data-access/ResourceLogsController";
 import { ResourcesController } from "../data-access/ResourcesController";
+import { ResourceUserCredentialDependenciesController } from "../data-access/ResourceUserCredentialDependenciesController";
 
 @Injectable
 export class ResourceDeletionService
 {
     constructor(private resourceProviderManager: ResourceProviderManager, private resourceDependenciesController: ResourceDependenciesController, private roleAssignmentsController: RoleAssignmentsController,
         private permissionsManager: PermissionsManager, private instanceConfigController: ResourceConfigController, private healthController: HealthController, private instanceLogsController: ResourceLogsController,
-        private resourcesController: ResourcesController)
+        private resourcesController: ResourcesController, private resourceUserCredentialDependenciesController: ResourceUserCredentialDependenciesController)
     {
     }
 
@@ -42,6 +43,7 @@ export class ResourceDeletionService
         const resourceId = resourceReference.id;
 
         await this.resourceDependenciesController.DeleteDependenciesOf(resourceId);
+        await this.resourceUserCredentialDependenciesController.CleanForResource(resourceId);
 
         //first everything that the user is also able to do himself
         const roleAssignments = await this.roleAssignmentsController.QueryResourceLevelRoleAssignments(resourceReference.id);

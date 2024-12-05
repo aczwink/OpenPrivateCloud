@@ -69,7 +69,7 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
         switch(resourceReference.resourceTypeName)
         {
             case resourceProviders.networkServices.dnsServerResourceType.name:
-                return await this.dnsServerManager.QueryHealthStatus(resourceReference);
+                return await this.dnsServerManager.CheckResourceHealth(resourceReference, type);
             case resourceProviders.networkServices.openVPNGatewayResourceType.name:
                 return await this.openVPNGatwayManager.CheckResource(resourceReference, type);
             case resourceProviders.networkServices.virtualNetworkResourceType.name:
