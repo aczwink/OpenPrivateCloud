@@ -178,6 +178,24 @@ export class ContainerAppServiceManager
         throw new Error(state);
     }
 
+    public async RehostResource(resourceReference: LightweightResourceReference, targetProperties: DockerContainerProperties, context: DeploymentContext)
+    {
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(targetProperties.vnetResourceId);
+
+        await this.ExecuteAction(resourceReference, "shutdown");
+
+        const srcPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const targetPath = this.resourcesManager.BuildResourceStoragePath(context.resourceReference);
+
+        await this.remoteFileSystemManager.Replicate(resourceReference.hostId, srcPath, context.hostId, targetPath);
+
+        const config = await this.QueryContainerConfig(resourceReference.id);
+        config.vnetResourceId = vnetRef!.id;
+        await this.UpdateContainerConfig(resourceReference.id, config);
+
+        await this.DeleteResource(resourceReference);
+    }
+
     public async UpdateContainerConfig(resourceId: number, config: ContainerAppServiceConfig)
     {
         await this.resourceConfigController.UpdateOrInsertConfig(resourceId, config);

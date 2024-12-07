@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@
  * */
 
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
-import { APIController, Body, BodyProp, Common, Delete, Get, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_apiGatewayResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
@@ -56,7 +56,9 @@ class _api_ extends ResourceAPIControllerBase
         @Body api: API_EntryConfig
     )
     {
-        await this.apiGatewayManager.DeleteAPI(resourceReference, api);
+        const result = await this.apiGatewayManager.DeleteAPI(resourceReference, api);
+        if(!result)
+            return NotFound("API not found");
     }
 
     @Get("apis")

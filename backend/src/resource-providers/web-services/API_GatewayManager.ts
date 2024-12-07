@@ -85,12 +85,16 @@ export class API_GatewayManager
     {
         const config = await this.ReadConfig(resourceReference.id);
 
-        const idx = config.apiEntries.findIndex(x => EqualsAny(x, api2delete));
+        const idx = config.apiEntries.findIndex(x => x.frontendDomainName === api2delete.frontendDomainName);
+        if(idx === -1)
+            return false;
         config.apiEntries.Remove(idx);
         
         await this.UpdateConfig(resourceReference.id, config);
 
         this.UpdateGateway(resourceReference);
+
+        return true;
     }
 
     public async DeleteResource(resourceReference: LightweightResourceReference)

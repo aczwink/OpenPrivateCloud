@@ -113,9 +113,16 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
         return ResourceState.Running;
     }
 
-    public RehostResource(resourceReference: ResourceReference, targetProperties: ComputeServicesProperties, context: DeploymentContext): Promise<void>
+    public async RehostResource(resourceReference: ResourceReference, targetProperties: ComputeServicesProperties, context: DeploymentContext): Promise<void>
     {
-        throw new Error("Method not implemented.");
+        switch(targetProperties.type)
+        {
+            case "docker-container":
+                await this.dockerContainerManager.RehostResource(resourceReference, targetProperties, context);
+                break;
+            default:
+                throw new Error("Method not implemented.");
+        }
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

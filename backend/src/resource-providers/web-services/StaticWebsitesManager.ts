@@ -201,7 +201,7 @@ server {
         const vNetResourceReference = await this.resourcesManager.CreateResourceReferenceFromExternalId(vNetExternalId);
         if(vNetResourceReference === undefined)
             throw new Error("VNet does not exist");
-        await this.resourceDependenciesController.EnsureResourceDependencyExists(vNetResourceReference.id, resourceReference.id);
+        await this.resourceDependenciesController.SetResourceDependencies(resourceReference.id, [vNetResourceReference.id]);
 
         const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetResourceReference);
 
