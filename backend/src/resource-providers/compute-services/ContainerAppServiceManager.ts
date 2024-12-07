@@ -18,7 +18,7 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
-import { DeploymentContext, ResourceDeletionError, ResourceState } from "../ResourceProvider";
+import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceDeletionError, ResourceState } from "../ResourceProvider";
 import { DockerContainerConfig, DockerContainerConfigVolume, DockerContainerInfo, DockerEnvironmentVariableMapping, DockerManager } from "./DockerManager";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { ResourcesManager } from "../../services/ResourcesManager";
@@ -28,6 +28,7 @@ import { ResourceDependenciesController } from "../../data-access/ResourceDepend
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { FileStoragesManager } from "../file-services/FileStoragesManager";
+import { HealthStatus } from "../../data-access/HealthController";
 
 interface Certificate
 {
@@ -78,6 +79,36 @@ export class ContainerAppServiceManager
     }
 
     //Public methods
+    public async CheckResource(resourceReference: LightweightResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
+    {
+        switch(type)
+        {
+            case ResourceCheckType.Availability:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    return {
+                        status: HealthStatus.Corrupt,
+                        context: "incorrect file ownership"
+                    };
+                }
+            }
+            case ResourceCheckType.ServiceHealth:
+            {
+                const fp = await this.resourcesManager.IsResourceStoragePathOwnershipCorrect(resourceReference);
+                if(!fp)
+                {
+                    const rootPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+                    await this.resourcesManager.CorrectResourceStoragePathOwnership(resourceReference, [{ path: rootPath, recursive: true }]);
+                }
+            }
+            break;
+        }
+
+        return HealthStatus.Up;
+    }
+    
     public async DeleteResource(resourceReference: LightweightResourceReference): Promise<ResourceDeletionError | null>
     {
         const containerName = this.DeriveContainerName(resourceReference);

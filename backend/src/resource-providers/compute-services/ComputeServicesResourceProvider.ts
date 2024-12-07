@@ -61,6 +61,11 @@ export class ComputeServicesResourceProvider implements ResourceProvider<Compute
     //Public methods
     public async CheckResource(resourceReference: ResourceReference, type: ResourceCheckType): Promise<HealthStatus | ResourceCheckResult>
     {
+        switch(resourceReference.resourceTypeName)
+        {
+            case resourceProviders.computeServices.dockerContainerResourceType.name:
+                return await this.dockerContainerManager.CheckResource(resourceReference, type);
+        }
         return HealthStatus.Up;
     }
     
