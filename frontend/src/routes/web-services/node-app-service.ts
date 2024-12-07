@@ -23,7 +23,6 @@ import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "
 import { Use } from "acfrontend";
 import { APIService } from "../../services/APIService";
 import { OpenAPISchema } from "../../api-info";
-import { UploadNodeAppServieContentComponent } from "../../components/node-app-service/UploadNodeAppServieContentComponent";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -93,6 +92,27 @@ const configViewModel: RouteSetup<ResourceAndGroupId, NodeAppServiceConfigDTO> =
     routingKey: "config",
 };
 
+const contentRouteSetup: RouteSetup<ResourceAndGroupId, { file: File }> = {
+    content: {
+        type: "create",
+        call: (ids, data) => Use(APIService).resourceProviders._any_.webservices.nodeappservice._any_.post(ids.resourceGroupName, ids.resourceName, { file: data.file }),
+        schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+                file: {
+                    type: "string",
+                    format: "binary"
+                },
+            },
+            required: ["file"],
+        }
+    },
+    displayText: "Content",
+    icon: "archive",
+    routingKey: "content",
+};
+
 export const nodeAppServiceViewodel: RouteSetup<ResourceAndGroupId> = {
     content: {
         type: "multiPage",
@@ -106,15 +126,7 @@ export const nodeAppServiceViewodel: RouteSetup<ResourceAndGroupId> = {
                     overviewViewModel,
                     statusViewModel,
                     configViewModel,
-                    {
-                        content: {
-                            type: "component",
-                            component: UploadNodeAppServieContentComponent
-                        },
-                        displayText: "Content",
-                        icon: "archive",
-                        routingKey: "content",
-                    }
+                    contentRouteSetup,
                 ]
             },
             BuildResourceGeneralPageGroupEntry(BuildResourceId)

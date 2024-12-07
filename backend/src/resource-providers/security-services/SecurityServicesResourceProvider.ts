@@ -118,6 +118,11 @@ export class SecurityServicesResourceProvider implements ResourceProvider<Securi
         return ResourceState.Running;
     }
 
+    public RehostResource(resourceReference: ResourceReference, targetProperties: SecurityServicesProperties, context: DeploymentContext): Promise<void>
+    {
+        throw new Error("Method not implemented.");
+    }
+
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
     {
         return null;

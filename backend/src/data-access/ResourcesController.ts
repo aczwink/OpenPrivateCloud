@@ -179,4 +179,10 @@ export class ResourcesController
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         await conn.UpdateRows("instances", { name }, "id = ?", id);
     }
+
+    public async UpdateResourceStorage(id: number, storageId: number)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.UpdateRows("instances", { storageId }, "id = ?", id);
+    }
 }

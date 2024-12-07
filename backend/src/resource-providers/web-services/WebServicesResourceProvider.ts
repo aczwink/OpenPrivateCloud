@@ -70,7 +70,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
             {
                 dataIntegrityCheckSchedule: null,
                 fileSystemType: "btrfs",
-                requiredModules: [],
+                requiredModules: ["node"],
                 schemaName: "NodeAppServiceProperties"
             },
             {
@@ -188,6 +188,21 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
                 return await this.nodeAppServiceManager.QueryResourceState(resourceReference);
         }
         return ResourceState.Running;
+    }
+
+    public async RehostResource(resourceReference: ResourceReference, targetProperties: WebServicesResourceProperties, context: DeploymentContext): Promise<void>
+    {
+        switch(targetProperties.type)
+        {
+            case "node-app-service":
+                await this.nodeAppServiceManager.RehostResource(resourceReference, targetProperties, context);
+                break;
+            case "static-website":
+                await this.staticWebsitesManager.RehostResource(resourceReference, targetProperties, context);
+                break;
+            default:
+                throw new Error("Method not implemented.");
+        }
     }
 
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>

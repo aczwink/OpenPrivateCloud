@@ -16,20 +16,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { IdBoundObjectAction, RouteSetup } from "acfrontendex";
-import { ResourceHealthDTO } from "../../../dist/api";
+import { IdBoundObjectAction, NamedSchemaRegistry, RouteSetup } from "acfrontendex";
+import { ResourceHealthDTO, ResourceState } from "../../../dist/api";
 import { APIService } from "../../services/APIService";
 import { Use } from "acfrontend";
-import { APISchemaOf, OpenAPISchema } from "../../api-info";
+import { APIMap, APISchemaOf, OpenAPISchema } from "../../api-info";
 import { BuildAccessControlViewModel } from "./accesscontrol";
 
 
 function BuildHealthViewModel(buildResourceId: (resourceGroupName: string, resourceName: string) => string)
 {
+    const schema = OpenAPISchema("AnyResourceProperties");
     const healthViewModel: RouteSetup<ResourceAndGroupId, ResourceHealthDTO> = {
         content: {
             type: "object",
-            actions: [],
+            actions: [
+                {
+                    type: "custom_edit",
+                    key: "rehost",
+                    title: "Rehost",
+                    icon: "send",
+                    loadContext: ids => {
+                        const request = Use(APIService).health.resource.get({ id: buildResourceId(ids.resourceGroupName, ids.resourceName) });
+                        return APIMap(request, x => ({ hostName: x.hostName }));
+                    },
+                    requestObject: async _ => ({ rawBody: null, statusCode: 200, data: Use(NamedSchemaRegistry).CreateDefault(schema)}),
+                    schema,
+                    updateResource: (ids, newData) => Use(APIService).resourceGroups._any_.resources.rehost.patch(ids.resourceGroupName, { resourceId: buildResourceId(ids.resourceGroupName, ids.resourceName), targetProperties: newData as any })
+                }
+            ],
             formTitle: _ => "Resource health",
             requestObject: ids => Use(APIService).health.resource.get({ id: buildResourceId(ids.resourceGroupName, ids.resourceName) }),
             schema: APISchemaOf(x => x.ResourceHealthDTO)

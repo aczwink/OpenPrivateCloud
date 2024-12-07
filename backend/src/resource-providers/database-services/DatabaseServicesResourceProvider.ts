@@ -100,6 +100,11 @@ export class DatabaseServicesResourceProvider implements ResourceProvider<Mariad
         return ResourceState.Running;
     }
 
+    public RehostResource(resourceReference: ResourceReference, targetProperties: MariadbProperties, context: DeploymentContext): Promise<void>
+    {
+        throw new Error("Method not implemented.");
+    }
+
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
     {
         return null;

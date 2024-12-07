@@ -187,6 +187,26 @@ export class RemoteFileSystemManager
         await this.RemoveDirectory(hostId, dirPath);
     }
 
+    public async Replicate(srcHostId: number, srcPath: string, targetHostId: number, targetPath: string)
+    {
+        const status = await this.QueryStatus(srcHostId, srcPath);
+        if(status.isDirectory())
+        {
+            await this.CreateDirectory(targetHostId, targetPath);
+
+            const children = await this.ListDirectoryContents(srcHostId, srcPath);
+            for (const child of children)
+                await this.Replicate(srcHostId, path.join(srcPath, child), targetHostId, path.join(targetPath, child));
+        }
+        else
+        {
+            const data = await this.ReadFile(srcHostId, srcPath);
+            await this.WriteFile(targetHostId, targetPath, data);
+        }
+
+        await this.ChangeMode(targetHostId, targetPath, status.mode);
+    }
+
     public async StreamFile(hostId: number, filePath: string)
     {
         const conn = await this.remoteConnectionsManager.AcquireConnection(hostId);

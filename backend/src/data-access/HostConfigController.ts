@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,12 @@ export class HostConfigController
     }
 
     //Public methods
+    public async DeleteConfig(hostId: number)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.DeleteRows("hosts_configuration", "hostId = ?", hostId);
+    }
+
     public async QueryConfig<ConfigType>(hostId: number, configKey: string)
     {
         const query = `

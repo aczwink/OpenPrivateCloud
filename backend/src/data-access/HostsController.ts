@@ -55,10 +55,10 @@ export class HostsController
         await conn.InsertRow("hosts_storages", { hostId, path: props.path, fileSystemType });
     }
 
-    public async DeleteHost(hostName: string)
+    public async DeleteHost(hostId: number)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("hosts", "hostName = ?", hostName);
+        await conn.DeleteRows("hosts", "id = ?", hostId);
     }
 
     public async QueryHost(id: number)

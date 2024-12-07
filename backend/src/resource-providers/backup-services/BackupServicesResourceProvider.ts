@@ -93,6 +93,11 @@ export class BackupServicesResourceProvider implements ResourceProvider<BackupVa
         return this.backupVaultManager.QueryResourceState(resourceReference);
     }
 
+    public RehostResource(resourceReference: ResourceReference, targetProperties: BackupVaultProperties, context: DeploymentContext): Promise<void>
+    {
+        throw new Error("Method not implemented.");
+    }
+
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
     {
         return null;

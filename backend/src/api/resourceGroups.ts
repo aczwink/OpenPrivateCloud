@@ -29,6 +29,7 @@ import { ResourceGroupsManager } from "../services/ResourceGroupsManager";
 import { ResourceQueryService } from "../services/ResourceQueryService";
 import { PermissionsManager } from "../services/PermissionsManager";
 import { ResourceDeletionService } from "../services/ResourceDeletionService";
+import { ResourceRehostingService } from "../services/ResourceRehostingService";
 
 interface ResourceGroupDTO
 {
@@ -136,7 +137,7 @@ class _api3_
 {
     constructor(private resourceGroupsController: ResourceGroupsController, private hostsController: HostsController, private sessionsManager: SessionsManager,
         private permissionsController: PermissionsController, private resourcesManager: ResourcesManager, private resourceDeploymentService: ResourceDeploymentService,
-        private resourceQueryService: ResourceQueryService, private resourceDeletionService: ResourceDeletionService)
+        private resourceQueryService: ResourceQueryService, private resourceDeletionService: ResourceDeletionService, private resourceRehostingService: ResourceRehostingService)
     {
     }
 
@@ -230,6 +231,24 @@ class _api3_
     {
         const resourceIds = await this.permissionsController.QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(common.userId, common.resourceGroup.id);
         return this.resourceQueryService.QueryOverviewData(resourceIds);
+    }
+
+    @Patch("rehost")
+    public async RehostResource(
+        @Common common: ResourceGroupWithSession,
+        @BodyProp resourceId: string,
+        @BodyProp targetProperties: AnyResourceProperties
+    )
+    {
+        const ref = await this.resourcesManager.CreateResourceReferenceFromExternalId(resourceId);
+        if(ref === undefined)
+            return NotFound("resource not found");
+
+        const hostId = await this.hostsController.RequestHostId(targetProperties.hostName);
+        if(hostId === undefined)
+            return NotFound("target host not found");
+
+        await this.resourceRehostingService.RehostResource(ref, targetProperties, hostId, common.userId);
     }
 }
 

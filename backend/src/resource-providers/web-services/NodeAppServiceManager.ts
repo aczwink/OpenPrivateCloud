@@ -18,7 +18,6 @@
 import path from "path";
 import { Injectable } from "acts-util-node";
 import { ResourcesManager } from "../../services/ResourcesManager";
-import { ModulesManager } from "../../services/ModulesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
 import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { NodeAppServiceProperties } from "./Properties";
@@ -60,7 +59,7 @@ export interface NodeAppServiceConfig
 @Injectable
 export class NodeAppServiceManager
 {
-    constructor(private resourcesManager: ResourcesManager, private modulesManager: ModulesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceDependenciesController: ResourceDependenciesController,
+    constructor(private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager, private resourceDependenciesController: ResourceDependenciesController,
         private systemServicesManager: SystemServicesManager, private resourceConfigController: ResourceConfigController, private keyVaultManager: KeyVaultManager)
     {
     }
@@ -142,8 +141,6 @@ export class NodeAppServiceManager
 
     public async ProvideResource(instanceProperties: NodeAppServiceProperties, context: DeploymentContext)
     {
-        await this.modulesManager.EnsureModuleIsInstalled(context.hostId, "node");
-
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
         await this.UpdateService(context.resourceReference, {});
     }
@@ -173,6 +170,19 @@ export class NodeAppServiceManager
     {
         const serviceName = this.DeriveSystemUnitName(resourceReference);
         return await this.systemServicesManager.QueryStatus(resourceReference.hostId, serviceName);
+    }
+
+    public async RehostResource(resourceReference: LightweightResourceReference, targetProperties: NodeAppServiceProperties, context: DeploymentContext)
+    {
+        const srcPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const targetPath = this.resourcesManager.BuildResourceStoragePath(context.resourceReference);
+
+        await this.remoteFileSystemManager.Replicate(resourceReference.hostId, srcPath, context.hostId, targetPath);
+
+        const config = await this.QueryConfig(resourceReference);
+        await this.UpdateConfig(context.resourceReference, config);
+
+        await this.DeleteResource(resourceReference);
     }
 
     public async UpdateConfig(resourceReference: LightweightResourceReference, config: NodeAppServiceConfig)

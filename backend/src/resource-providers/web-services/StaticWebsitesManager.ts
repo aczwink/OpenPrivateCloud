@@ -84,6 +84,7 @@ export class StaticWebsitesManager
     
     public async DeleteResource(resourceReference: LightweightResourceReference)
     {
+        await this.managedDockerContainerManager.DestroyContainer(resourceReference);
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
@@ -92,16 +93,11 @@ export class StaticWebsitesManager
         return this.managedDockerContainerManager.ExtractContainerInfo(resourceReference);
     }
 
-    public async ProvideResource(instanceProperties: StaticWebsiteProperties, context: DeploymentContext)
+    public async ProvideResource(resourceProperties: StaticWebsiteProperties, context: DeploymentContext)
     {
-        const vNetResourceReference = await this.resourcesManager.CreateResourceReferenceFromExternalId(instanceProperties.vNetExternalId);
-        if(vNetResourceReference === undefined)
-            throw new Error("VNet does not exist");
-        await this.resourceDependenciesController.EnsureResourceDependencyExists(vNetResourceReference.id, context.resourceReference.id);
-
         await this.WriteConfig(context.resourceReference.id, {
             indexFileNames: "index.html",
-            port: instanceProperties.port,
+            port: resourceProperties.port,
         });
 
         await this.resourcesManager.CreateResourceStorageDirectory(context.resourceReference);
@@ -112,40 +108,25 @@ export class StaticWebsitesManager
 
         await this.Write_nginxConfig(context.resourceReference);
 
-        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetResourceReference);
-
-        await this.managedDockerContainerManager.EnsureContainerIsRunning(context.resourceReference, {
-            additionalHosts: [],
-            capabilities: [],
-            dnsSearchDomains: [],
-            dnsServers: [dockerNetwork.primaryDNS_Server],
-            env: [],
-            imageName: "nginx:latest",
-            macAddress: this.managedDockerContainerManager.CreateMAC_Address(context.resourceReference.id),
-            networkName: dockerNetwork.name,
-            portMap: [],
-            privileged: false,
-            removeOnExit: false,
-            restartPolicy: "always",
-            volumes: [
-                {
-                    containerPath: "/etc/nginx/conf.d",
-                    hostPath: configPath,
-                    readOnly: true
-                },
-                {
-                    containerPath: "/usr/share/nginx/html",
-                    hostPath: contentPath,
-                    readOnly: true
-                }
-            ],
-        });
+        await this.UpdateService(context.resourceReference, resourceProperties.vNetExternalId);
     }
 
     public async QueryConfig(resourceId: number)
     {
         const config = await this.resourceConfigController.QueryConfig<StaticWebsiteConfig>(resourceId);
         return config!;
+    }
+
+    public async RehostResource(resourceReference: LightweightResourceReference, targetProperties: StaticWebsiteProperties, context: DeploymentContext)
+    {
+        const srcPath = this.resourcesManager.BuildResourceStoragePath(resourceReference);
+        const targetPath = this.resourcesManager.BuildResourceStoragePath(context.resourceReference);
+
+        await this.remoteFileSystemManager.Replicate(resourceReference.hostId, srcPath, context.hostId, targetPath);
+
+        await this.UpdateService(context.resourceReference, targetProperties.vNetExternalId);
+
+        await this.DeleteResource(resourceReference);
     }
 
     public async UpdateConfig(resourceReference: LightweightResourceReference, config: StaticWebsiteConfig)
@@ -213,6 +194,43 @@ server {
     {
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
         return path.join(resourceDir, "config");
+    }
+
+    private async UpdateService(resourceReference: LightweightResourceReference, vNetExternalId: string)
+    {
+        const vNetResourceReference = await this.resourcesManager.CreateResourceReferenceFromExternalId(vNetExternalId);
+        if(vNetResourceReference === undefined)
+            throw new Error("VNet does not exist");
+        await this.resourceDependenciesController.EnsureResourceDependencyExists(vNetResourceReference.id, resourceReference.id);
+
+        const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetResourceReference);
+
+        await this.managedDockerContainerManager.EnsureContainerIsRunning(resourceReference, {
+            additionalHosts: [],
+            capabilities: [],
+            dnsSearchDomains: [],
+            dnsServers: [dockerNetwork.primaryDNS_Server],
+            env: [],
+            imageName: "nginx:latest",
+            macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
+            networkName: dockerNetwork.name,
+            portMap: [],
+            privileged: false,
+            removeOnExit: false,
+            restartPolicy: "always",
+            volumes: [
+                {
+                    containerPath: "/etc/nginx/conf.d",
+                    hostPath: this.GetConfigPath(resourceReference),
+                    readOnly: true
+                },
+                {
+                    containerPath: "/usr/share/nginx/html",
+                    hostPath: this.GetContentPath(resourceReference),
+                    readOnly: true
+                }
+            ],
+        });
     }
 
     private async WriteConfig(resourceId: number, config: StaticWebsiteConfig)

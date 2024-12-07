@@ -101,5 +101,6 @@ export interface ResourceProvider<PropertiesType extends BaseResourceProperties>
     ResourcePermissionsChanged(resourceReference: ResourceReference): Promise<void>;
     ProvideResource(instanceProperties: PropertiesType, context: DeploymentContext): Promise<DeploymentResult>;
     QueryResourceState(resourceReference: ResourceReference): Promise<ResourceState>;
+    RehostResource(resourceReference: ResourceReference, targetProperties: PropertiesType, context: DeploymentContext): Promise<void>;
     RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>;
 }

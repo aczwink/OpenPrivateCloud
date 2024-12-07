@@ -133,6 +133,11 @@ export class NetworkServicesResourceProvider implements ResourceProvider<Network
         return ResourceState.Running;
     }
 
+    public RehostResource(resourceReference: ResourceReference, targetProperties: NetworkServicesProperties, context: DeploymentContext): Promise<void>
+    {
+        throw new Error("Method not implemented.");
+    }
+
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
     {
         switch(resourceReference.resourceTypeName)

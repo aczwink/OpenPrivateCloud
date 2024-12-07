@@ -128,6 +128,11 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
         return ResourceState.Running;
     }
 
+    public RehostResource(resourceReference: ResourceReference, targetProperties: FileServicesProperties, context: DeploymentContext): Promise<void>
+    {
+        throw new Error("Method not implemented.");
+    }
+
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
     {
         return null;

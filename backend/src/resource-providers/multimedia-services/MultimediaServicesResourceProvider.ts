@@ -131,6 +131,11 @@ export class MultimediaServicesResourceProvider implements ResourceProvider<AVTr
         return ResourceState.Running;
     }
 
+    public RehostResource(resourceReference: ResourceReference, targetProperties: AVTranscoderProperties, context: DeploymentContext): Promise<void>
+    {
+        throw new Error("Method not implemented.");
+    }
+
     public async RequestDataProvider(resourceReference: ResourceReference): Promise<DataSourcesProvider | null>
     {
         return null;

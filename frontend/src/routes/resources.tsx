@@ -35,8 +35,8 @@ import { apiGatewayViewModel } from "./web-services/api-gateway";
 import { jdownloaderViewModel } from "./web-services/jdownloader";
 import { letsEncryptViewModel } from "./web-services/letsencrypt-cert";
 import { nextcloudViewModel } from "./web-services/nextcloud";
-import { nodeAppServiceViewodel } from "./web-services/nodeAppService";
-import { staticWebsiteViewModel } from "./web-services/staticWebsite";
+import { nodeAppServiceViewodel } from "./web-services/node-app-service";
+import { staticWebsiteViewModel } from "./web-services/static-website";
 import { ClusterLockedGuard } from "../ClusterLockedGuard";
 import { JSX_CreateElement } from "acfrontend";
 

@@ -33,6 +33,8 @@ import { NetworkTraceSimulator } from "../services/NetworkTraceSimulator";
 import { IPv4 } from "../common/IPv4";
 import { DateTime } from "acts-util-node";
 import { CIDRRange } from "../common/CIDRRange";
+import { ClusterKeyStoreController } from "../data-access/ClusterKeyStoreController";
+import { HostConfigController } from "../data-access/HostConfigController";
 
 interface AddHostDTO
 {
@@ -128,7 +130,8 @@ class HostAPIController
 {
     constructor(private hostsController: HostsController, private remoteCommandExecutor: RemoteCommandExecutor, private hostPerformanceMeasurementService: HostPerformanceMeasurementService,
         private hostNetworkInterfaceCardsManager: HostNetworkInterfaceCardsManager, private hostFirewallZonesManager: HostFirewallZonesManager, private healthController: HealthController,
-        private processTrackerManager: ProcessTrackerManager, private hostTakeOverService: HostTakeOverService)
+        private processTrackerManager: ProcessTrackerManager, private hostTakeOverService: HostTakeOverService, private clusterKeyStoreController: ClusterKeyStoreController,
+        private hostConfigController: HostConfigController)
     {
     }
 
@@ -137,7 +140,13 @@ class HostAPIController
         @Path hostName: string
     )
     {
-        await this.hostsController.DeleteHost(hostName);
+        const hostId = await this.hostsController.RequestHostId(hostName);
+        if(hostId === undefined)
+            return NotFound("host does not exist");
+
+        await this.clusterKeyStoreController.DeleteHostSecretValues(hostId);
+        await this.hostConfigController.DeleteConfig(hostId);
+        await this.hostsController.DeleteHost(hostId);
     }
 
     @Get()
