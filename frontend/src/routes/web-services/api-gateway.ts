@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { resourceProviders } from "openprivatecloud-common";
-import { API_EntryConfig, API_GatewaySettings, ContainerInfo, DockerContainerLogDto } from "../../../dist/api";
+import { API_EntryConfig, API_GatewaySettingsDTO, ContainerInfo, DockerContainerLogDto } from "../../../dist/api";
 import { APIResponseHandler, RouteSetup } from "acfrontendex";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../resources-shared/resource-general";
 import { Use } from "acfrontend";
@@ -79,7 +79,7 @@ const apisViewModel: RouteSetup<ResourceAndGroupId, API_EntryConfig> = {
     routingKey: "apis"
 };
 
-const settingsViewModel: RouteSetup<ResourceAndGroupId, API_GatewaySettings> = {
+const settingsViewModel: RouteSetup<ResourceAndGroupId, API_GatewaySettingsDTO> = {
     content: {
         type: "object",
         actions: [
@@ -99,13 +99,13 @@ const settingsViewModel: RouteSetup<ResourceAndGroupId, API_GatewaySettings> = {
                     };
                 },
                 requestObject: ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.settings.get(ids.resourceGroupName, ids.resourceName),
-                schema: OpenAPISchema("API_GatewaySettings"),
+                schema: OpenAPISchema("API_GatewaySettingsDTO"),
                 updateResource: (ids, settings) => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.settings.put(ids.resourceGroupName, ids.resourceName, settings),
             }
         ],
         formTitle: _ => "Settings",
         requestObject: ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.settings.get(ids.resourceGroupName, ids.resourceName),
-        schema: OpenAPISchema("API_GatewaySettings"),
+        schema: OpenAPISchema("API_GatewaySettingsDTO"),
     },
     displayText: "Server settings",
     icon: "sliders",

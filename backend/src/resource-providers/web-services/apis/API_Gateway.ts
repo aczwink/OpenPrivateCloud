@@ -21,13 +21,38 @@ import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Pos
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_apiGatewayResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { API_EntryConfig, API_GatewayManager, API_GatewaySettings } from "../API_GatewayManager";
+import { API_EntryConfig, API_GatewayManager } from "../API_GatewayManager";
 import { DockerContainerLogDto } from "../../compute-services/api/docker-container-app-service";
+import { KeyVaultManager } from "../../security-services/KeyVaultManager";
+import { Of } from "acts-util-core";
+
+interface API_GatewaySettingsDTO
+{
+    /**
+     * Set to enforce https traffic
+     * @title Certificate
+     * @format key-vault-reference[certificate]
+     */
+    keyVaultCertificateReference?: string;
+
+    frontendPorts: number[];
+
+    /**
+     * @format byteSize
+     */
+    maxRequestBodySize: number;
+
+    /**
+     * @title Virtual network
+     * @format resource-same-host[network-services/virtual-network]
+     */
+    vnetResourceId: string;
+}
 
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_apiGatewayResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
-    constructor(resourcesManager: ResourcesManager, private apiGatewayManager: API_GatewayManager)
+    constructor(resourcesManager: ResourcesManager, private apiGatewayManager: API_GatewayManager, private keyVaultManager: KeyVaultManager)
     {
         super(resourcesManager, c_webServicesResourceProviderName, c_apiGatewayResourceTypeName);
     }
@@ -102,19 +127,43 @@ class _api_ extends ResourceAPIControllerBase
     }
 
     @Get("settings")
-    public QuerySettings(
+    public async QuerySettings(
         @Common resourceReference: ResourceReference,
     )
     {
-        return this.apiGatewayManager.QuerySettings(resourceReference);
+        const settings = await this.apiGatewayManager.QuerySettings(resourceReference);
+
+        const vnetRef = await this.resourcesManager.CreateResourceReference(settings.vnetResourceId);
+        const certRef = (settings.certificate === undefined) ? undefined : await this.keyVaultManager.CreateKeyVaultReference(settings.certificate.keyVaultId, "certificate", settings.certificate.certificateName);
+
+        return Of<API_GatewaySettingsDTO>({
+            frontendPorts: settings.frontendPorts,
+            maxRequestBodySize: settings.maxRequestBodySize,
+            vnetResourceId: vnetRef!.externalId,
+            keyVaultCertificateReference: certRef
+        });
     }
 
     @Put("settings")
-    public UpdateServerSettings(
+    public async UpdateServerSettings(
         @Common resourceReference: ResourceReference,
-        @Body settings: API_GatewaySettings
+        @Body settings: API_GatewaySettingsDTO
     )
     {
-        return this.apiGatewayManager.UpdateSettings(resourceReference, settings);
+        const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(settings.vnetResourceId);
+        if(vnetRef === undefined)
+            return NotFound("vnet not found");
+
+        const certRef = (settings.keyVaultCertificateReference === undefined) ? undefined : await this.keyVaultManager.ResolveKeyVaultReference(settings.keyVaultCertificateReference);
+
+        return this.apiGatewayManager.UpdateSettings(resourceReference, {
+            frontendPorts: settings.frontendPorts,
+            maxRequestBodySize: settings.maxRequestBodySize,
+            vnetResourceId: vnetRef.id,
+            certificate: (certRef === undefined) ? undefined : {
+                certificateName: certRef.objectName,
+                keyVaultId: certRef.kvRef.id
+            }
+        });
     }
 }
