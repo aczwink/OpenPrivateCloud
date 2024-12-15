@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,45 +23,44 @@ import { RemoteRootFileSystemManager } from "../../../services/RemoteRootFileSys
 import { CreateGPGEncryptionCommandOrPipe, DeleteSingleFileSnapshotsThatAreOlderThanRetentionPeriod, ReplaceSpecialCharacters } from "./Shared";
 import { TempFilesManager } from "../../../services/TempFilesManager";
 import { TargetFileSystemType } from "../BackupTargetMountService";
-import { LocalCommandExecutor } from "../../../services/LocalCommandExecutor";
 import { RemoteCommandExecutor } from "../../../services/RemoteCommandExecutor";
-import { DBConnectionsManager } from "../../../data-access/DBConnectionsManager";
+import { OIDPService } from "../../../services/OIDPService";
 
 @Injectable
-export class ControllerDatabaseServerBackupService
+export class OIDPBackupService
 {
-    constructor(private remoteRootFileSystemManager: RemoteRootFileSystemManager, private tempFilesManager: TempFilesManager, private localCommandExecutor: LocalCommandExecutor, 
-        private remoteCommandExecutor: RemoteCommandExecutor, private dbConnectionsManager: DBConnectionsManager)
+    constructor(private remoteRootFileSystemManager: RemoteRootFileSystemManager, private tempFilesManager: TempFilesManager, 
+        private remoteCommandExecutor: RemoteCommandExecutor, private oidpService: OIDPService)
     {
     }
 
     //Public methods
     public async BackupDatabase(hostId: number, backupTargetPath: string, targetFileSystemType: TargetFileSystemType, encryptionKeyKeyVaultReference: string | undefined, processTracker: ProcessTracker)
     {
-        const targetResourcePath = path.join(backupTargetPath, "opc-controller-database");
+        const targetResourcePath = path.join(backupTargetPath, "oidp-database");
         await this.remoteRootFileSystemManager.CreateDirectory(hostId, targetResourcePath);
 
         const snapshotFileName = new Date().toISOString() + ".sql.gz" + (encryptionKeyKeyVaultReference === undefined ? "" : ".gpg");
         const targetSnapshotFileName = ReplaceSpecialCharacters(snapshotFileName, targetFileSystemType);
         const targetPath = path.join(targetResourcePath, targetSnapshotFileName);
 
-        processTracker.Add("Backing up controller database");
+        processTracker.Add("Backing up OIDP database");
 
         await this.DoDatabaseExportAndStoreFile(hostId, encryptionKeyKeyVaultReference, targetPath);
     }
 
     public async DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId: number, backupTargetPath: string, retention: BackupVaultRetentionConfig, processTracker: ProcessTracker)
     {
-        const targetResourcePath = path.join(backupTargetPath, "opc-controller-database");
-        await DeleteSingleFileSnapshotsThatAreOlderThanRetentionPeriod(hostId, targetResourcePath, " opc controller database", retention, processTracker);
+        const targetResourcePath = path.join(backupTargetPath, "oidp-database");
+        await DeleteSingleFileSnapshotsThatAreOlderThanRetentionPeriod(hostId, targetResourcePath, " oidp database", retention, processTracker);
     }
 
     //Private methods
     private async DoDatabaseExportAndStoreFile(hostId: number, encryptionKeyKeyVaultReference: string | undefined, targetPath: string)
     {
-        const info = await this.dbConnectionsManager.CollectConnectionInfo();
+        const response = await this.oidpService.backup.get();
+        const result = response.data;
 
-        const result = await this.localCommandExecutor.ExecuteCommandWithoutEncoding(['MYSQL_PWD="' + info.password + '"', "mysqldump", "-u", info.user, "-h", info.host, info.dbName, "|", "gzip"]);
         const tempDumpPath = await this.tempFilesManager.CreateFile(hostId, result);
 
         try

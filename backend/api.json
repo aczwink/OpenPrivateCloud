@@ -1,14 +1,24 @@
-{
-    "type": "openapi",
-    "source": "./src",
-    "destination": "./dist/openapi",
-    "globalSecurityRequirement": [
-        {"bearerAuth":[]}
-    ],
-    "securitySchemes": {
-        "bearerAuth": {
-            "type": "http",
-            "scheme": "bearer"
+[
+    {
+        "type": "api",
+        "source": "./node_modules/oidp/dist/openapi.json",
+        "destination": "./dist/oidp-api.ts",
+        "excludedStatusCodes": [],
+        "header": "interface OptionalRequestData{}",
+        "target": "node"
+    },
+    {
+        "type": "openapi",
+        "source": "./src",
+        "destination": "./dist/openapi",
+        "globalSecurityRequirement": [
+            {"bearerAuth":[]}
+        ],
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer"
+            }
         }
     }
-}
+]

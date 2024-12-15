@@ -191,14 +191,35 @@ export class KeyVaultManager
         switch(key.type)
         {
             case "gpg-4096":
-                throw new Error("Method not implemented.");
+            {
+                const keyPath = await this.tempFilesManager.CreateSecretFile(resourceReference.hostId, key.key);
+                const srcPath = await this.tempFilesManager.CreateFile(resourceReference.hostId, encryptedData);
+                const destPath = await this.tempFilesManager.CreateUniqueTempPath(resourceReference.hostId);
+
+                await this.remoteCommandExecutor.ExecuteCommand([
+                    "gpg",
+                    "--passphrase-file", keyPath,
+                    "--cipher-algo", "AES256",
+                    "--batch",
+                    "--no-symkey-cache", //don't cache password in keyring
+                    "--output", destPath,
+                    "--decrypt", srcPath,
+                ], resourceReference.hostId);
+
+                const decrypted = await this.remoteFileSystemManager.ReadFile(resourceReference.hostId, destPath);
+
+                await this.tempFilesManager.Cleanup(resourceReference.hostId, keyPath);
+                await this.tempFilesManager.Cleanup(resourceReference.hostId, srcPath);
+                await this.tempFilesManager.Cleanup(resourceReference.hostId, destPath);
+
+                return decrypted;
+            }
             case "rsa-4096":
             {
                 const pem = key.key.toString("utf-8");
                 const parts = this.SplitPEM(pem);
                 return AsymmetricDecrypt(parts.privateKey, encryptedData);
             }
-            break;
         }
     }
 

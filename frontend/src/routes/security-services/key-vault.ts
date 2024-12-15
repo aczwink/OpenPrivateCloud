@@ -17,9 +17,9 @@
  * */
 import { resourceProviders } from "openprivatecloud-common";
 import { CA_Config, CertificateDTO, KeyCreationDTO, KeyDTO, KeyVaultCertificate, KeyVaultCertificateInfo, SecretDTO, SecretListDTO } from "../../../dist/api";
-import { RouteSetup } from "acfrontendex";
+import { APIResponseHandler, RouteSetup } from "acfrontendex";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../resources-shared/resource-general";
-import { Use } from "acfrontend";
+import { FileDownloadService, Use } from "acfrontend";
 import { APIService } from "../../services/APIService";
 import { APISchemaOf, OpenAPISchema } from "../../api-info";
 
@@ -44,7 +44,25 @@ const createKeyRoute: RouteSetup<ResourceAndGroupId, KeyCreationDTO> = {
 const keyViewModel: RouteSetup<ResourceAndGroupId & { keyName: string }, KeyDTO> = {
     content: {
         type: "object",
-        actions: [],
+        actions: [
+            {
+                type: "form",
+
+                icon: "key",
+                schema: {
+                    type: "string",
+                    format: "binary"
+                },
+                submit: async (ids, data) => {
+                    const response = await Use(APIService).resourceProviders._any_.securityservices.keyvault._any_.keys._any_.decrypt.post(ids.resourceGroupName, ids.resourceName, ids.keyName, { data })
+                    const result = await Use(APIResponseHandler).ExtractDataFromResponseOrShowErrorMessageOnError(response);
+                    if(result.ok)
+                        Use(FileDownloadService).DownloadBlobAsFile(result.value, "decrypted");
+                    return response;
+                },
+                title: "Decrypt",
+            }
+        ],
         formTitle: (ids, _) => ids.keyName,
         requestObject: ids => Use(APIService).resourceProviders._any_.securityservices.keyvault._any_.keys._any_.get(ids.resourceGroupName, ids.resourceName, ids.keyName),
         schema: APISchemaOf(x => x.KeyDTO)

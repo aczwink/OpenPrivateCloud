@@ -23,7 +23,6 @@ import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "
 import { Use } from "acfrontend";
 import { APIService } from "../../services/APIService";
 import { OpenAPISchema } from "../../api-info";
-import { UploadStaticWebsiteContentComponent } from "../../components/static-website/UploadStaticWebsiteContentComponent";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
@@ -65,6 +64,27 @@ const configViewModel: RouteSetup<ResourceAndGroupId, StaticWebsiteConfig> = {
     routingKey: "config",
 };
 
+const contentRouteSetup: RouteSetup<ResourceAndGroupId, { file: File }> = {
+    content: {
+        type: "create",
+        call: (ids, data) => Use(APIService).resourceProviders._any_.webservices.staticwebsite._any_.post(ids.resourceGroupName, ids.resourceName, { file: data.file }),
+        schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+                file: {
+                    type: "string",
+                    format: "binary"
+                },
+            },
+            required: ["file"],
+        }
+    },
+    displayText: "Content",
+    icon: "archive",
+    routingKey: "content",
+};
+
 export const staticWebsiteViewModel: RouteSetup<ResourceAndGroupId> = {
     content: {
         type: "multiPage",
@@ -77,15 +97,7 @@ export const staticWebsiteViewModel: RouteSetup<ResourceAndGroupId> = {
                 entries: [
                     overviewViewModel,
                     configViewModel,
-                    {
-                        content: {
-                            type: "component",
-                            component: UploadStaticWebsiteContentComponent
-                        },
-                        displayText: "Content",
-                        icon: "archive",
-                        routingKey: "content",
-                    }
+                    contentRouteSetup
                 ]
             },
             BuildResourceGeneralPageGroupEntry(BuildResourceId),

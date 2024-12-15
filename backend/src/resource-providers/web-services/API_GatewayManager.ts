@@ -36,8 +36,8 @@ export interface API_EntryConfig
     backendURL: string;
     frontendDomainName: string;
     /**
-     * @format byteSize
      * Define only if you want to override the service configuration value.
+     * @format byteSize
      */
     maxRequestBodySize?: number;
 }

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,13 @@
  * */
 
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
-import { APIController, Body, Common, Delete, Get, NotFound, Path, Post } from "acts-util-apilib";
+import { APIController, Body, Common, Delete, FormField, Get, NotFound, Path, Post } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { c_keyVaultResourceTypeName, c_securityServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { KeyVaultKeyType, KeyVaultManager } from "../KeyVaultManager";
 import { CA_Config } from "../EasyRSAManager";
+import { HTTP } from "acts-util-node";
 
 interface CertificateDTO
 {
@@ -146,6 +147,17 @@ class _api_ extends ResourceAPIControllerBase
             type: x.type
         };
         return dto;
+    }
+
+    @Post("keys/{keyName}/decrypt")
+    public async Decrypt(
+        @Common resourceReference: ResourceReference,
+        @Path keyName: string,
+        @FormField data: HTTP.UploadedFile
+    )
+    {
+        const decrypted = await this.keyVaultManager.Decrypt(resourceReference, keyName, data.buffer);
+        return decrypted;
     }
 
     @Get("pkiconfig")

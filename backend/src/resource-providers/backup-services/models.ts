@@ -36,7 +36,7 @@ export interface BackupVaultControllerDatabaseConfig
     enable: boolean;
 
     /**
-     * In case you are hosting ODIP on the same database server, it can also be backed up. This contains amongst many other data user information and should therefore never backed up to an untrusted source without encryption!
+     * Backup OpenIdentityProvider database as well. Note that OIDP contains amongst many other data user information and should therefore never backed up to an untrusted source without encryption!
      */
     enableODIP?: boolean;
 }

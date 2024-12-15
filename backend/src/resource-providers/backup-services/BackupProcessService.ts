@@ -27,6 +27,7 @@ import { DatabaseBackupProcessService } from "./processors/DatabaseBackupProcess
 import { ControllerDatabaseServerBackupService } from "./processors/ControllerDatabaseServerBackupService";
 import { KeyVaultBackupProcessService } from "./processors/KeyVaultBackupProcessService";
 import { ObjectStorageBackupProcessService } from "./processors/ObjectStorageBackupProcessService";
+import { OIDPBackupService } from "./processors/OIDPBackupService";
 
  
 @Injectable
@@ -36,7 +37,9 @@ export class BackupProcessService
         private hostStoragesController: HostStoragesController, private instanceLogsController: ResourceLogsController,
         private backupTargetMountService: BackupTargetMountService, private controllerDatabaseBackupService: ControllerDatabaseServerBackupService,
         private fileStorageBackupProcessService: FileStorageBackupProcessService, private keyVaultBackupProcessService: KeyVaultBackupProcessService,
-        private databaseBackupProcessService: DatabaseBackupProcessService, private objectStorageBackupProcessService: ObjectStorageBackupProcessService)
+        private databaseBackupProcessService: DatabaseBackupProcessService, private objectStorageBackupProcessService: ObjectStorageBackupProcessService,
+        private oidpBackupService: OIDPBackupService
+    )
     {
     }
     
@@ -58,9 +61,9 @@ export class BackupProcessService
             for (const database of sources.databases)
                 await this.databaseBackupProcessService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, retention, mountStatus.encryptionKeyKeyVaultReference, processTracker);
             if(sources.controllerDB.enable)
-                await this.controllerDatabaseBackupService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, mountStatus.targetPath, retention, processTracker, "opc");
+                await this.controllerDatabaseBackupService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, mountStatus.targetPath, retention, processTracker);
             if(sources.controllerDB.enableODIP)
-                await this.controllerDatabaseBackupService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, mountStatus.targetPath, retention, processTracker, "oidp");
+                await this.oidpBackupService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, mountStatus.targetPath, retention, processTracker);
             for(const keyVault of sources.keyVaults)
                 await this.keyVaultBackupProcessService.DeleteSnapshotsThatAreOlderThanRetentionPeriod(hostId, mountStatus.targetPath, retention, keyVault, processTracker);
             //object storages are always backed up 1:1
@@ -111,9 +114,9 @@ export class BackupProcessService
         for (const database of sources.databases)
             await this.databaseBackupProcessService.BackupDatabase(hostId, database, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
         if(sources.controllerDB.enable)
-            await this.controllerDatabaseBackupService.BackupDatabase(hostId, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker, "opc");
+            await this.controllerDatabaseBackupService.BackupDatabase(hostId, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
         if(sources.controllerDB.enableODIP)
-            await this.controllerDatabaseBackupService.BackupDatabase(hostId, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker, "oidp");
+            await this.oidpBackupService.BackupDatabase(hostId, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
         for(const keyVault of sources.keyVaults)
             await this.keyVaultBackupProcessService.Backup(hostId, keyVault, mountStatus.targetPath, mountStatus.targetFileSystemType, mountStatus.encryptionKeyKeyVaultReference, processTracker);
         for(const objectStorage of sources.objectStorages)
