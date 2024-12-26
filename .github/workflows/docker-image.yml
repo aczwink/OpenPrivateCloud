@@ -85,9 +85,8 @@ jobs:
 
     - name: Building OIDP
       run: |
-        npm link acts-util-core
+        npm link acts-util-apilib acts-util-core acts-util-node
         npm install
-        npm run compile
         npm run build
         npm link
       working-directory: ./oidp/oidp
