@@ -83,14 +83,14 @@ jobs:
         repository: aczwink/OpenIdentityProvider
         path: oidp
 
-    - name: Building oidp
+    - name: Building OIDP
       run: |
         npm link acts-util-core
         npm install
         npm run compile
         npm run build
         npm link
-      working-directory: ./oidp
+      working-directory: ./oidp/oidp
 
 
     #build common
