@@ -76,6 +76,21 @@ jobs:
         npm link
       working-directory: ./acfrontend/extended
 
+    #build oidp
+    - name: Checkout OpenIdentityProvider repo
+      uses: actions/checkout@v4
+      with:
+        repository: aczwink/OpenIdentityProvider
+        path: oidp
+
+    - name: Building OIDP
+      run: |
+        npm link acts-util-apilib acts-util-core acts-util-node
+        npm install
+        npm run build
+        npm link
+      working-directory: ./oidp/oidp
+
 
     #build common
     - name: Building OPC common
@@ -88,7 +103,7 @@ jobs:
     #build backend
     - name: Building OPC backend
       run: |
-        npm link acts-util-core acts-util-node acts-util-apilib openprivatecloud-common
+        npm link acts-util-core acts-util-node acts-util-apilib oidp openprivatecloud-common
         npm install
         npm run build-release-package
       working-directory: ./backend
