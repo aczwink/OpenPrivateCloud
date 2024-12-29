@@ -371,22 +371,6 @@ CREATE TABLE `users` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `users_clientSecrets`
---
-
-DROP TABLE IF EXISTS `users_clientSecrets`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `users_clientSecrets` (
-  `userId` int(10) unsigned NOT NULL,
-  `pwHash` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `pwSalt` char(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  PRIMARY KEY (`userId`),
-  CONSTRAINT `users_clientSecrets_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `users_wallet`
 --
 
@@ -411,4 +395,4 @@ CREATE TABLE `users_wallet` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-12-07 21:44:32
+-- Dump completed on 2024-12-30  0:19:08

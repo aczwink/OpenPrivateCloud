@@ -192,14 +192,14 @@ class HostAPIController
         const interfaces = await this.hostNetworkInterfaceCardsManager.QueryAllNetworkInterfaces(hostId);
         const addresses = await this.hostNetworkInterfaceCardsManager.QueryAllNetworkInterfacesWithAddresses(hostId);
         return Promise.all(interfaces.map(async x => {
-            const zone = await this.hostFirewallZonesManager.DetermineAssignedZoneForNetworkInterface(hostId, x);
+            const zone = this.hostFirewallZonesManager.DetermineAssignedZoneForNetworkInterface(hostId, x);
             const iface = addresses.find(y => y.ifname === x);
-            const ipv4 = iface!.addr_info.find(x => x.family === "inet")!;
+            const ipv4 = iface!.addr_info.find(x => x.family === "inet");
             const res: NetworkInterfaceDTO = {
                 name: x,
                 zone,
-                ip: ipv4.local,
-                subnet: CIDRRange.FromIP(new IPv4(ipv4.local), ipv4.prefixlen).ToString()
+                ip: ipv4?.local ?? "No IPv4",
+                subnet: (ipv4 === undefined) ? "No IPv4 subnet": CIDRRange.FromIP(new IPv4(ipv4.local), ipv4.prefixlen).ToString()
             };
             return res;
         }));

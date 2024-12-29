@@ -42,13 +42,7 @@ class UserAPIController
         if(ok)
             await this.usersManager.SetUserPassword(userId, newPw);
         else
-        {
-            const hasPw = await this.authenticationManager.DoesUserHavePassword(userId);
-            if(!hasPw && (oldPw === ""))
-                await this.usersManager.SetUserPassword(userId, newPw);
-            else
-                return Unauthorized("wrong password");
-        }
+            return Unauthorized("wrong password");
     }
 
     @Get()

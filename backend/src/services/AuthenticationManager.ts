@@ -20,7 +20,6 @@ import { Injectable } from "acts-util-node";
 import { NotificationsManager } from "./NotificationsManager";
 import { Duration, NumberDictionary } from "acts-util-core";
 import { UsersController } from "../data-access/UsersController";
-import { HashPassword } from "../common/crypto/passwords";
 
 export type AuthMethod = "client-secret" | "email-otp";
 
@@ -43,16 +42,6 @@ export class AuthenticationManager
     {
         switch(method)
         {
-            case "client-secret":
-            {
-                const user = await this.usersController.RequestClientSecretData(userId);
-                if(user !== undefined)
-                {
-                    const expectedHash = HashPassword(password, user.pwSalt);
-                    return expectedHash === user.pwHash;
-                }
-            }
-            break;
             case "email-otp":
             {
                 const generated = this.mailOTP[userId];
@@ -62,12 +51,6 @@ export class AuthenticationManager
             break;
         }
         return false;
-    }
-
-    public async DoesUserHavePassword(userId: number)
-    {
-        const cs = await this.usersController.RequestClientSecretData(userId);
-        return (cs !== undefined);
     }
 
     public async ExecutePreAuthenticationStep(userId: number, method: AuthMethod)
@@ -92,7 +75,7 @@ export class AuthenticationManager
     {
         const result: AuthMethod[] = [];
 
-        if(await this.DoesUserHavePassword(userId))
+        //if(await this.DoesUserHavePassword(userId))
             result.push("client-secret");
         if(await this.IsEMailSendingToUserPossible(userId))
             result.push("email-otp");

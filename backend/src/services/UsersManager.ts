@@ -58,17 +58,12 @@ export class UsersManager
 
     public async SetUserPassword(userId: number, newPassword: string)
     {
-        const cs = await this.usersController.RequestClientSecretData(userId);
-        if(cs === undefined)
+        if(true)
         {
             //user never had a password. Thus he also doesn't have a key, nor a samba pw
 
             const keyPair = CreateRSA4096KeyPair(newPassword);
             await this.usersController.UpdateUserKeys(userId, keyPair.privateKey, keyPair.publicKey);
-
-            const pwSalt = this.CreateSalt();
-            const pwHash = HashPassword(newPassword, pwSalt);
-            await this.usersController.UpdateUserClientSecret(userId, pwHash, pwSalt);
 
             await this.RotateSambaPassword(userId);
         }

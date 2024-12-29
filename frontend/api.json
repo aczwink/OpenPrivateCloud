@@ -3,5 +3,6 @@
     "source": "../backend/dist/openapi.json",
     "destination": "./dist/api.ts",
     "excludedStatusCodes": [],
-    "header": "import { OptionalRequestData } from \"../src/services/OptionalRequestData\";"
+    "header": "import { OptionalRequestData } from \"../src/services/OptionalRequestData\";",
+    "target": "browser"
 }

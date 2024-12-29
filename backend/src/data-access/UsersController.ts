@@ -19,12 +19,6 @@
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
-interface ClientSecretData
-{
-    pwHash: string;
-    pwSalt: string;
-}
-
 interface PrivateUserData
 {
     privateKey: string;
@@ -60,7 +54,6 @@ export class UsersController
     public async DeleteUser(userId: number)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("users_clientSecrets", "userId = ?", userId);
         await conn.DeleteRows("users_wallet", "userId = ?", userId);
         await conn.DeleteRows("users", "id = ?", userId);
     }
@@ -135,28 +128,6 @@ export class UsersController
         const rows = await conn.Select<PublicUserData>(query);
 
         return rows;
-    }
-
-    public async RequestClientSecretData(userId: number)
-    {
-        let query = `
-        SELECT pwHash, pwSalt
-        FROM users_clientSecrets
-        WHERE userId = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne<ClientSecretData>(query, userId);
-
-        return row;
-    }
-
-    public async UpdateUserClientSecret(userId: number, pwHash: string, pwSalt: string)
-    {
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const result = await conn.UpdateRows("users_clientSecrets", { pwHash, pwSalt }, "userId = ?", userId);
-        if(result.affectedRows === 0)
-            await conn.InsertRow("users_clientSecrets", { pwHash, pwSalt, userId });
     }
 
     public async UpdateUserData(userId: number, data: EditableUserData)
