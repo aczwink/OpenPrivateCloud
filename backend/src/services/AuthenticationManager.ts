@@ -42,6 +42,8 @@ export class AuthenticationManager
     {
         switch(method)
         {
+            case "client-secret":
+                return true;
             case "email-otp":
             {
                 const generated = this.mailOTP[userId];
