@@ -364,25 +364,8 @@ CREATE TABLE `users` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `emailAddress` varchar(200) NOT NULL,
   `firstName` varchar(100) NOT NULL,
-  `privateKey` text CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `publicKey` text CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `serviceSecret` char(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `users_wallet`
---
-
-DROP TABLE IF EXISTS `users_wallet`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `users_wallet` (
-  `userId` int(10) unsigned NOT NULL,
-  `entryKey` varchar(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `value` text NOT NULL,
-  PRIMARY KEY (`userId`,`entryKey`),
-  CONSTRAINT `users_wallet_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -395,4 +378,4 @@ CREATE TABLE `users_wallet` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-12-30  0:19:08
+-- Dump completed on 2025-01-12 22:39:13

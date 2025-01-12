@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,8 +20,6 @@ import { Injectable } from "acts-util-node";
 import { ClusterEventsManager } from "./ClusterEventsManager";
 import { UsersController } from "../data-access/UsersController";
 import { ResourceUserCredentialDependenciesController, SyncState } from "../data-access/ResourceUserCredentialDependenciesController";
-import { UserWalletManager } from "./UserWalletManager";
-import { UsersManager } from "./UsersManager";
 import { ResourceEventsManager } from "./ResourceEventsManager";
 
 /**
@@ -31,14 +29,12 @@ import { ResourceEventsManager } from "./ResourceEventsManager";
 export class UserCredentialsProvider
 {
     constructor(clusterEventsManager: ClusterEventsManager, private usersController: UsersController, private resourceUserCredentialDependenciesController: ResourceUserCredentialDependenciesController,
-        private userWalletManager: UserWalletManager, private usersManager: UsersManager, private resourceEventsManager: ResourceEventsManager
+        private resourceEventsManager: ResourceEventsManager
     )
     {
         clusterEventsManager.RegisterListener(ev => {
             if(ev.type === "userLogIn")
-                this.OnUserLogIn(ev.userId, ev.password);
-            else if(ev.type === "userPasswordChanged")
-                this.ProvideUserCredentials(ev.userId, ev.newPassword, SyncState.Provided);
+                this.OnUserLogIn(ev.userId);
             else if(ev.type === "userSambaPasswordChanged")
                 this.ProvideUserSambaPW(ev.userId);
         });
@@ -58,11 +54,7 @@ export class UserCredentialsProvider
         {
             for (const userId of userIds)
             {
-                if(this.userWalletManager.IsUnlocked(userId))
-                {
-                    const sambaPW = await this.usersManager.QuerySambaPassword(userId);
-                    this.ProvideCredentials(resourceId, userId, sambaPW!);
-                }
+                this.ProvideCredentials(resourceId, userId);
             }
         }
     }
@@ -76,47 +68,42 @@ export class UserCredentialsProvider
     }
 
     //Private methods
-    private async ProvideCredentials(resourceId: number, userId: number, secret: string)
+    private async ProvideCredentials(resourceId: number, userId: number)
     {
         this.resourceEventsManager.PublishEvent({
             type: "userCredentialsProvided",
             resourceId,
-            secret,
             userId
         });
 
         await this.resourceUserCredentialDependenciesController.SetState(resourceId, userId, SyncState.Provided);
     }
 
-    private async ProvideUserCredentials(userId: number, password: string, syncState: SyncState)
+    private async ProvideUserCredentials(userId: number, syncState: SyncState)
     {
         const userRows = await this.resourceUserCredentialDependenciesController.RequestUserRows(userId, syncState);
         for (const userRow of userRows)
         {
             if(userRow.wantLoginPassword)
-                this.ProvideCredentials(userRow.resourceId, userId, password);
+                this.ProvideCredentials(userRow.resourceId, userId);
             else
-            {
-                const sambaPW = await this.usersManager.QuerySambaPassword(userId);
-                this.ProvideCredentials(userRow.resourceId, userId, sambaPW!);
-            }
+                this.ProvideCredentials(userRow.resourceId, userId);
         }
     }
 
     private async ProvideUserSambaPW(userId: number)
     {
-        const sambaPW = await this.usersManager.QuerySambaPassword(userId);
         const userRows = await this.resourceUserCredentialDependenciesController.RequestUserRows(userId, SyncState.Provided);
         for (const userRow of userRows)
         {
             if(!userRow.wantLoginPassword)
-                this.ProvideCredentials(userRow.resourceId, userId, sambaPW!);
+                this.ProvideCredentials(userRow.resourceId, userId);
         }
     }
 
     //Event handlers
-    private OnUserLogIn(userId: number, password: string)
+    private OnUserLogIn(userId: number)
     {
-        this.ProvideUserCredentials(userId, password, SyncState.NotProvidedYet);
+        this.ProvideUserCredentials(userId, SyncState.NotProvidedYet);
     }
 }

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,18 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Conflict, Get, Header, Put } from "acts-util-apilib";
+import { APIController, Body, Get, Header, Put } from "acts-util-apilib";
 import { MailerSettings } from "../services/EMailService";
 import { NotificationsManager } from "../services/NotificationsManager";
 import { SessionsManager } from "../services/SessionsManager";
 import { ClusterKeyStoreManager } from "../services/ClusterKeyStoreManager";
-import { UserWalletManager } from "../services/UserWalletManager";
 import { ClusterConfigManager, PublicClusterSettings } from "../services/ClusterConfigManager";
 
 @APIController("cluster/keystore")
 class _api_
 {
-    constructor(private clusterKeyStoreManager: ClusterKeyStoreManager, private sessionsManager: SessionsManager, private userWalletManager: UserWalletManager)
+    constructor(private clusterKeyStoreManager: ClusterKeyStoreManager)
     {
     }
 
@@ -35,27 +34,6 @@ class _api_
     public QueryLockedStatus()
     {
         return this.clusterKeyStoreManager.IsLocked();
-    }
-
-    @Get()
-    public QueryMasterKey()
-    {
-        if(this.clusterKeyStoreManager.IsLocked())
-            return Conflict("key store is locked");
-        return this.clusterKeyStoreManager.GetMasterKeyEncoded();
-    }
-
-    @Put()
-    public async RotateMasterKey(
-        @Header Authorization: string
-    )
-    {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-
-        await this.clusterKeyStoreManager.RotateMasterKey();
-
-        const data = this.clusterKeyStoreManager.GetMasterKeyEncoded();
-        await this.userWalletManager.SetStringSecret(userId, "masterKey", data);
     }
 }
 

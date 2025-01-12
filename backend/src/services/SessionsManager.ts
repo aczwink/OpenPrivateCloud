@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,6 @@ import crypto from "crypto";
 
 import { Dictionary } from "acts-util-core";
 import { DateTime, Injectable } from "acts-util-node";
-import { UserWalletManager } from "./UserWalletManager";
-import { ClusterKeyStoreManager } from "./ClusterKeyStoreManager";
 import { ClusterEventsManager } from "./ClusterEventsManager";
 
 interface Session
@@ -33,7 +31,7 @@ interface Session
 @Injectable
 export class SessionsManager
 {
-    constructor(private userWalletManager: UserWalletManager, private clusterKeyStoreManager: ClusterKeyStoreManager, private clusterEventsManager: ClusterEventsManager)
+    constructor(private clusterEventsManager: ClusterEventsManager)
     {
         this.sessions = {};
     }
@@ -48,6 +46,12 @@ export class SessionsManager
         };
 
         this.SetAutoLogOutTimer(token, session);
+
+        this.clusterEventsManager.PublishEvent({
+            type: "userLogIn",
+            userId,
+        });
+
         return { expiryDateTime: session.expiryDateTime, token };
     }
 
@@ -71,29 +75,11 @@ export class SessionsManager
 
         if(session !== undefined)
         {
-            this.userWalletManager.Lock(session.userId);
             this.clusterEventsManager.PublishEvent({
                 type: "userLogOut",
                 userId: session.userId
             });
         }
-    }
-
-    public async PasswordBasedLogin(userId: number, password: string)
-    {
-        await this.userWalletManager.Unlock(userId, password);
-        if(this.clusterKeyStoreManager.IsLocked())
-        {
-            const masterKey = await this.userWalletManager.ReadStringSecret(userId, "masterKey");
-            if(masterKey !== undefined)
-                this.clusterKeyStoreManager.Unlock(masterKey);
-        }
-
-        this.clusterEventsManager.PublishEvent({
-            type: "userLogIn",
-            userId,
-            password
-        });
     }
 
     //Private variables

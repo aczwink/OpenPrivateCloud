@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,16 +23,4 @@ export interface FileStorageProperties extends BaseResourceProperties
     type: "file-storage";
 }
 
-export interface ObjectStorageProperties extends BaseResourceProperties
-{
-    type: "object-storage";
-
-    /**
-     * The root key encryption key.
-     * @format key-vault-reference[key]
-     * @title Root KEK
-     */
-    rootKEK_KeyVaultReference: string;
-}
-
-export type FileServicesProperties = FileStorageProperties | ObjectStorageProperties;
+export type FileServicesProperties = FileStorageProperties;

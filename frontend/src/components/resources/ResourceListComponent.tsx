@@ -87,8 +87,6 @@ export class ResourceListComponent extends Component<{ query: (apiService: APISe
                 return <BootstrapIcon>database</BootstrapIcon>;
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return <BootstrapIcon>folder-fill</BootstrapIcon>;
-            case resourceProviders.fileServices.objectStorageResourceType.name:
-                return <BootstrapIcon>folder2</BootstrapIcon>;
             case resourceProviders.multimediaServices.avTranscoderResourceType.name:
                 return <BootstrapIcon>film</BootstrapIcon>;
             case resourceProviders.networkServices.dnsServerResourceType.name:

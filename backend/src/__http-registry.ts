@@ -39,7 +39,6 @@ import "./resource-providers/compute-services/api/docker-container-app-service";
 import "./resource-providers/compute-services/VirtualMachineAPIController";
 import "./resource-providers/database-services/MariaDB/MariaDBAPIController";
 import "./resource-providers/file-services/api/FileStorageAPIController";
-import "./resource-providers/file-services/api/object-storage";
 import "./resource-providers/multimedia-services/AVTranscoderAPIController";
 import "./resource-providers/network-services/api/dns-server";
 import "./resource-providers/network-services/api/openvpn-gateway";

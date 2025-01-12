@@ -23,7 +23,7 @@ import { BackupVaultManager } from "../BackupVaultManager";
 import { BackupVaultControllerDatabaseConfig, BackupVaultRetentionConfig, BackupVaultTargetConfig, BackupVaultTrigger } from "../models";
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { ResourceReference } from "../../../common/ResourceReference";
-import { BackupVaultAnySourceConfigDTO, BackupVaultObjectStorageSourceDTO, BackupVaultSourcesDTO, BackupVaultTargetConfigDTO } from "./DTOs";
+import { BackupVaultAnySourceConfigDTO, BackupVaultSourcesDTO, BackupVaultTargetConfigDTO } from "./DTOs";
 import { KeyVaultManager } from "../../security-services/KeyVaultManager";
 
 interface BackupVaultDeploymentDataDto
@@ -75,18 +75,7 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         if("createSnapshotBeforeBackup" in source)
-        {
-            if("externalId" in source)
-                await this.backupVaultManager.AddFileStorageSource(resourceReference, source);
-            else
-            {
-                const iRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(source.id);
-                if(iRef === undefined)
-                    return NotFound("object storage not found");
-
-                await this.backupVaultManager.AddObjectStorageSource(resourceReference, { createSnapshotBeforeBackup: source.createSnapshotBeforeBackup, resourceId: iRef.id });
-            }
-        }
+            await this.backupVaultManager.AddFileStorageSource(resourceReference, source);
         else if("databaseName" in source)
             await this.backupVaultManager.AddDatabaseSource(resourceReference, source);
         else
@@ -105,17 +94,7 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         if("createSnapshotBeforeBackup" in source)
-        {
-            if("externalId" in source)
-                await this.backupVaultManager.RemoveFileStorageSource(resourceReference, source.externalId);
-            else
-            {
-                const iRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(source.id);
-                if(iRef === undefined)
-                    return NotFound("object storage not found");
-                await this.backupVaultManager.RemoveObjectStorageSource(resourceReference, iRef.id);
-            }
-        }
+            await this.backupVaultManager.RemoveFileStorageSource(resourceReference, source.externalId);
         else if("databaseName" in source)
             await this.backupVaultManager.RemoveDatabaseSource(resourceReference, source.externalId, source.databaseName);
         else
@@ -138,13 +117,6 @@ class _api_ extends ResourceAPIControllerBase
             databases: config.sources.databases,
             fileStorages: config.sources.fileStorages,
             keyVaults: await config.sources.keyVaults.Values().Map(x => this.resourcesManager.CreateResourceReference(x.resourceId)).MapAsync(x => ({ id: x!.externalId })).PromiseAll(),
-            objectStorages: await config.sources.objectStorages.Values().Map<Promise<BackupVaultObjectStorageSourceDTO>>(async x => {
-                const ref = await this.resourcesManager.CreateResourceReference(x.resourceId);
-                return {
-                    id: ref!.externalId,
-                    createSnapshotBeforeBackup: x.createSnapshotBeforeBackup
-                };
-            }).PromiseAll(),
         };
         return sources;
     }

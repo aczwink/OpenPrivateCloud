@@ -21,14 +21,13 @@ import { resourceProviders } from "openprivatecloud-common";
 import { FileStoragesManager } from "./FileStoragesManager";
 import { ResourceReference } from "../../common/ResourceReference";
 import { FileServicesProperties } from "./properties";
-import { ObjectStoragesManager } from "./ObjectStoragesManager";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 import { HealthStatus } from "../../data-access/HealthController";
 
 @Injectable
 export class FileServicesResourceProvider implements ResourceProvider<FileServicesProperties>
 {
-    constructor(private fileStoragesManager: FileStoragesManager, private objectStoragesManager: ObjectStoragesManager)
+    constructor(private fileStoragesManager: FileStoragesManager)
     {
     }
     
@@ -47,12 +46,6 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
                 requiredModules: ["samba"],
                 schemaName: "FileStorageProperties"
             },
-            {
-                dataIntegrityCheckSchedule: null,
-                fileSystemType: "btrfs",
-                requiredModules: [],
-                schemaName: "ObjectStorageProperties"
-            }
         ];
     }
 
@@ -63,8 +56,6 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
         {
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return await this.fileStoragesManager.CheckResourceHealth(resourceReference, type);
-            case resourceProviders.fileServices.objectStorageResourceType.name:
-                return await this.objectStoragesManager.CheckResourceHealth(resourceReference, type);
         }
         return HealthStatus.Up;
     }
@@ -75,8 +66,6 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
         {
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return await this.fileStoragesManager.DeleteResource(resourceReference);
-            case resourceProviders.fileServices.objectStorageResourceType.name:
-                return await this.objectStoragesManager.DeleteResource(resourceReference);
         }
         return null;
     }
@@ -108,9 +97,6 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 await this.fileStoragesManager.ProvideResource(context);
                 break;
-            case "object-storage":
-                await this.objectStoragesManager.ProvideResource(instanceProperties, context.resourceReference);
-                break;
         }
 
         return {};
@@ -122,8 +108,6 @@ export class FileServicesResourceProvider implements ResourceProvider<FileServic
         {
             case resourceProviders.fileServices.fileStorageResourceType.name:
                 return await this.fileStoragesManager.QueryResourceState(resourceReference);
-            case resourceProviders.fileServices.objectStorageResourceType.name:
-                return await this.objectStoragesManager.QueryResourceState(resourceReference);
         }
         return ResourceState.Running;
     }

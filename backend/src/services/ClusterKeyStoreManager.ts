@@ -58,19 +58,6 @@ export class ClusterKeyStoreManager
         }, unencrypted);
     }
 
-    public GetMasterKeyEncoded()
-    {
-        throw new Error("TODO: there should be a permission check");
-
-        return JSON.stringify(
-            {
-                iv: this.masterKey!.iv.toString("base64"),
-                key: this.masterKey!.key.toString("base64"),
-                authTagLength: this.masterKey!.authTagLength,
-            }
-        );
-    }
-
     public IsLocked()
     {
         return this.masterKey === undefined;

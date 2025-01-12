@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,6 @@ import { AuthGuard } from "../AuthGuard";
 import { Use } from "acfrontend";
 import { APISchemaOf } from "../api-info";
 import { MailerSettings, PublicClusterSettings } from "../../dist/api";
-import { ClusterKeyStoreComponent } from "../components/cluster/ClusterKeyStoreComponent";
 import { APIService } from "../services/APIService";
 import { ClusterLockedGuard } from "../ClusterLockedGuard";
 
@@ -43,16 +42,6 @@ const notificationSettingsViewModel: RouteSetup<{}, MailerSettings> = {
     displayText: "Notifications",
     icon: "bell",
     routingKey: "notification"
-};
-
-const keyStoreViewModel: RouteSetup<{}> = {
-    content: {
-        type: "component",
-        component: ClusterKeyStoreComponent,
-    },
-    displayText: "Key store",
-    icon: "key",
-    routingKey: "keystore",
 };
 
 const publicSettingsViewModel: RouteSetup<{}, PublicClusterSettings> = {
@@ -84,7 +73,6 @@ export const clusterRoute: RouteSetup<{}> = {
                 displayName: "",
                 entries: [
                     notificationSettingsViewModel,
-                    keyStoreViewModel,
                     publicSettingsViewModel
                 ]
             }

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -27,30 +27,15 @@ interface BackupVaultKeyVaultSourceDTO
     id: string;
 }
 
-export interface BackupVaultObjectStorageSourceDTO
-{
-    /**
-     * @title Object storage
-     * @format resource-same-host[file-services/object-storage]
-     */
-    id: string;
-
-    /**
-     * @title Create snapshot right before saving snapshots in this vault
-     */
-    createSnapshotBeforeBackup: boolean;
-}
-
 export interface BackupVaultSourcesDTO
 {
     databases: BackupVaultDatabaseConfig[];
     controllerDB: BackupVaultControllerDatabaseConfig;
     fileStorages: BackupVaultFileStorageConfig[];
     keyVaults: BackupVaultKeyVaultSourceDTO[];
-    objectStorages: BackupVaultObjectStorageSourceDTO[];
 }
 
-export type BackupVaultAnySourceConfigDTO = BackupVaultFileStorageConfig | BackupVaultDatabaseConfig | BackupVaultKeyVaultSourceDTO | BackupVaultObjectStorageSourceDTO;
+export type BackupVaultAnySourceConfigDTO = BackupVaultFileStorageConfig | BackupVaultDatabaseConfig | BackupVaultKeyVaultSourceDTO;
 
 
 interface WebDAVTargetConfigDTO

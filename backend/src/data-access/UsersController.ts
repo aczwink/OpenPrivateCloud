@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,12 +18,6 @@
 
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
-
-interface PrivateUserData
-{
-    privateKey: string;
-    publicKey: string;
-}
 
 export interface EditableUserData
 {
@@ -44,17 +38,16 @@ export class UsersController
     }
 
     //Public methods
-    public async CreateUser(emailAddress: string)
+    public async CreateUser(emailAddress: string, serviceSecret: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const result = await conn.InsertRow("users", { emailAddress, firstName: emailAddress, privateKey: "", publicKey: "" });
+        const result = await conn.InsertRow("users", { emailAddress, firstName: emailAddress, serviceSecret });
         return result.insertId;
     }
 
     public async DeleteUser(userId: number)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("users_wallet", "userId = ?", userId);
         await conn.DeleteRows("users", "id = ?", userId);
     }
 
@@ -72,20 +65,6 @@ export class UsersController
         const rows = await conn.Select<PublicUserData>(query, userGroupId);
 
         return rows;
-    }
-
-    public async QueryPrivateData(id: number)
-    {
-        let query = `
-        SELECT privateKey, publicKey
-        FROM users
-        WHERE id = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne<PrivateUserData>(query, id);
-
-        return row;
     }
 
     public async QueryUserId(emailAddress: string)
@@ -130,15 +109,23 @@ export class UsersController
         return rows;
     }
 
+    public async ReadServiceSecret(userId: number)
+    {
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        const row = await conn.SelectOne<{ serviceSecret: string; }>("SELECT serviceSecret FROM users WHERE id = ?", userId);
+
+        return row?.serviceSecret;
+    }
+
+    public async UpdateServiceSecret(userId: number, serviceSecret: string)
+    {        
+        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
+        await conn.UpdateRows("users", { serviceSecret }, "userId = ?", userId);
+    }
+
     public async UpdateUserData(userId: number, data: EditableUserData)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         await conn.UpdateRows("users", { firstName: data.firstName }, "id = ?", userId);
-    }
-
-    public async UpdateUserKeys(userId: number, privateKey: string, publicKey: string)
-    {
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.UpdateRows("users", { privateKey, publicKey }, "id = ?", userId);
     }
 }

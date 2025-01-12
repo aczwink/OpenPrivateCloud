@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -49,9 +49,6 @@ class _api_
             return Unauthorized("invalid login credentials");
 
         const session = await this.sessionsManager.CreateSession(userId);
-
-        if(method === "client-secret")
-            await this.sessionsManager.PasswordBasedLogin(userId, password);
 
         return session;
     }

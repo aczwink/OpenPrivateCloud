@@ -1,6 +1,6 @@
-.vscode/settings.json
 backend/dist
 backend/node_modules
+backend/.env
 backend/package-lock.json
 backend-tests/dist
 backend-tests/node_modules

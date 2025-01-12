@@ -17,7 +17,7 @@
  * */
 
 import { resourceProviders } from "openprivatecloud-common";
-import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultKeyVaultSourceDTO, BackupVaultObjectStorageSourceDTO, BackupVaultRetentionConfig, BackupVaultTargetConfigDTO, BackupVaultTrigger, InstanceLog, ResourceLogOverviewData } from "../../../dist/api";
+import { BackupVaultControllerDatabaseConfig, BackupVaultDatabaseConfig, BackupVaultDeploymentDataDto, BackupVaultFileStorageConfig, BackupVaultKeyVaultSourceDTO, BackupVaultRetentionConfig, BackupVaultTargetConfigDTO, BackupVaultTrigger, InstanceLog, ResourceLogOverviewData } from "../../../dist/api";
 import { APIResponseHandler, RouteSetup } from "acfrontendex";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../resources-shared/resource-general";
 import { APIMap, OpenAPISchema } from "../../api-info";
@@ -137,48 +137,6 @@ const fileStorageSourcesViewModel: RouteSetup<ResourceAndGroupId, BackupVaultFil
     displayText: "File storages",
     icon: "folder-fill",
     routingKey: "fileStorageSources",
-};
-
-const addObjectStorageSourceRoute: RouteSetup<ResourceAndGroupId, BackupVaultObjectStorageSourceDTO> = {
-    content: {
-        type: "create",
-        call: (ids, newValue) => Use(APIService).resourceProviders._any_.backupservices.backupvault._any_.sources.post(ids.resourceGroupName, ids.resourceName, newValue),
-        loadContext: async ids => {
-            const response = await Use(APIService).resourceProviders._any_.backupservices.backupvault._any_.deploymentdata.get(ids.resourceGroupName, ids.resourceName);
-            const result = await Use(APIResponseHandler).ExtractDataFromResponseOrShowErrorMessageOnError(response);
-            if(result.ok === false)
-                throw new Error("TODO");
-            return result.value;
-        },
-        schema: OpenAPISchema("BackupVaultObjectStorageSourceDTO")
-    },
-    displayText: "Add object storage source",
-    icon: "plus",
-    routingKey: "add",
-};
-
-const objectStorageSourcesViewModel: RouteSetup<ResourceAndGroupId, BackupVaultObjectStorageSourceDTO> = {
-    content: {
-        type: "list",
-        actions: [
-            addObjectStorageSourceRoute
-        ],
-        boundActions: [
-            {
-                type: "delete",
-                deleteResource: (ids, config) => Use(APIService).resourceProviders._any_.backupservices.backupvault._any_.sources.delete(ids.resourceGroupName, ids.resourceName, config),
-            }
-        ],
-        requestObjects: ids =>
-        {
-            const response = Use(APIService).resourceProviders._any_.backupservices.backupvault._any_.sources.get(ids.resourceGroupName, ids.resourceName);
-            return APIMap(response, x => x.objectStorages);
-        },
-        schema: OpenAPISchema("BackupVaultObjectStorageSourceDTO")
-    },
-    displayText: "Object storages",
-    icon: "folder2",
-    routingKey: "objectStorageSources",
 };
 
 const addDatabaseStorageSourceRoute: RouteSetup<ResourceAndGroupId, BackupVaultDatabaseConfig> = {
@@ -353,7 +311,6 @@ export const backupVaultViewModel: RouteSetup<ResourceAndGroupId> = {
                 entries: [
                     targetConfigViewModel,
                     fileStorageSourcesViewModel,
-                    objectStorageSourcesViewModel,
                     databaseSourcesViewModel,
                     keyVaultSourcesViewModel,
                     controllerDBSourceViewModel,

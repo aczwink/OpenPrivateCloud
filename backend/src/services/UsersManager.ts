@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,6 @@
 import crypto from "crypto";
 import { Injectable } from "acts-util-node";
 import { UsersController } from "../data-access/UsersController";
-import { UserWalletManager } from "./UserWalletManager";
-import { CreateRSA4096KeyPair } from "../common/crypto/asymmetric";
 import { HashPassword } from "../common/crypto/passwords";
 import { ClusterEventsManager } from "./ClusterEventsManager";
 
@@ -27,20 +25,20 @@ import { ClusterEventsManager } from "./ClusterEventsManager";
 @Injectable
 export class UsersManager
 {
-    constructor(private usersController: UsersController, private userWalletManager: UserWalletManager, private clusterEventsManager: ClusterEventsManager)
+    constructor(private usersController: UsersController, private clusterEventsManager: ClusterEventsManager)
     {
     }
     
     //Public methods
     public async CreateUser(emailAddress: string)
     {
-        const userId = await this.usersController.CreateUser(emailAddress);
+        const userId = await this.usersController.CreateUser(emailAddress, this.CreateSambaPassword());
         return userId;
     }
 
     public async QuerySambaPassword(userId: number)
     {
-        const sambaPW = await this.userWalletManager.ReadStringSecret(userId, "sambaPW");
+        const sambaPW = await this.usersController.ReadServiceSecret(userId);
         return sambaPW;
     }
 
@@ -48,40 +46,11 @@ export class UsersManager
     {
         const newPw = this.CreateSambaPassword();
 
-        await this.userWalletManager.SetStringSecret(userId, "sambaPW", newPw);
+        await this.usersController.UpdateServiceSecret(userId, newPw);
 
         this.clusterEventsManager.PublishEvent({
             type: "userSambaPasswordChanged",
             userId,
-        });
-    }
-
-    public async SetUserPassword(userId: number, newPassword: string)
-    {
-        if(true)
-        {
-            //user never had a password. Thus he also doesn't have a key, nor a samba pw
-
-            const keyPair = CreateRSA4096KeyPair(newPassword);
-            await this.usersController.UpdateUserKeys(userId, keyPair.privateKey, keyPair.publicKey);
-
-            await this.RotateSambaPassword(userId);
-        }
-        else
-        {
-            if(!this.userWalletManager.IsUnlocked(userId))
-                throw new Error("Can't change password when user is not logged in");
-
-            //TODO: this should probably be done in a sql transaction
-            throw new Error("TODO: IMPLEMENT THIS SAFELY!");
-            //TODO: is this actually needed? we are not changing the private key in this case, only the password it is encrypted with... test this
-            await this.userWalletManager.PrivateKeyChanged(userId, newPassword);
-        }
-
-        this.clusterEventsManager.PublishEvent({
-            type: "userPasswordChanged",
-            userId,
-            newPassword
         });
     }
 

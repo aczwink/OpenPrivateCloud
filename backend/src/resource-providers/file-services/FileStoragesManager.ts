@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,6 +28,7 @@ import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceStat
 import { ResourceEvent, ResourceEventListener, ResourceEventsManager } from "../../services/ResourceEventsManager";
 import { HostUsersManager } from "../../services/HostUsersManager";
 import { HealthStatus } from "../../data-access/HealthController";
+import { UsersManager } from "../../services/UsersManager";
 
 interface SMBConfig
 {
@@ -48,7 +49,7 @@ export interface FileStorageConfig
 export class FileStoragesManager implements ResourceEventListener
 {
     constructor(private resourcesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager, private hostUsersManager: HostUsersManager,
-        private remoteFileSystemManager: RemoteFileSystemManager, resourceEventsManager: ResourceEventsManager,
+        private remoteFileSystemManager: RemoteFileSystemManager, resourceEventsManager: ResourceEventsManager, private usersManager: UsersManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: ResourceConfigController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
     {
@@ -247,7 +248,8 @@ export class FileStoragesManager implements ResourceEventListener
         if(event.type === "userCredentialsProvided")
         {
             const ref = await this.resourcesManager.CreateResourceReference(event.resourceId);
-            await this.hostUsersManager.UpdateSambaPasswordOnHostIfExisting(ref!.hostId, event.userId, event.secret);
+            const sambaPW = await this.usersManager.QuerySambaPassword(event.userId);
+            await this.hostUsersManager.UpdateSambaPasswordOnHostIfExisting(ref!.hostId, event.userId, sambaPW!);
         }
     }
 

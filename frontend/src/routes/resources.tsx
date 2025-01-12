@@ -27,7 +27,6 @@ import { dockerContainerViewModel } from "./compute-services/docker-container";
 import { vnetViewModel } from "./network-services/virtual-network";
 import { virtualMachineViewModel } from "./compute-services/virtual-machine";
 import { fileStorageViewModel } from "./file-services/file-storage";
-import { objectStorageViewModel } from "./file-services/object-storage";
 import { avTranscoderViewModel } from "./multimedia-services/av-transcoder";
 import { dnsServerViewModel } from "./network-services/dns-server";
 import { wafViewModel } from "./security-services/waf";
@@ -48,7 +47,6 @@ export const resourceTypesRoutes: RouteSetup<ResourceAndGroupId>[] = [
     virtualMachineViewModel,
     mariadbViewModel,
     fileStorageViewModel,
-    objectStorageViewModel,
     avTranscoderViewModel,
     dnsServerViewModel,
     openVPNGatewayViewModel,
