@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { resourceProviders } from "openprivatecloud-common";
-import { API_EntryConfig, API_GatewaySettingsDTO, ContainerInfo, DockerContainerLogDto } from "../../../dist/api";
+import { API_GatewaySettingsDTO, AppGatewayRoutingRuleDTO, ContainerInfo, DockerContainerLogDto } from "../../../dist/api";
 import { APIResponseHandler, RouteSetup } from "acfrontendex";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../resources-shared/resource-general";
 import { Use } from "acfrontend";
@@ -43,18 +43,18 @@ const overviewViewModel: RouteSetup<ResourceAndGroupId, ContainerInfo> = {
     routingKey: "overview",
 };
 
-const createAPIRoute: RouteSetup<ResourceAndGroupId, API_EntryConfig> = {
+const createAPIRoute: RouteSetup<ResourceAndGroupId, AppGatewayRoutingRuleDTO> = {
     content: {
         type: "create",
         call: (ids, api) => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.apis.post(ids.resourceGroupName, ids.resourceName, api),
-        schema: OpenAPISchema("API_EntryConfig"),
+        schema: OpenAPISchema("AppGatewayRoutingRuleDTO"),
     },
     displayText: "Create API",
     icon: "plus",
     routingKey: "create",
 };
 
-const apisViewModel: RouteSetup<ResourceAndGroupId, API_EntryConfig> = {
+const apisViewModel: RouteSetup<ResourceAndGroupId, AppGatewayRoutingRuleDTO> = {
     content: {
         type: "list",
         actions: [
@@ -64,7 +64,7 @@ const apisViewModel: RouteSetup<ResourceAndGroupId, API_EntryConfig> = {
             {
                 type: "edit",
                 updateResource: (ids, newProps, oldProps) => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.apis.put(ids.resourceGroupName, ids.resourceName, { oldFrontendDomainName: oldProps.frontendDomainName, newProps }),
-                schema: OpenAPISchema("API_EntryConfig")
+                schema: OpenAPISchema("AppGatewayRoutingRuleDTO")
             },
             {
                 type: "delete",
@@ -72,7 +72,7 @@ const apisViewModel: RouteSetup<ResourceAndGroupId, API_EntryConfig> = {
             }
         ],
         requestObjects: ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.apis.get(ids.resourceGroupName, ids.resourceName),
-        schema: OpenAPISchema("API_EntryConfig")
+        schema: OpenAPISchema("AppGatewayRoutingRuleDTO")
     },
     displayText: "APIs",
     icon: "list",

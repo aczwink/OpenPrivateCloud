@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -55,6 +55,15 @@ class MariaDBAPIController extends ResourceAPIControllerBase
     )
     {
         await this.mariaDBManager.CreateDatabase(resourceReference, data.Database);
+    }
+
+    @Delete("databases")
+    public async DeleteDatabase(
+        @Common resourceReference: ResourceReference,
+        @Body data: MySQLDatabaseEntry,
+    )
+    {
+        await this.mariaDBManager.DeleteDatabase(resourceReference, data.Database);
     }
 
     @Get("databases")

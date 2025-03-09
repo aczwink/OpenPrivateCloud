@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -116,7 +116,7 @@ class _api_ extends ResourceAPIControllerBase
             controllerDB: config.sources.controllerDB,
             databases: config.sources.databases,
             fileStorages: config.sources.fileStorages,
-            keyVaults: await config.sources.keyVaults.Values().Map(x => this.resourcesManager.CreateResourceReference(x.resourceId)).MapAsync(x => ({ id: x!.externalId })).PromiseAll(),
+            keyVaults: await config.sources.keyVaults.Values().Map(x => this.resourcesManager.CreateResourceReference(x.resourceId)).Async().Map(x => ({ id: x!.externalId })).ToArray(),
         };
         return sources;
     }

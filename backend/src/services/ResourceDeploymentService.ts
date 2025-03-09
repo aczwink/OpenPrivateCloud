@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,7 @@ export class ResourceDeploymentService
     }
 
     //Public methods
-    public async StartInstanceDeployment(resourceProperties: BaseResourceProperties, resourceGroup: ResourceGroup, hostId: number, userId: number)
+    public async StartInstanceDeployment(resourceProperties: BaseResourceProperties, resourceGroup: ResourceGroup, hostId: number, opcUserId: number)
     {
         const {resourceProvider, resourceTypeDef} = this.resourceProviderManager.FindResourceProviderByResourceProperties(resourceProperties);
 
@@ -65,18 +65,18 @@ export class ResourceDeploymentService
             hostName: host!.hostName,
             hostStoragePath: storage!.path,
         });
-        this.TryDeployInstance(resourceProvider, resourceProperties, ref, hostId, storage!, userId);
+        this.TryDeployInstance(resourceProvider, resourceProperties, ref, hostId, storage!, opcUserId);
         return ref;
     }
 
     //Private methods
-    private async DeployInstance(resourceProvider: ResourceProvider<any>, instanceProperties: BaseResourceProperties, instanceReference: ResourceReference, hostId: number, storage: HostStorage, userId: number)
+    private async DeployInstance(resourceProvider: ResourceProvider<any>, instanceProperties: BaseResourceProperties, instanceReference: ResourceReference, hostId: number, storage: HostStorage, opcUserId: number)
     {
         const result = await resourceProvider.ProvideResource(instanceProperties, {
             resourceReference: instanceReference,
             hostId,
             storagePath: storage.path,
-            userId,
+            opcUserId,
         });
 
         if(result.config !== undefined)
@@ -85,12 +85,12 @@ export class ResourceDeploymentService
         }
     }
     
-    private async TryDeployInstance(resourceProvider: ResourceProvider<any>, instanceProperties: BaseResourceProperties, resourceReference: ResourceReference, hostId: number, storage: HostStorage, userId: number)
+    private async TryDeployInstance(resourceProvider: ResourceProvider<any>, instanceProperties: BaseResourceProperties, resourceReference: ResourceReference, hostId: number, storage: HostStorage, opcUserId: number)
     {
         const tracker = await this.processTrackerManager.Create(hostId, "Deployment of: " + resourceReference.externalId);
         try
         {
-            await this.DeployInstance(resourceProvider, instanceProperties, resourceReference, hostId, storage, userId);
+            await this.DeployInstance(resourceProvider, instanceProperties, resourceReference, hostId, storage, opcUserId);
             tracker.Finish();
 
             await this.resourceHealthManager.CheckResourceAvailability(resourceReference.id);

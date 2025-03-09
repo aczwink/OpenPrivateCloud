@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,21 +15,19 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Get, Header, NotFound, Path, Query } from "acts-util-apilib";
+import { APIController, Auth, Get, NotFound, Path, Query } from "acts-util-apilib";
 import { ResourceLogsController } from "../data-access/ResourceLogsController";
 import { ResourcesController } from "../data-access/ResourcesController";
 import { ResourcesManager } from "../services/ResourcesManager";
-import { PermissionsController } from "../data-access/PermissionsController";
 import { ResourceQueryService } from "../services/ResourceQueryService";
-import { SessionsManager } from "../services/SessionsManager";
-import { PermissionsManager } from "../services/PermissionsManager";
-import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
+import { AccessToken } from "../api_security";
+import { UsersManager } from "../services/UsersManager";
 
 @APIController("resources")
 class _api_
 {
-    constructor(private resourceLogsController: ResourceLogsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private permissionsController: PermissionsController,
-        private resourceQueryService: ResourceQueryService, private sessionsManager: SessionsManager, private permissionsManager: PermissionsManager, private resourceGroupsController: ResourceGroupsController)
+    constructor(private resourceLogsController: ResourceLogsController, private resourcesController: ResourcesController, private resourcesManager: ResourcesManager,
+        private resourceQueryService: ResourceQueryService, private usersManager: UsersManager)
     {
     }
 
@@ -59,10 +57,12 @@ class _api_
     }
 
     @Get()
-    public async QueryResources(@Header Authorization: string)
+    public async QueryResources(
+        @Auth("jwt") accessToken: AccessToken
+    )
     {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        const resourceIds = await this.resourceQueryService.QueryResourceIds(userId);
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
+        const resourceIds = await this.resourceQueryService.QueryResourceIds(opcUserId);
         return this.resourceQueryService.QueryOverviewData(resourceIds);
     }
 

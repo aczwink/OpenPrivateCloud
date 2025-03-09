@@ -159,6 +159,14 @@ const databasesViewModel: RouteSetup<ResourceAndGroupId, MySQLDatabaseEntry> = {
         actions: [
             createDatabaseRoute
         ],
+        boundActions: [
+            {
+                type: "delete",
+                deleteResource: (ids, dbEntry) => {
+                    return Use(APIService).resourceProviders._any_.databaseservices.mariadb._any_.databases.delete(ids.resourceGroupName, ids.resourceName, dbEntry);
+                }
+            }
+        ],
         requestObjects: ids => Use(APIService).resourceProviders._any_.databaseservices.mariadb._any_.databases.get(ids.resourceGroupName, ids.resourceName),
         schema: APISchemaOf(x => x.MySQLDatabaseEntry),
     },

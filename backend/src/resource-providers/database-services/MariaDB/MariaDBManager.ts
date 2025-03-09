@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -88,6 +88,12 @@ export class MariaDBManager
     {
         const mariaDBInterface = await this.QueryInterface(resourceReference.id);
         await mariaDBInterface.CreateUser(resourceReference, userName, hostName, password);
+    }
+
+    public async DeleteDatabase(resourceReference: ResourceReference, databaseName: string)
+    {
+        const mariaDBInterface = await this.QueryInterface(resourceReference.id);
+        await mariaDBInterface.DeleteDatabase(resourceReference, databaseName);
     }
 
     public async DeleteResource(resourceReference: ResourceReference)

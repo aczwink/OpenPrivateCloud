@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,19 +16,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Common, Body, Forbidden, Get, Header, Path, Put, Query, Post, BadRequest, NotFound } from "acts-util-apilib";
+import { APIController, Common, Body, Forbidden, Get, Path, Put, Query, Post, BadRequest, NotFound, Auth } from "acts-util-apilib";
 import path from "path";
 import { HostUsersManager } from "../../../services/HostUsersManager";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../../services/RemoteFileSystemManager";
 import { c_fileServicesResourceProviderName, c_fileStorageResourceTypeName } from "openprivatecloud-common/dist/constants";
-import { SessionsManager } from "../../../services/SessionsManager";
 import { FileStorageConfig, FileStoragesManager } from "../FileStoragesManager";
 import { ResourceReference, ResourceReferenceWithSession } from "../../../common/ResourceReference";
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { PermissionsManager } from "../../../services/PermissionsManager";
 import { permissions } from "openprivatecloud-common";
 import { DateTime } from "acts-util-node";
+import { AccessToken } from "../../../api_security";
+import { UsersManager } from "../../../services/UsersManager";
 
 interface DeploymentDataDto
 {
@@ -45,7 +46,7 @@ interface FileEntry
     /**
      * @format user
      */
-    userId: number;
+    opcUserId: number;
 }
 
 interface SnapshotDto
@@ -57,7 +58,7 @@ interface SnapshotDto
 class FileStorageAPIController extends ResourceAPIControllerBase
 {
     constructor(private remoteFileSystemManager: RemoteFileSystemManager, resourcesManager: ResourcesManager, private hostUsersManager: HostUsersManager, private permissionsManager: PermissionsManager,
-        private sessionsManager: SessionsManager, private fileStoragesManager: FileStoragesManager)
+        private fileStoragesManager: FileStoragesManager, private usersManager: UsersManager)
     {
         super(resourcesManager, c_fileServicesResourceProviderName, c_fileStorageResourceTypeName);
     }
@@ -66,7 +67,7 @@ class FileStorageAPIController extends ResourceAPIControllerBase
     public async ExtractCommonAPIData(
         @Path resourceGroupName: string,
         @Path resourceName: string,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
         const ref = await this.FetchResourceReference(resourceGroupName, resourceName);
@@ -75,7 +76,7 @@ class FileStorageAPIController extends ResourceAPIControllerBase
 
         const res: ResourceReferenceWithSession = {
             resourceReference: ref,
-            userId: this.sessionsManager.GetUserIdFromAuthHeader(Authorization)
+            opcUserId: await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub)
         }
         return res;
     }
@@ -95,7 +96,7 @@ class FileStorageAPIController extends ResourceAPIControllerBase
         @Query dirPath: string
     )
     {
-        const hasPermission = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.data.read);
+        const hasPermission = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.opcUserId, permissions.data.read);
         if(!hasPermission)
             return Forbidden("access denied");
 
@@ -123,10 +124,11 @@ class FileStorageAPIController extends ResourceAPIControllerBase
     @Get("smbconnect")
     public async QuerySMBConnectionInfo(
         @Common context: ResourceReferenceWithSession,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        return await this.fileStoragesManager.GetSMBConnectionInfo(context.resourceReference, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
+        return await this.fileStoragesManager.GetSMBConnectionInfo(context.resourceReference, opcUserId);
     }
 
     @Get("config")
@@ -170,7 +172,7 @@ class FileStorageAPIController extends ResourceAPIControllerBase
             fileName: fileName,
             type: status.isDirectory() ? "directory" : "file",
             size: status.size,
-            userId: this.hostUsersManager.MapLinuxUserNameToUserId(linuxUserName)
+            opcUserId: this.hostUsersManager.MapLinuxUserNameToUserId(linuxUserName)
         };
     }
 }

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -64,6 +64,12 @@ export class MariaDBContainerManager implements MariaDBInterface
     {
         const client = this.CreateClient(resourceReference);
         await client.CreateUser(userName, hostName, password);
+    }
+
+    public async DeleteDatabase(resourceReference: LightweightResourceReference, databaseName: string): Promise<void>
+    {
+        const client = this.CreateClient(resourceReference);
+        await client.DropDatabase(databaseName);
     }
 
     public async DeleteResource(resourceReference: LightweightResourceReference): Promise<void>

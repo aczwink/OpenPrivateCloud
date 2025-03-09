@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,14 +25,10 @@ import "./api/HostStoragesAPIController";
 import "./api/resourceGroups";
 import "./api/resources";
 import "./api/processes";
-import "./api/public";
 import "./api/ResourceProviderAPIController";
 import "./api/RolesAPIController";
 import "./api/roleAssignments";
-import "./api/sessions";
-import "./api/UserGroupsAPIController";
 import "./api/user";
-import "./api/users";
 
 import "./resource-providers/backup-services/api/backup-vault";
 import "./resource-providers/compute-services/api/docker-container-app-service";

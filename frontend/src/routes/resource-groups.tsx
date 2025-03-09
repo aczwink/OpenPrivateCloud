@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,6 @@
  * */
 
 import { RouteSetup } from "acfrontendex";
-import { AuthGuard } from "../AuthGuard";
 import { JSX_CreateElement, Use } from "acfrontend";
 import { APIService } from "../services/APIService";
 import { ResourceGroupDTO, RoleAssignment } from "../../dist/api";
@@ -25,7 +24,6 @@ import { APISchemaOf } from "../api-info";
 import { ResourceListComponent } from "../components/resources/ResourceListComponent";
 import { CreateResourceComponent } from "../components/resources/CreateResourceComponent";
 import { resourceTypesRoutes } from "./resources";
-import { ClusterLockedGuard } from "../ClusterLockedGuard";
 
 type ResourceGroupId = { resourceGroupName: string };
 
@@ -142,7 +140,7 @@ export const resourceGroupsRoute: RouteSetup<{}, ResourceGroupDTO> = {
         schema: APISchemaOf(x => x.ResourceGroupDTO),
     },
     displayText: "Resource groups",
-    guards: [ClusterLockedGuard, AuthGuard],
     icon: "collection-fill",
+    requiredScopes: ["admin"],
     routingKey: "resourcegroups",
 };

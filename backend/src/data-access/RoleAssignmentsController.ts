@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,10 +22,10 @@ import { DBConnectionsManager } from "./DBConnectionsManager";
 export interface RoleAssignment
 {
     /**
-     * @title Usergroup
-     * @format usergroup
+     * @title User/Group
+     * @format oidpPrincipalObjectId
      */
-    userGroupId: number;
+    objectId: string;
 
     /**
      * @title Role
@@ -48,40 +48,40 @@ export class RoleAssignmentsController
         await conn.InsertRow("cluster_roleAssignments", roleAssignment);
     }
 
-    public async AddResourceLevelRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
+    public async AddResourceLevelRoleAssignment(resourceId: number, roleAssignment: RoleAssignment)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("instances_roleAssignments", { instanceId, userGroupId: roleAssignment.userGroupId, roleId: roleAssignment.roleId });
+        await conn.InsertRow("resources_roleAssignments", { resourceId, objectId: roleAssignment.objectId, roleId: roleAssignment.roleId });
     }
 
-    public async AddInstanceGroupRoleAssignment(instanceGroupId: number, roleAssignment: RoleAssignment)
+    public async AddInstanceGroupRoleAssignment(resourceGroupId: number, roleAssignment: RoleAssignment)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.InsertRow("instancegroups_roleAssignments", { instanceGroupId, userGroupId: roleAssignment.userGroupId, roleId: roleAssignment.roleId });
+        await conn.InsertRow("resourcegroups_roleAssignments", { resourceGroupId, objectId: roleAssignment.objectId, roleId: roleAssignment.roleId });
     }
 
     public async DeleteClusterRoleAssignment(roleAssignment: RoleAssignment)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("cluster_roleAssignments", "userGroupId = ? AND roleId = ?", roleAssignment.userGroupId, roleAssignment.roleId);
+        await conn.DeleteRows("cluster_roleAssignments", "objectId = ? AND roleId = ?", roleAssignment.objectId, roleAssignment.roleId);
     }
 
-    public async DeleteInstanceRoleAssignment(instanceId: number, roleAssignment: RoleAssignment)
+    public async DeleteResourceLevelRoleAssignment(resourceId: number, roleAssignment: RoleAssignment)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("instances_roleAssignments", "instanceId = ? AND userGroupId = ? AND roleId = ?", instanceId, roleAssignment.userGroupId, roleAssignment.roleId);
+        await conn.DeleteRows("resources_roleAssignments", "resourceId = ? AND objectId = ? AND roleId = ?", resourceId, roleAssignment.objectId, roleAssignment.roleId);
     }
 
-    public async DeleteResourceGroupRoleAssignment(instanceGroupId: number, roleAssignment: RoleAssignment)
+    public async DeleteResourceGroupRoleAssignment(resourceGroupId: number, roleAssignment: RoleAssignment)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.DeleteRows("instancegroups_roleAssignments", "instanceGroupId = ? AND userGroupId = ? AND roleId = ?", instanceGroupId, roleAssignment.userGroupId, roleAssignment.roleId);
+        await conn.DeleteRows("resourcegroups_roleAssignments", "resourceGroupId = ? AND objectId = ? AND roleId = ?", resourceGroupId, roleAssignment.objectId, roleAssignment.roleId);
     }
 
     public async QueryAllClusterRoleAssignments()
     {
         const query = `
-        SELECT userGroupId, CAST(roleId AS char) AS roleId
+        SELECT objectId, CAST(roleId AS char) AS roleId
         FROM cluster_roleAssignments
         `;
 
@@ -94,22 +94,22 @@ export class RoleAssignmentsController
     public async QueryResourceLevelRoleAssignments(resourceId: number)
     {
         const query = `
-        SELECT ira.userGroupId, CAST(ira.roleId AS char) AS roleId
-        FROM instances_roleAssignments ira
-        WHERE ira.instanceId = ?
+        SELECT ira.objectId, CAST(ira.roleId AS char) AS roleId
+        FROM resources_roleAssignments ira
+        WHERE ira.resourceId = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
         return await conn.Select<RoleAssignment>(query, resourceId);
     }
 
-    public async QueryResourceGroupRoleAssignments(instanceGroupId: number)
+    public async QueryResourceGroupRoleAssignments(resourceGroupId: number)
     {
         const query = `
-        SELECT igra.userGroupId, CAST(igra.roleId AS char) AS roleId
-        FROM instancegroups_roleAssignments igra
-        WHERE igra.instanceGroupId = ?
+        SELECT igra.objectId, CAST(igra.roleId AS char) AS roleId
+        FROM resourcegroups_roleAssignments igra
+        WHERE igra.resourceGroupId = ?
         `;
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        return await conn.Select<RoleAssignment>(query, instanceGroupId);
+        return await conn.Select<RoleAssignment>(query, resourceGroupId);
     }
 }

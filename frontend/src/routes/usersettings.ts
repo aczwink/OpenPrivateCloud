@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,10 +17,7 @@
  * */
 
 import { RouteSetup } from "acfrontendex";
-import { ChangeUserPasswordComponent } from "../components/user-settings/ChangeUserPasswordComponent";
 import { UserSecretComponent } from "../components/user-settings/UserSecretComponent";
-import { AuthGuard } from "../AuthGuard";
-import { ClusterLockedGuard } from "../ClusterLockedGuard";
 
 export const userSettingsViewModel: RouteSetup = {
     content: {
@@ -39,22 +36,13 @@ export const userSettingsViewModel: RouteSetup = {
                         icon: "wallet",
                         routingKey: "wallet",
                     },
-                    {
-                        content: {
-                            type: "component",
-                            component: ChangeUserPasswordComponent
-                        },
-                        displayText: "Change password",
-                        icon: "key",
-                        routingKey: "pw",
-                    }
                 ]
             }
         ],
         formTitle: _ => "User settings",
     },
     displayText: "User settings",
-    guards: [ClusterLockedGuard, AuthGuard],
     icon: "person",
+    requiredScopes: ["admin"],
     routingKey: "usersettings",
 };

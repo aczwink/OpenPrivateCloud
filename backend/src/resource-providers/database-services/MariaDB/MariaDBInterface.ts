@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,6 +24,7 @@ export interface MariaDBInterface
     CheckAllDatabases(resourceReference: LightweightResourceReference): Promise<string>;
     CreateDatabase(resourceReference: LightweightResourceReference, databaseName: string): Promise<void>;
     CreateUser(resourceReference: LightweightResourceReference, userName: string, hostName: string, password: string): Promise<void>;
+    DeleteDatabase(resourceReference: LightweightResourceReference, databaseName: string): Promise<void>;
     DeleteResource(resourceReference: ResourceReference): Promise<void>;
     DeleteUser(resourceReference: LightweightResourceReference, userName: string, hostName: string): Promise<void>;
     ExecuteSelectQuery(resourceReference: LightweightResourceReference, query: string): Promise<any[]>;

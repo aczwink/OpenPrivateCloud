@@ -18,30 +18,13 @@
 
 import { Injectable } from "acts-util-node";
 
-interface NoDataEvent
-{
-    type: "keyStoreUnlocked";
-}
-
-interface UserLogInEvent
-{
-    type: "userLogIn";
-    userId: number;
-}
-
-interface UserLogOutEvent
-{
-    type: "userLogOut";
-    userId: number;
-}
-
 interface UserSambaPasswordChangedEvent
 {
     type: "userSambaPasswordChanged";
-    userId: number;
+    opcUserId: number;
 }
 
-type ClusterEvent = NoDataEvent | UserLogInEvent | UserLogOutEvent | UserSambaPasswordChangedEvent;
+type ClusterEvent = UserSambaPasswordChangedEvent;
 
 type EventCallback = (event: ClusterEvent) => void;
   

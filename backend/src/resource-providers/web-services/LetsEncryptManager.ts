@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -34,12 +34,12 @@ import { DockerContainerConfig, DockerManager } from "../compute-services/Docker
 import { ManagedDockerContainerManager } from "../compute-services/ManagedDockerContainerManager";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
-import { UsersController } from "../../data-access/UsersController";
 import { TimeUtil } from "acts-util-core";
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 import { RemoteRootFileSystemManager } from "../../services/RemoteRootFileSystemManager";
 import { ResourceDeletionService } from "../../services/ResourceDeletionService";
+import { UsersManager } from "../../services/UsersManager";
 
 interface LetsEncryptCertBotConfig
 {
@@ -59,7 +59,7 @@ export class LetsEncryptManager
     constructor(private resourceConfigController: ResourceConfigController, private resourceDeploymentService: ResourceDeploymentService, private resourceGroupsController: ResourceGroupsController, 
         private resourceProviderManager: ResourceProviderManager, private hostFirewallSettingsManager: HostFirewallSettingsManager, private vnetManager: VNetManager, private dockerManager: DockerManager,
         private managedDockerContainerManager: ManagedDockerContainerManager, private resourcesManager: ResourcesManager, private remoteFileSystemManager: RemoteFileSystemManager,
-        private usersController: UsersController, private resourceDependenciesController: ResourceDependenciesController, private keyVaultManager: KeyVaultManager,
+        private usersManager: UsersManager, private resourceDependenciesController: ResourceDependenciesController, private keyVaultManager: KeyVaultManager,
         private remoteRootFileSystemManager: RemoteRootFileSystemManager, private resourceDeletionService: ResourceDeletionService)
     {
     }
@@ -93,7 +93,7 @@ export class LetsEncryptManager
             isRunning: false,
             keyVaultResourceId: kvRef.id,
             sourcePort: instanceProperties.sourcePort,
-            userId: context.userId,
+            userId: context.opcUserId,
             vNetAddressSpace: instanceProperties.vNetAddressSpace
         };
         await this.WriteConfig(context.resourceReference.id, config);
@@ -102,9 +102,9 @@ export class LetsEncryptManager
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, path.join(basePath, "etc"));
         await this.remoteFileSystemManager.CreateDirectory(context.hostId, path.join(basePath, "logs"));
 
-        const user = await this.usersController.QueryUser(context.userId);
+        const emailAddress = await this.usersManager.QueryUsersEMailAddress(context.opcUserId);
 
-        const command = ["certonly", "--cert-name", instanceProperties.domainName, "-v", "-d", instanceProperties.domainName, "--standalone", "-m", user!.emailAddress, "--agree-tos"];
+        const command = ["certonly", "--cert-name", instanceProperties.domainName, "-v", "-d", instanceProperties.domainName, "--standalone", "-m", emailAddress, "--agree-tos"];
         await this.OrchestrateCertbotWorkflow(context.resourceReference, command);
     }
 
@@ -263,7 +263,8 @@ export class LetsEncryptManager
             port: config.sourcePort,
             protocol: "TCP",
             targetAddress: containerAddress.ToString(),
-            targetPort: httpPort
+            targetPort: httpPort,
+            externalZoneOnly: false
         });
         await TimeUtil.Delay(5000); //wait for firewall to refresh
 

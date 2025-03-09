@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2024-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -40,7 +40,7 @@ export class ResourceRehostingService
     }
 
     //Public methods
-    public async RehostResource(resourceReference: ResourceReference, targetProperties: BaseResourceProperties, targetHostId: number, userId: number)
+    public async RehostResource(resourceReference: ResourceReference, targetProperties: BaseResourceProperties, targetHostId: number, opcUserId: number)
     {
         const {resourceProvider, resourceTypeDef} = this.resourceProviderManager.FindResourceProviderByResourceProperties(targetProperties);
         if(resourceProvider.name !== resourceReference.resourceProviderName)
@@ -72,7 +72,7 @@ export class ResourceRehostingService
             resourceReference: targetResourceReference,
             hostId: targetHostId,
             storagePath: storage!.path,
-            userId,
+            opcUserId: opcUserId,
         });
 
         await this.resourcesController.UpdateResourceStorage(resourceReference.id, storageId);

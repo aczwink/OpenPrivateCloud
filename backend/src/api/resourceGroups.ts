@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
-import { APIController, Body, BodyProp, Common, Conflict, Delete, Forbidden, Get, Header, NotFound, Patch, Path, Post } from "acts-util-apilib";
+import { APIController, Auth, Body, BodyProp, Common, Conflict, Delete, Forbidden, Get, NotFound, Patch, Path, Post } from "acts-util-apilib";
 import { ResourceGroup, ResourceGroupsController } from "../data-access/ResourceGroupsController";
-import { SessionsManager } from "../services/SessionsManager";
 import { PermissionsController } from "../data-access/PermissionsController";
 import { permissions } from "openprivatecloud-common";
 import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
@@ -30,6 +29,8 @@ import { ResourceQueryService } from "../services/ResourceQueryService";
 import { PermissionsManager } from "../services/PermissionsManager";
 import { ResourceDeletionService } from "../services/ResourceDeletionService";
 import { ResourceRehostingService } from "../services/ResourceRehostingService";
+import { AccessToken } from "../api_security";
+import { UsersManager } from "../services/UsersManager";
 
 interface ResourceGroupDTO
 {
@@ -39,7 +40,7 @@ interface ResourceGroupDTO
 interface ResourceGroupWithSession
 {
     resourceGroup: ResourceGroup;
-    userId: number;
+    opcUserId: number;
 }
 
 function ToDTO(input: ResourceGroup | undefined): ResourceGroupDTO | undefined
@@ -55,7 +56,9 @@ function ToDTO(input: ResourceGroup | undefined): ResourceGroupDTO | undefined
 @APIController("resourceGroups")
 class _api_
 {
-    constructor(private resourceGroupsController: ResourceGroupsController, private sessionsManager: SessionsManager, private permissionsController: PermissionsController)
+    constructor(private resourceGroupsController: ResourceGroupsController, private permissionsController: PermissionsController,
+        private usersManager: UsersManager, private permissionsManager: PermissionsManager
+    )
     {
     }
 
@@ -69,17 +72,17 @@ class _api_
 
     @Get()
     public async QueryInstanceGroups(
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
 
         let groups;
-        if(await this.permissionsController.HasUserClusterWidePermission(userId, permissions.read))
+        if(await this.permissionsManager.HasUserClusterWidePermission(opcUserId, permissions.read))
             groups = await this.resourceGroupsController.QueryAllGroups();
         else
         {
-            const groupIds = await this.permissionsController.QueryResourceGroupIdsThatUserHasAccessTo(userId);
+            const groupIds = await this.permissionsManager.QueryResourceGroupIdsThatUserHasAccessTo(opcUserId);
             const result = await groupIds.Map(id => this.resourceGroupsController.QueryGroup(id)).PromiseAll();
             groups = result;
         }
@@ -135,16 +138,17 @@ class _api4_
 @APIController("resourceGroups/{resourceGroupName}/resources")
 class _api3_
 {
-    constructor(private resourceGroupsController: ResourceGroupsController, private hostsController: HostsController, private sessionsManager: SessionsManager,
-        private permissionsController: PermissionsController, private resourcesManager: ResourcesManager, private resourceDeploymentService: ResourceDeploymentService,
-        private resourceQueryService: ResourceQueryService, private resourceDeletionService: ResourceDeletionService, private resourceRehostingService: ResourceRehostingService)
+    constructor(private resourceGroupsController: ResourceGroupsController, private hostsController: HostsController,
+        private resourcesManager: ResourcesManager, private resourceDeploymentService: ResourceDeploymentService,
+        private resourceQueryService: ResourceQueryService, private resourceDeletionService: ResourceDeletionService, private resourceRehostingService: ResourceRehostingService,
+        private usersManager: UsersManager, private permissionsManager: PermissionsManager)
     {
     }
 
     @Common()
     public async Common(
         @Path resourceGroupName: string,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
         const group = await this.resourceGroupsController.QueryGroupByName(resourceGroupName);
@@ -153,7 +157,7 @@ class _api3_
 
         const res: ResourceGroupWithSession = {
             resourceGroup: group,
-            userId: this.sessionsManager.GetUserIdFromAuthHeader(Authorization)
+            opcUserId: await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub),
         }
         return res;
     }
@@ -221,7 +225,7 @@ class _api3_
         if(hostId === undefined)
             return NotFound("host not found");
 
-        await this.resourceDeploymentService.StartInstanceDeployment(properties, common.resourceGroup, hostId, common.userId);
+        await this.resourceDeploymentService.StartInstanceDeployment(properties, common.resourceGroup, hostId, common.opcUserId);
     }
 
     @Get()
@@ -229,7 +233,7 @@ class _api3_
         @Common common: ResourceGroupWithSession
     )
     {
-        const resourceIds = await this.permissionsController.QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(common.userId, common.resourceGroup.id);
+        const resourceIds = await this.permissionsManager.QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(common.opcUserId, common.resourceGroup.id);
         return this.resourceQueryService.QueryOverviewData(resourceIds);
     }
 
@@ -248,27 +252,28 @@ class _api3_
         if(hostId === undefined)
             return NotFound("target host not found");
 
-        await this.resourceRehostingService.RehostResource(ref, targetProperties, hostId, common.userId);
+        await this.resourceRehostingService.RehostResource(ref, targetProperties, hostId, common.opcUserId);
     }
 }
 
 interface ResourceGroupAndUserId
 {
     resourceGroupId: number;
-    userId: number;
+    opcUserId: number;
 }
 
 @APIController("resourceGroups/{resourceGroupName}/roleAssignments")
 class _api2_
 {
-    constructor(private roleAssignmentsController: RoleAssignmentsController, private resourceGroupsController: ResourceGroupsController, private sessionsManager: SessionsManager, private permissionsManager: PermissionsManager)
+    constructor(private roleAssignmentsController: RoleAssignmentsController, private resourceGroupsController: ResourceGroupsController,
+        private permissionsManager: PermissionsManager, private usersManager: UsersManager)
     {
     }
 
     @Common()
     public async Common(
         @Path resourceGroupName: string,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
         const group = await this.resourceGroupsController.QueryGroupByName(resourceGroupName);
@@ -277,7 +282,7 @@ class _api2_
 
         const res: ResourceGroupAndUserId = {
             resourceGroupId: group.id,
-            userId: this.sessionsManager.GetUserIdFromAuthHeader(Authorization)
+            opcUserId: await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub)
         }
         return res;
     }
@@ -288,7 +293,7 @@ class _api2_
         @Body roleAssignment: RoleAssignment
     )
     {
-        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceGroupScope(context.resourceGroupId, context.userId, permissions.roleAssignments.write);
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceGroupScope(context.resourceGroupId, context.opcUserId, permissions.roleAssignments.write);
         if(!canWriteData)
             return Forbidden("write access to role assignments denied");
 
@@ -301,7 +306,7 @@ class _api2_
         @Body roleAssignment: RoleAssignment
     )
     {
-        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceGroupScope(context.resourceGroupId, context.userId, permissions.roleAssignments.write);
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceGroupScope(context.resourceGroupId, context.opcUserId, permissions.roleAssignments.write);
         if(!canWriteData)
             return Forbidden("delete access to role assignments denied");
 

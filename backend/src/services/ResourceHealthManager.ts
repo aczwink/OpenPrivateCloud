@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,24 +19,22 @@
 import { DateTime, Injectable } from "acts-util-node";
 import { HealthController, HealthStatus } from "../data-access/HealthController";
 import { ResourcesController } from "../data-access/ResourcesController";
-import { UserGroupsController } from "../data-access/UserGroupsController";
-import { NotificationsManager } from "./NotificationsManager";
 import { ResourceProviderManager } from "./ResourceProviderManager";
 import { TaskScheduler } from "./TaskScheduler";
 import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
 import { ErrorService } from "./ErrorService";
 import { ResourcesManager } from "./ResourcesManager";
-import { ResourceReference } from "../common/ResourceReference";
 import { ModulesManager } from "./ModulesManager";
 import { ResourceCheckType } from "../resource-providers/ResourceProvider";
 import { TimeSchedule } from "../common/TimeSchedule";
+import { LoggingService } from "./LoggingService";
   
 @Injectable
 export class ResourceHealthManager
 {
     constructor(private resourcesController: ResourcesController, private resourceProviderManager: ResourceProviderManager, private resourceGroupController: ResourceGroupsController,
-        private healthController: HealthController, private taskScheduler: TaskScheduler, private notificationsManager: NotificationsManager, private modulesManager: ModulesManager,
-        private userGroupsController: UserGroupsController, private errorService: ErrorService, private resourcesManager: ResourcesManager)
+        private healthController: HealthController, private taskScheduler: TaskScheduler, private modulesManager: ModulesManager,
+        private errorService: ErrorService, private resourcesManager: ResourcesManager, private loggingService: LoggingService)
     {
     }
     
@@ -125,20 +123,12 @@ export class ResourceHealthManager
         catch(e)
         {
             await this.UpdateResourceHealth(ref.id, checkType, HealthStatus.Corrupt, e);
-            const userGroupId = await this.FindGroupAssociatedWithInstance(ref);
-            await this.notificationsManager.SendErrorNotification(userGroupId, "Resource health check failed", e);
+            this.loggingService.LogError("Resource health check failed", { resourceId, error: e });
             return false;
         }
 
         await this.UpdateResourceHealth(ref.id, checkType, HealthStatus.Up);
         return true;
-    }
-
-    private async FindGroupAssociatedWithInstance(resourceReference: ResourceReference)
-    {
-        //TODO: instances would need an owner or creator
-        const groups = await this.userGroupsController.QueryUserGroups();
-        return groups[0].id;
     }
 
     private async RequestDataIntegrityCheckSchedule(resourceId: number)

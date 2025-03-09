@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,6 @@ import { AddHostDTO, FirewallRule, Host, HostBootEntryDTO, HostHealthData, HostS
 import { JSX_CreateElement, Use } from "acfrontend";
 import { APIService } from "../services/APIService";
 import { APISchemaOf } from "../api-info";
-import { AuthGuard } from "../AuthGuard";
 import { HostUpdateComponent } from "../components/host/HostUpdateComponent";
 import { HostMonitorComponent } from "../components/host/HostMonitorComponent";
 import { ViewProcessesListComponent } from "../components/activitymonitor/ViewProcessesListComponent";
@@ -28,7 +27,6 @@ import { DataExplorerComponent } from "../components/data-explorer/DataExplorerC
 import { HostFirewallTracingComponent } from "../components/host/HostFirewallTracingComponent";
 import { NetworkTraceSimulationComponent } from "../components/host/NetworkTraceSimulationComponent";
 import { ShowSMARTInfoComponent } from "../components/host/ShowSMARTInfoComponent";
-import { ClusterLockedGuard } from "../ClusterLockedGuard";
 import { ResourceListComponent } from "../components/resources/ResourceListComponent";
 
 const addHostRoute: RouteSetup<{}, AddHostDTO> = {
@@ -462,7 +460,7 @@ export const hostsRoute: RouteSetup<{}, Host> = {
         schema: APISchemaOf(x => x.Host)
     },
     displayText: "Hosts",
-    guards: [ClusterLockedGuard, AuthGuard],
     icon: "pc",
+    requiredScopes: ["admin"],
     routingKey: "hosts",
 };

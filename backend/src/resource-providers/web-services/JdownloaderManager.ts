@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -70,9 +70,9 @@ export class JdownloaderManager
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
-    public async GetSMBConnectionInfo(resourceReference: ResourceReference, userId: number)
+    public async GetSMBConnectionInfo(resourceReference: ResourceReference, opcUserId: number)
     {
-        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(resourceReference, userId);
+        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(resourceReference, opcUserId);
     }
 
     public async IsActive(resourceReference: LightweightResourceReference)
@@ -191,7 +191,8 @@ export class JdownloaderManager
                     additionalHosts: [],
                     capabilities: [],
                     dnsSearchDomains: [],
-                    dnsServers: [dockerNetwork.primaryDNS_Server],
+                    //dnsServers: [dockerNetwork.primaryDNS_Server], //TODO fix this: for some reason it doesn't work within the vnet
+                    dnsServers: [],
                     env: [
                         {
                             varName: "MYJD_USER",
@@ -208,7 +209,8 @@ export class JdownloaderManager
                     ],
                     imageName: "jaymoulin/jdownloader",
                     macAddress: this.managedDockerContainerManager.CreateMAC_Address(resourceReference.id),
-                    networkName: dockerNetwork.name,
+                    //networkName: dockerNetwork.name, //TODO fix this: for some reason it doesn't work within the vnet
+                    networkName: "host",
                     portMap: [],
                     privileged: false,
                     removeOnExit: false,

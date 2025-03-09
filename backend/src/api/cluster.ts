@@ -16,31 +16,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Get, Header, Put } from "acts-util-apilib";
+import { APIController, Auth, Body, Get, Put } from "acts-util-apilib";
 import { MailerSettings } from "../services/EMailService";
 import { NotificationsManager } from "../services/NotificationsManager";
-import { SessionsManager } from "../services/SessionsManager";
-import { ClusterKeyStoreManager } from "../services/ClusterKeyStoreManager";
-import { ClusterConfigManager, PublicClusterSettings } from "../services/ClusterConfigManager";
-
-@APIController("cluster/keystore")
-class _api_
-{
-    constructor(private clusterKeyStoreManager: ClusterKeyStoreManager)
-    {
-    }
-
-    @Get("locked")
-    public QueryLockedStatus()
-    {
-        return this.clusterKeyStoreManager.IsLocked();
-    }
-}
+import { AccessToken } from "../api_security";
+import { UsersManager } from "../services/UsersManager";
 
 @APIController("cluster/config/notifications")
 class ClusterConfigAPIController
 {
-    constructor(private notificationsManager: NotificationsManager, private sessionsManager: SessionsManager)
+    constructor(private notificationsManager: NotificationsManager, private usersManager: UsersManager)
     {
     }
 
@@ -54,26 +39,10 @@ class ClusterConfigAPIController
     @Put()
     public async UpdateNotificationsConfig(
         @Body config: MailerSettings,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        await this.notificationsManager.SetMailerSettings(config, userId);
-    }
-}
-
-@APIController("cluster/config/settings")
-class _api2_
-{
-    constructor(private clusterConfigManager: ClusterConfigManager)
-    {
-    }
-
-    @Put()
-    public async UpdateConfig(
-        @Body config: PublicClusterSettings,
-    )
-    {
-        await this.clusterConfigManager.SetPublicSettings(config);
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
+        await this.notificationsManager.SetMailerSettings(config, opcUserId);
     }
 }

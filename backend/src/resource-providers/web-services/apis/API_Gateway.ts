@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,29 @@ import { API_EntryConfig, API_GatewayManager } from "../API_GatewayManager";
 import { DockerContainerLogDto } from "../../compute-services/api/docker-container-app-service";
 import { KeyVaultManager } from "../../security-services/KeyVaultManager";
 import { Of } from "acts-util-core";
+
+interface AppGatewayRoutingRuleDTO
+{
+    /**
+     * Set to enforce https traffic or to override the default certificate
+     * @title Certificate
+     * @format key-vault-reference[certificate]
+     */
+    keyVaultCertificateReference?: string;
+
+    /**
+     * Important: If you specify a path, the request path will be URL-decoded. To avoid that, specify only a host i.e. https://10.0.0.1:443 (notice the missing trailing slash).
+     */
+    backendURL: string;
+
+    frontendDomainName: string;
+
+    /**
+     * Define only if you want to override the service configuration value.
+     * @format byteSize
+     */
+    maxRequestBodySize?: number;
+}
 
 interface API_GatewaySettingsDTO
 {
@@ -69,16 +92,17 @@ class _api_ extends ResourceAPIControllerBase
     @Post("apis")
     public async AddAPI(
         @Common resourceReference: ResourceReference,
-        @Body api: API_EntryConfig
+        @Body dto: AppGatewayRoutingRuleDTO
     )
     {
-        await this.apiGatewayManager.AddAPI(resourceReference, api);
+        const rule = await this.MapDTOToRule(dto);
+        await this.apiGatewayManager.AddAPI(resourceReference, rule);
     }
 
     @Delete("apis")
     public async DeleteAPI(
         @Common resourceReference: ResourceReference,
-        @Body api: API_EntryConfig
+        @Body api: AppGatewayRoutingRuleDTO
     )
     {
         const result = await this.apiGatewayManager.DeleteAPI(resourceReference, api);
@@ -87,21 +111,23 @@ class _api_ extends ResourceAPIControllerBase
     }
 
     @Get("apis")
-    public QueryAPIs(
+    public async QueryAPIs(
         @Common resourceReference: ResourceReference,
     )
     {
-        return this.apiGatewayManager.QueryAPIs(resourceReference);
+        const rules = await this.apiGatewayManager.QueryAPIs(resourceReference);
+        return await rules.Values().Map(this.MapRuleToDTO.bind(this)).PromiseAll();
     }
 
     @Put("apis")
     public async UpdateAPI(
         @Common resourceReference: ResourceReference,
         @BodyProp oldFrontendDomainName: string,
-        @BodyProp newProps: API_EntryConfig
+        @BodyProp newProps: AppGatewayRoutingRuleDTO
     )
     {
-        await this.apiGatewayManager.UpdateAPI(resourceReference, oldFrontendDomainName, newProps);
+        const rule = await this.MapDTOToRule(newProps);
+        await this.apiGatewayManager.UpdateAPI(resourceReference, oldFrontendDomainName, rule);
     }
 
     @Get("info")
@@ -165,5 +191,33 @@ class _api_ extends ResourceAPIControllerBase
                 keyVaultId: certRef.kvRef.id
             }
         });
+    }
+
+    //Private methods
+    private async MapDTOToRule(dto: AppGatewayRoutingRuleDTO): Promise<API_EntryConfig>
+    {
+        const certRef = (dto.keyVaultCertificateReference === undefined) ? undefined : await this.keyVaultManager.ResolveKeyVaultReference(dto.keyVaultCertificateReference);
+
+        return {
+            backendURL: dto.backendURL,
+            certificate: (certRef === undefined) ? undefined : {
+                certificateName: certRef.objectName,
+                keyVaultId: certRef.kvRef.id
+            },
+            frontendDomainName: dto.frontendDomainName,
+            maxRequestBodySize: dto.maxRequestBodySize
+        }
+    }
+
+    private async MapRuleToDTO(rule: API_EntryConfig): Promise<AppGatewayRoutingRuleDTO>
+    {
+        const certRef = (rule.certificate === undefined) ? undefined : await this.keyVaultManager.CreateKeyVaultReference(rule.certificate.keyVaultId, "certificate", rule.certificate.certificateName);
+
+        return {
+            backendURL: rule.backendURL,
+            frontendDomainName: rule.frontendDomainName,
+            keyVaultCertificateReference: certRef,
+            maxRequestBodySize: rule.maxRequestBodySize
+        };
     }
 }

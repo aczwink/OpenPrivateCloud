@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,13 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, BodyProp, Common, Conflict, Get, Header, Path, Post, Put } from "acts-util-apilib";
+import { APIController, Auth, Body, BodyProp, Common, Conflict, Get, Path, Post, Put } from "acts-util-apilib";
 import { c_jdownloaderResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
 import { ResourcesManager } from "../../../services/ResourcesManager";
-import { SessionsManager } from "../../../services/SessionsManager";
 import { JDownloaderPublicConfig, JdownloaderManager } from "../JdownloaderManager";
 import { ResourceReference } from "../../../common/ResourceReference";
 import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
+import { AccessToken } from "../../../api_security";
+import { UsersManager } from "../../../services/UsersManager";
 
 interface JdownloaderInfoDto
 {
@@ -38,7 +39,7 @@ interface JdownloaderInfoDto
 @APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_jdownloaderResourceTypeName}/{resourceName}`)
 class JdownloaderAPIController extends ResourceAPIControllerBase
 {
-    constructor(private jdownloaderManager: JdownloaderManager, resourcesManager: ResourcesManager, private sessionsManager: SessionsManager)
+    constructor(private jdownloaderManager: JdownloaderManager, resourcesManager: ResourcesManager, private usersManager: UsersManager)
     {
         super(resourcesManager, c_webServicesResourceProviderName, c_jdownloaderResourceTypeName);
     }
@@ -98,9 +99,10 @@ class JdownloaderAPIController extends ResourceAPIControllerBase
     @Get("smbconnect")
     public async QuerySMBConnectionInfo(
         @Common resourceReference: ResourceReference,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        return await this.jdownloaderManager.GetSMBConnectionInfo(resourceReference, this.sessionsManager.GetUserIdFromAuthHeader(Authorization));
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
+        return await this.jdownloaderManager.GetSMBConnectionInfo(resourceReference, opcUserId);
     }
 }

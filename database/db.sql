@@ -38,12 +38,11 @@ DROP TABLE IF EXISTS `cluster_roleAssignments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `cluster_roleAssignments` (
-  `userGroupId` int(10) unsigned NOT NULL,
+  `objectId` varchar(37) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `roleId` bigint(20) unsigned NOT NULL,
-  KEY `cluster_roleAssignments_userGroupId` (`userGroupId`),
+  PRIMARY KEY (`objectId`,`roleId`),
   KEY `cluster_roleAssignments_roleId` (`roleId`),
-  CONSTRAINT `cluster_roleAssignments_roleId` FOREIGN KEY (`roleId`) REFERENCES `roles` (`id`),
-  CONSTRAINT `cluster_roleAssignments_userGroupId` FOREIGN KEY (`userGroupId`) REFERENCES `usergroups` (`id`)
+  CONSTRAINT `cluster_roleAssignments_roleId` FOREIGN KEY (`roleId`) REFERENCES `roles` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -126,26 +125,6 @@ CREATE TABLE `instancegroups` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `instancegroups_roleAssignments`
---
-
-DROP TABLE IF EXISTS `instancegroups_roleAssignments`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `instancegroups_roleAssignments` (
-  `instanceGroupId` int(10) unsigned NOT NULL,
-  `userGroupId` int(10) unsigned NOT NULL,
-  `roleId` bigint(20) unsigned NOT NULL,
-  PRIMARY KEY (`instanceGroupId`,`userGroupId`,`roleId`) USING BTREE,
-  KEY `instancegroups_roleAssignments_roleId` (`roleId`),
-  KEY `instancegroups_roleAssignments_userGroupId` (`userGroupId`),
-  CONSTRAINT `instancegroups_roleAssignments_instanceGroupId` FOREIGN KEY (`instanceGroupId`) REFERENCES `instancegroups` (`id`),
-  CONSTRAINT `instancegroups_roleAssignments_roleId` FOREIGN KEY (`roleId`) REFERENCES `roles` (`id`),
-  CONSTRAINT `instancegroups_roleAssignments_userGroupId` FOREIGN KEY (`userGroupId`) REFERENCES `usergroups` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `instances`
 --
 
@@ -204,26 +183,6 @@ CREATE TABLE `instances_logs` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `instances_roleAssignments`
---
-
-DROP TABLE IF EXISTS `instances_roleAssignments`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `instances_roleAssignments` (
-  `instanceId` int(10) unsigned NOT NULL,
-  `userGroupId` int(10) unsigned NOT NULL,
-  `roleId` bigint(20) unsigned NOT NULL,
-  PRIMARY KEY (`instanceId`,`userGroupId`,`roleId`),
-  KEY `instances_roleAssignments_userGroupId` (`userGroupId`),
-  KEY `instances_roleAssignments_roleId` (`roleId`),
-  CONSTRAINT `instances_roleAssignments_instanceId` FOREIGN KEY (`instanceId`) REFERENCES `instances` (`id`),
-  CONSTRAINT `instances_roleAssignments_roleId` FOREIGN KEY (`roleId`) REFERENCES `roles` (`id`),
-  CONSTRAINT `instances_roleAssignments_userGroupId` FOREIGN KEY (`userGroupId`) REFERENCES `usergroups` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `keystore_hosts`
 --
 
@@ -236,6 +195,24 @@ CREATE TABLE `keystore_hosts` (
   `value` blob NOT NULL,
   PRIMARY KEY (`hostId`,`entryKey`),
   CONSTRAINT `keystore_hosts_hostId` FOREIGN KEY (`hostId`) REFERENCES `hosts` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `resourcegroups_roleAssignments`
+--
+
+DROP TABLE IF EXISTS `resourcegroups_roleAssignments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `resourcegroups_roleAssignments` (
+  `resourceGroupId` int(10) unsigned NOT NULL,
+  `objectId` varchar(37) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `roleId` bigint(20) unsigned NOT NULL,
+  PRIMARY KEY (`resourceGroupId`,`objectId`,`roleId`) USING BTREE,
+  KEY `instancegroups_roleAssignments_roleId` (`roleId`),
+  CONSTRAINT `instancegroups_roleAssignments_instanceGroupId` FOREIGN KEY (`resourceGroupId`) REFERENCES `instancegroups` (`id`),
+  CONSTRAINT `instancegroups_roleAssignments_roleId` FOREIGN KEY (`roleId`) REFERENCES `roles` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -275,21 +252,20 @@ CREATE TABLE `resources_health` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `resources_userCredentialDependencies`
+-- Table structure for table `resources_roleAssignments`
 --
 
-DROP TABLE IF EXISTS `resources_userCredentialDependencies`;
+DROP TABLE IF EXISTS `resources_roleAssignments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `resources_userCredentialDependencies` (
+CREATE TABLE `resources_roleAssignments` (
   `resourceId` int(10) unsigned NOT NULL,
-  `userId` int(10) unsigned NOT NULL,
-  `wantLoginPassword` tinyint(1) NOT NULL,
-  `state` tinyint(3) unsigned NOT NULL,
-  PRIMARY KEY (`resourceId`,`userId`),
-  KEY `resources_userCredentialDependencies_userId` (`userId`),
-  CONSTRAINT `resources_userCredentialDependencies_resourceId` FOREIGN KEY (`resourceId`) REFERENCES `instances` (`id`),
-  CONSTRAINT `resources_userCredentialDependencies_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
+  `objectId` varchar(37) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `roleId` bigint(20) unsigned NOT NULL,
+  PRIMARY KEY (`resourceId`,`objectId`,`roleId`),
+  KEY `instances_roleAssignments_roleId` (`roleId`),
+  CONSTRAINT `instances_roleAssignments_instanceId` FOREIGN KEY (`resourceId`) REFERENCES `instances` (`id`),
+  CONSTRAINT `instances_roleAssignments_roleId` FOREIGN KEY (`roleId`) REFERENCES `roles` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -323,37 +299,6 @@ CREATE TABLE `roles_permissions` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `usergroups`
---
-
-DROP TABLE IF EXISTS `usergroups`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `usergroups` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(200) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `usergroups_members`
---
-
-DROP TABLE IF EXISTS `usergroups_members`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `usergroups_members` (
-  `groupId` int(10) unsigned NOT NULL,
-  `userId` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`groupId`,`userId`),
-  KEY `usergroups_members_userId` (`userId`),
-  CONSTRAINT `usergroups_members_groupId` FOREIGN KEY (`groupId`) REFERENCES `usergroups` (`id`),
-  CONSTRAINT `usergroups_members_userId` FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `users`
 --
 
@@ -362,8 +307,8 @@ DROP TABLE IF EXISTS `users`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `users` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `emailAddress` varchar(200) NOT NULL,
-  `firstName` varchar(100) NOT NULL,
+  `oAuth2Subject` varchar(200) NOT NULL,
+  `userName` varchar(100) NOT NULL,
   `serviceSecret` char(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -378,4 +323,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-01-12 22:39:13
+-- Dump completed on 2025-03-09 20:14:05

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,9 +22,6 @@ import { ResourceState } from "../resource-providers/ResourceProvider";
 import { ResourcesController } from "../data-access/ResourcesController";
 import { ResourcesManager } from "./ResourcesManager";
 import { PermissionsManager } from "./PermissionsManager";
-import { permissions } from "openprivatecloud-common";
-import { ResourceGroupsController } from "../data-access/ResourceGroupsController";
-import { PermissionsController } from "../data-access/PermissionsController";
 import { ResourceHealthManager } from "./ResourceHealthManager";
 import { ResourceReference } from "../common/ResourceReference";
 import { HealthStatus } from "../data-access/HealthController";
@@ -46,7 +43,7 @@ interface ResourceOverviewDataDTO
 export class ResourceQueryService
 {
     constructor(private resourcesController: ResourcesController, private resourcesManager: ResourcesManager, private resourceHealthManager: ResourceHealthManager, private permissionsManager: PermissionsManager, 
-        private resourceGroupsController: ResourceGroupsController, private permissionsController: PermissionsController, private resourceProviderManager: ResourceProviderManager,
+        private resourceProviderManager: ResourceProviderManager,
         private hostsController: HostsController)
     {
     }
@@ -62,16 +59,9 @@ export class ResourceQueryService
         return resourceIds;
     }
 
-    public async QueryResourceIds(userId: number)
+    public async QueryResourceIds(opcUserId: number)
     {
-        const cluster = await this.permissionsManager.HasUserClusterWidePermission(userId, permissions.read);
-        const rgIds = cluster ? (await this.resourceGroupsController.QueryAllGroups()).Values().Map(x => x.id) : await this.permissionsController.QueryResourceGroupIdsThatUserHasAccessTo(userId);
-        const resourceIdSets = await this.QueryResourceIdsOfResourceGroups(userId, rgIds);
-        const resourceIds = resourceIdSets.Values().Reduce( (x, y) => x.Union(y), new Set<number>());
-
-        const directResourceIds = await this.permissionsController.QueryResourceIdsThatUserHasDirectlyAccessTo(userId);
-
-        return resourceIds.Union(directResourceIds.ToSet()).Values();
+        return await this.permissionsManager.QueryResourceIdsThatUserHasAccessTo(opcUserId);
     }
 
     public async QueryOverviewData(resourceIds: EnumeratorBuilder<number>)
@@ -94,11 +84,6 @@ export class ResourceQueryService
     }
 
     //Private methods
-    private async QueryResourceIdsOfResourceGroups(userId: number, resourceGroupIds: EnumeratorBuilder<number>)
-    {
-        return await resourceGroupIds.Map(resourceGroupId => this.permissionsController.QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(userId, resourceGroupId)).MapAsync(x => x.ToSet()).PromiseAll();
-    }
-
     public async RequestResourceState(resourceReference: ResourceReference): Promise<{ healthStatus: HealthStatus; state: ResourceState; }>
     {
         const healthStatus = await this.resourceHealthManager.RequestHealthStatus(resourceReference.id);

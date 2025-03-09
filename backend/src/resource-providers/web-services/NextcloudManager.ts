@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -65,8 +65,8 @@ export class NextcloudManager
 
         const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);
 
-        const user = await this.usersController.QueryUser(context.userId);
-        const sambaPW = await this.usersManager.QuerySambaPassword(context.userId);
+        const userName = await this.usersManager.QueryUsersName(context.opcUserId);
+        const sambaPW = await this.usersManager.QuerySambaPassword(context.opcUserId);
 
         await this.managedDockerContainerManager.EnsureContainerIsRunning(context.resourceReference, {
             additionalHosts: [],
@@ -76,7 +76,7 @@ export class NextcloudManager
             env: [
                 {
                     varName: "NEXTCLOUD_ADMIN_USER",
-                    value: user!.firstName,
+                    value: userName,
                 },
                 {
                     varName: "NEXTCLOUD_ADMIN_PASSWORD",

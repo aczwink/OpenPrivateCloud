@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,31 +16,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { APIController, Body, Common, Delete, Forbidden, Get, Header, NotFound, Post, Query } from "acts-util-apilib";
+import { APIController, Auth, Body, Common, Delete, Forbidden, Get, NotFound, Post, Query } from "acts-util-apilib";
 import { RoleAssignment, RoleAssignmentsController } from "../data-access/RoleAssignmentsController";
 import { PermissionsManager } from "../services/PermissionsManager";
 import { ResourceProviderManager } from "../services/ResourceProviderManager";
 import { ResourcesManager } from "../services/ResourcesManager";
 import { ResourceReferenceWithSession } from "../common/ResourceReference";
-import { SessionsManager } from "../services/SessionsManager";
 import { permissions } from "openprivatecloud-common";
+import { AccessToken } from "../api_security";
+import { UsersManager } from "../services/UsersManager";
 
  
 @APIController("roleAssignments")
 class RoleAssignmentsAPIController
 {
-    constructor(private roleAssignmentsController: RoleAssignmentsController, private permissionsManager: PermissionsManager, private sessionsManager: SessionsManager)
+    constructor(private roleAssignmentsController: RoleAssignmentsController, private permissionsManager: PermissionsManager, private usersManager: UsersManager)
     {
     }
 
     @Post()
     public async AddClusterRoleAssignment(
         @Body roleAssignment: RoleAssignment,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        const canWriteData = await this.permissionsManager.HasUserClusterWidePermission(userId, permissions.roleAssignments.write);
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
+        const canWriteData = await this.permissionsManager.HasUserClusterWidePermission(opcUserId, permissions.roleAssignments.write);
         if(!canWriteData)
             return Forbidden("write access to role assignments denied");
 
@@ -50,11 +51,11 @@ class RoleAssignmentsAPIController
     @Delete()
     public async DeleteClusterRoleAssignment(
         @Body roleAssignment: RoleAssignment,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        const canWriteData = await this.permissionsManager.HasUserClusterWidePermission(userId, permissions.roleAssignments.write);
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
+        const canWriteData = await this.permissionsManager.HasUserClusterWidePermission(opcUserId, permissions.roleAssignments.write);
         if(!canWriteData)
             return Forbidden("delete access to role assignments denied");
 
@@ -71,15 +72,15 @@ class RoleAssignmentsAPIController
 @APIController("roleAssignments/instance")
 class _api2_
 {
-    constructor(private roleAssignmentsController: RoleAssignmentsController, private permissionsManager: PermissionsManager, private sessionsManager: SessionsManager,
-        private resourceProviderManager: ResourceProviderManager, private resourcesManager: ResourcesManager)
+    constructor(private roleAssignmentsController: RoleAssignmentsController, private permissionsManager: PermissionsManager,
+        private resourceProviderManager: ResourceProviderManager, private resourcesManager: ResourcesManager, private usersManager: UsersManager)
     {
     }
 
     @Common()
     public async ExtractCommonAPIData(
         @Query resourceId: string,
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
         const ref = await this.resourcesManager.CreateResourceReferenceFromExternalId(resourceId);
@@ -88,7 +89,7 @@ class _api2_
 
         const res: ResourceReferenceWithSession = {
             resourceReference: ref,
-            userId: this.sessionsManager.GetUserIdFromAuthHeader(Authorization)
+            opcUserId: await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub)
         }
         return res;
     }
@@ -99,7 +100,7 @@ class _api2_
         @Body roleAssignment: RoleAssignment
     )
     {
-        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.roleAssignments.write);
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.opcUserId, permissions.roleAssignments.write);
         if(!canWriteData)
             return Forbidden("write access to role assignments denied");
 
@@ -113,11 +114,11 @@ class _api2_
         @Body roleAssignment: RoleAssignment
     )
     {
-        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.userId, permissions.roleAssignments.write);
+        const canWriteData = await this.permissionsManager.HasUserPermissionOnResourceScope(context.resourceReference, context.opcUserId, permissions.roleAssignments.write);
         if(!canWriteData)
             return Forbidden("delete access to role assignments denied");
 
-        await this.permissionsManager.DeleteInstanceRoleAssignment(context.resourceReference.id, roleAssignment);
+        await this.permissionsManager.DeleteResourceLevelRoleAssignment(context.resourceReference.id, roleAssignment);
         await this.resourceProviderManager.ResourcePermissionsChanged(context.resourceReference);
     }
 

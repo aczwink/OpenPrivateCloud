@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,6 @@
  * */
 
 import { RouteSetup } from "acfrontendex";
-import { AuthGuard } from "../AuthGuard";
 import { ResourceListComponent } from "../components/resources/ResourceListComponent";
 import { mariadbViewModel } from "./database-services/mariadb";
 import { keyVaultViewModel } from "./security-services/key-vault";
@@ -36,7 +35,6 @@ import { letsEncryptViewModel } from "./web-services/letsencrypt-cert";
 import { nextcloudViewModel } from "./web-services/nextcloud";
 import { nodeAppServiceViewodel } from "./web-services/node-app-service";
 import { staticWebsiteViewModel } from "./web-services/static-website";
-import { ClusterLockedGuard } from "../ClusterLockedGuard";
 import { JSX_CreateElement } from "acfrontend";
 
 type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
@@ -78,7 +76,7 @@ export const resourcesRoute: RouteSetup<{}> = {
         ],
     },
     displayText: "Resources",
-    guards: [ClusterLockedGuard, AuthGuard],
     icon: "collection",
+    requiredScopes: ["admin"],
     routingKey: "resources",
 };

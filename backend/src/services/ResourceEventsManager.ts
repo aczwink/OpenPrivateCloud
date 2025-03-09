@@ -24,14 +24,7 @@ interface KeyVaultCertificateRevokedEvent
     keyVaultResourceId: number;
 }
 
-interface UserCredentialProvideEvent
-{
-    type: "userCredentialsProvided";
-    resourceId: number;
-    userId: number;
-}
-
-export type ResourceEvent = KeyVaultCertificateRevokedEvent | UserCredentialProvideEvent;
+export type ResourceEvent = KeyVaultCertificateRevokedEvent;
 
 export interface ResourceEventListener
 {

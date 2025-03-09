@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,26 +28,23 @@ import { DockerContainerConfig, DockerContainerConfigVolume } from "../compute-s
 import { ResourceDependenciesController } from "../../data-access/ResourceDependenciesController";
 import { KeyVaultManager } from "../security-services/KeyVaultManager";
 
+interface CertificateConfig
+{
+    certificateName: string;
+    keyVaultId: number;
+}
+
 export interface API_EntryConfig
 {
-    /**
-     * Important: If you specify a path, the request path will be URL-decoded. To avoid that, specify only a host i.e. https://10.0.0.1:443 (notice the missing trailing slash).
-     */
+    certificate?: CertificateConfig;
     backendURL: string;
     frontendDomainName: string;
-    /**
-     * Define only if you want to override the service configuration value.
-     * @format byteSize
-     */
     maxRequestBodySize?: number;
 }
 
 interface API_GatewaySettings
 {
-    certificate?: {
-        keyVaultId: number;
-        certificateName: string;
-    };
+    certificate?: CertificateConfig;
 
     frontendPorts: number[];
 
@@ -173,6 +170,35 @@ export class API_GatewayManager
     }
 
     //Private methods
+    private async AddRuleCertVolumes(apiEntries: API_EntryConfig[], volumes: DockerContainerConfigVolume[])
+    {
+        const mounted = new Set();
+        for (const rule of apiEntries)
+        {
+            if(rule.certificate === undefined)
+                continue;
+
+            const kvRef = await this.resourcesManager.CreateResourceReference(rule.certificate.keyVaultId);
+            const hostPaths = await this.keyVaultManager.QueryCertificatePaths(kvRef!, rule.certificate.certificateName);
+            const containerPaths = this.GetContainerCertificateMountPoint(rule.certificate);
+
+            if(mounted.has(hostPaths.certPath))
+                continue;
+            mounted.add(hostPaths.certPath);
+
+            volumes.push({
+                containerPath: containerPaths.certPath,
+                hostPath: hostPaths.certPath,
+                readOnly: true
+            });
+            volumes.push({
+                containerPath: containerPaths.keyPath,
+                hostPath: hostPaths.keyPath,
+                readOnly: true
+            });
+        }
+    }
+
     private Generate404Config(config: API_GatewayConfig): string
     {
         const listen = this.GenerateListenStatements(config.settings);
@@ -199,9 +225,9 @@ server {
 
     private GenerateAPI_nginxConfig(settings: API_GatewaySettings, config: API_EntryConfig)
     {
-        const listen = this.GenerateListenStatements(settings);
+        const listen = this.GenerateListenStatements(settings, config);
         const maxBodySizeConfig = (config.maxRequestBodySize === undefined) ? settings.maxRequestBodySize : config.maxRequestBodySize;
-        const ssl = this.GenerateSSLStatements(settings);
+        const ssl = this.GenerateSSLStatements(settings, config);
 
         return `
 server {
@@ -222,19 +248,21 @@ server {
         `.trim();
     }
 
-    private GenerateListenStatements(settings: API_GatewaySettings)
+    private GenerateListenStatements(settings: API_GatewaySettings, rule?: API_EntryConfig)
     {
-        const wantSSL = (settings.certificate === undefined) ? "" : " ssl";
+        const cert = rule?.certificate ?? settings.certificate;
+        const wantSSL = (cert === undefined) ? "" : " ssl";
         const frontEndPorts = settings.frontendPorts.map(x => "listen\t" + x + wantSSL + ";").join("\n");
         return frontEndPorts;
     }
 
-    private GenerateSSLStatements(settings: API_GatewaySettings)
+    private GenerateSSLStatements(settings: API_GatewaySettings, rule?: API_EntryConfig)
     {
-        if(settings.certificate === undefined)
+        const cert = rule?.certificate ?? settings.certificate;
+        if(cert === undefined)
             return "";
 
-        const paths = this.GetContainerCertificateMountPoint();
+        const paths = this.GetContainerCertificateMountPoint(cert);
 
         return `
         ssl_certificate ${paths.certPath};
@@ -242,11 +270,12 @@ server {
         `;
     }
 
-    private GetContainerCertificateMountPoint()
+    private GetContainerCertificateMountPoint(certificate: CertificateConfig)
     {
+        const name = certificate.keyVaultId + certificate.certificateName;
         return {
-            certPath: "/srv/public.crt",
-            keyPath: "/srv/private.key",
+            certPath: "/srv/" + name + ".crt",
+            keyPath: "/srv/" + name + ".key",
         };
     }
 
@@ -263,6 +292,13 @@ server {
         const dependencies = [config.settings.vnetResourceId];
         if(config.settings.certificate !== undefined)
             dependencies.push(config.settings.certificate.keyVaultId);
+
+        for (const rule of config.apiEntries)
+        {
+            if(rule.certificate !== undefined)
+                dependencies.push(rule.certificate.keyVaultId)
+        }
+
         await this.resourceDependenciesController.SetResourceDependencies(resourceId, dependencies);
     }
 
@@ -282,7 +318,7 @@ server {
         {
             const kvRef = await this.resourcesManager.CreateResourceReference(config.settings.certificate.keyVaultId);
             const hostPaths = await this.keyVaultManager.QueryCertificatePaths(kvRef!, config.settings.certificate.certificateName);
-            const containerPaths = this.GetContainerCertificateMountPoint();
+            const containerPaths = this.GetContainerCertificateMountPoint(config.settings.certificate);
 
             volumes.push({
                 containerPath: containerPaths.certPath,
@@ -294,6 +330,8 @@ server {
                 hostPath: hostPaths.keyPath,
                 readOnly: true
             });
+
+            await this.AddRuleCertVolumes(config.apiEntries, volumes);
         }
 
         const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);

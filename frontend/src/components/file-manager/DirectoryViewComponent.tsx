@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -78,7 +78,7 @@ export class DirectoryViewComponent extends Component<{ resourceGroupName: strin
             <td><BootstrapIcon>{entry.type === "directory" ? "folder" : "file"}</BootstrapIcon></td>
             <td>{this.RenderTitle(entry)}</td>
             <td>{entry.size.FormatBinaryPrefixed("B")}</td>
-            <td>{entry.userId}</td>
+            <td>{entry.opcUserId}</td>
         </tr>;
     }
 

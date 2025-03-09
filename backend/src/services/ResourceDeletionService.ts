@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,14 +26,13 @@ import { ResourceConfigController } from "../data-access/ResourceConfigControlle
 import { HealthController } from "../data-access/HealthController";
 import { ResourceLogsController } from "../data-access/ResourceLogsController";
 import { ResourcesController } from "../data-access/ResourcesController";
-import { ResourceUserCredentialDependenciesController } from "../data-access/ResourceUserCredentialDependenciesController";
 
 @Injectable
 export class ResourceDeletionService
 {
     constructor(private resourceProviderManager: ResourceProviderManager, private resourceDependenciesController: ResourceDependenciesController, private roleAssignmentsController: RoleAssignmentsController,
         private permissionsManager: PermissionsManager, private instanceConfigController: ResourceConfigController, private healthController: HealthController, private instanceLogsController: ResourceLogsController,
-        private resourcesController: ResourcesController, private resourceUserCredentialDependenciesController: ResourceUserCredentialDependenciesController)
+        private resourcesController: ResourcesController)
     {
     }
 
@@ -43,12 +42,11 @@ export class ResourceDeletionService
         const resourceId = resourceReference.id;
 
         await this.resourceDependenciesController.DeleteDependenciesOf(resourceId);
-        await this.resourceUserCredentialDependenciesController.CleanForResource(resourceId);
 
         //first everything that the user is also able to do himself
         const roleAssignments = await this.roleAssignmentsController.QueryResourceLevelRoleAssignments(resourceReference.id);
         for (const roleAssignment of roleAssignments)
-            await this.permissionsManager.DeleteInstanceRoleAssignment(resourceId, roleAssignment);
+            await this.permissionsManager.DeleteResourceLevelRoleAssignment(resourceId, roleAssignment);
 
         //delete the resource
         const result = await resourceProvider.DeleteResource(resourceReference);

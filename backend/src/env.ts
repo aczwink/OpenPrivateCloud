@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2024-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,6 +17,11 @@
  * */
 import "dotenv/config";
 
+export const ENV_MASTER_KEYSTORE_PATH = process.env.OPC_MASTER_KEYSTORE_PATH!;
 export const ENV_OIDP_CLIENT_ID = process.env.OPC_OIDP_CLIENT_ID!;
 export const ENV_OIDP_CLIENT_SECRET = process.env.OPC_OIDP_CLIENT_SECRET!;
 export const ENV_OIDP_ENDPOINT = process.env.OPC_OIDP_ENDPOINT!;
+
+export default {
+    OIDP_AUDIENCE: process.env.OPC_OIDP_AUDIENCE!,
+};

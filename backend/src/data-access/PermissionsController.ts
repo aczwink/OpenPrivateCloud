@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,6 @@
 
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
-import { permissions } from "openprivatecloud-common";
 
 @Injectable
 export class PermissionsController
@@ -28,231 +27,82 @@ export class PermissionsController
     }
 
     //Public methods
-    public async HasUserClusterWidePermission(userId: number, permission: string)
+    public async GetObjectsWithClusterWidePermission(permission: string)
     {
         const query = `
-        SELECT TRUE
+        SELECT cra.objectId
         FROM cluster_roleAssignments cra
-        INNER JOIN usergroups_members ugm
-            ON ugm.groupId = cra.userGroupId AND ugm.userId = ?
         INNER JOIN roles_permissions rp
             ON cra.roleId = rp.roleId
         WHERE rp.permission = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, userId, permission);
-
-        return row !== undefined;
+        const rows = await conn.Select<{ objectId: string }>(query, permission);
+        return rows.Values().Map(x => x.objectId);
     }
 
-    public async HasUserResourceGroupLevelPermission(resourceGroupId: number, userId: number, permission: string)
+    public async GetObjectsWithResourceGroupLevelPermission(resourceGroupId: number, permission: string)
     {
         const query = `
-        SELECT TRUE
-        FROM instancegroups_roleAssignments igra
-        INNER JOIN usergroups_members ugm
-            ON ugm.groupId = igra.userGroupId
+        SELECT igra.objectId
+        FROM resourcegroups_roleAssignments igra
         INNER JOIN roles_permissions rp
             ON igra.roleId = rp.roleId
-        WHERE igra.instanceGroupId = ? AND ugm.userId = ? AND rp.permission = ?
+        WHERE igra.resourceGroupId = ? AND rp.permission = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, resourceGroupId, userId, permission);
-
-        return row !== undefined;
+        const rows = await conn.Select<{ objectId: string }>(query, resourceGroupId, permission);
+        return rows.Values().Map(x => x.objectId);
     }
 
-    public async HasUserResourceLevelPermission(resourceId: number, userId: number, permission: string)
+    public async GetObjectsWithResourceLevelPermission(resourceId: number, permission: string)
     {
         const query = `
-        SELECT TRUE
-        FROM instances_roleAssignments ira
-        INNER JOIN usergroups_members ugm
-            ON ugm.groupId = ira.userGroupId
+        SELECT ira.objectId
+        FROM resources_roleAssignments ira
         INNER JOIN roles_permissions rp
             ON ira.roleId = rp.roleId
-        WHERE ira.instanceId = ? AND ugm.userId = ? AND rp.permission = ?
+        WHERE ira.resourceId = ? AND rp.permission = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, resourceId, userId, permission);
-
-        return row !== undefined;
+        const rows = await conn.Select<{ objectId: string }>(query, resourceId, permission);
+        return rows.Values().Map(x => x.objectId);
     }
 
-    public async IsUserRequiredOnHost(hostId: number, userId: number)
+    public async QueryResourceIdsWithDirectRoleAssignment(permission: string)
     {
-        let query = `
-        SELECT TRUE
-        FROM usergroups_members ugm
-        INNER JOIN instances_roleAssignments ira
-            ON ugm.groupId = ira.userGroupId
-        INNER JOIN instances i
-            ON i.id = ira.instanceId
-        INNER JOIN hosts_storages hs
-            ON hs.id = i.storageId
-        WHERE hs.hostId = ? AND ugm.userId = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, hostId, userId);
-
-        return row !== undefined;
-    }
-
-    public async QueryAllUsersRequiredOnHost(hostId: number)
-    {        
         const query = `
-        SELECT ugm.userId
-        FROM usergroups_members ugm
-        INNER JOIN instances_roleAssignments ira
-            ON ugm.groupId = ira.userGroupId
-        INNER JOIN instances i
-            ON i.id = ira.instanceId
-        INNER JOIN hosts_storages hs
-            ON hs.id = i.storageId
-        WHERE hs.hostId = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, hostId);
-
-        return rows.Values().Map(x => x.userId as number).ToSet();
-    }
-
-    public async QueryGroupsAssociatedWithHost(hostId: number)
-    {
-        let query = `
-        SELECT ira.userGroupId
-        FROM instances_roleAssignments ira
-        INNER JOIN instances i
-            ON ira.instanceId = i.id
-        INNER JOIN hosts_storages hs
-            ON i.storageId = hs.id
-        WHERE hs.hostId = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, hostId);
-
-        return rows.Values().Map(x => x.userGroupId as number).ToSet();
-    }
-
-    public async QueryGroupsWithPermission(instanceId: number, permission: string)
-    {
-        let query = `
-        SELECT DISTINCT ira.userGroupId
-        FROM instances_roleAssignments ira
+        SELECT ira.resourceId
+        FROM resources_roleAssignments ira
         INNER JOIN roles_permissions rp
             ON rp.roleId = ira.roleId
-        WHERE ira.instanceId = ? AND rp.permission = ?
+        WHERE rp.permission = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, instanceId, permission);
+        const rows = await conn.Select<{ resourceId: number; }>(query, permission);
 
-        return rows.Values().Map(x => x.userGroupId as number);
+        return rows.Values().Map(x => x.resourceId);
     }
 
-    public async QueryResourceIdsAssociatedWithGroup(userGroupId: number)
-    {
-        let query = `
-        SELECT DISTINCT ira.instanceId
-        FROM instances_roleAssignments ira
-        WHERE ira.userGroupId = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, userGroupId);
-
-        return rows.Values().Map(x => x.instanceId as number);
-    }
-
-    public async QueryResourceGroupIdsThatUserHasAccessTo(userId: number)
+    public async QueryResourceIdsWithDirectRoleAssignmentInResourceGroup(resourceGroupId: number, permission: string)
     {
         const query = `
-        SELECT ig.id
-        FROM instancegroups ig
-        INNER JOIN instancegroups_roleAssignments igra
-            ON igra.instanceGroupId = ig.id
-        INNER JOIN usergroups_members ugm
-            ON ugm.groupId = igra.userGroupId
-        INNER JOIN roles_permissions rp
-            ON rp.roleId = igra.roleId AND rp.permission = '/read'
-        WHERE ugm.userId = ?
-        GROUP BY ig.id
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, userId);
-
-        return rows.Values().Map(x => x.id as number);
-    }
-
-    public async QueryResourceIdsOfResourcesInResourceGroupThatUserHasAccessTo(userId: number, resourceGroupId: number)
-    {
-        const query = `
-        SELECT DISTINCT id FROM
-        (
-            SELECT i.id
-            FROM instances i
-            INNER JOIN instances_roleAssignments ira
-                ON i.id = ira.instanceId
-            INNER JOIN roles_permissions rp
-                ON rp.roleId = ira.roleId
-            INNER JOIN usergroups_members ugm
-                ON ugm.groupId = ira.userGroupId
-            WHERE ugm.userId = ? AND rp.permission = '/read' AND i.instanceGroupId = ?
-
-            UNION ALL
-            
-            SELECT i.id
-            FROM instances i
-            INNER JOIN instancegroups_roleAssignments igra
-                ON igra.instanceGroupId = i.instanceGroupId
-            INNER JOIN roles_permissions rp
-                ON rp.roleId = igra.roleId
-            INNER JOIN usergroups_members ugm
-                ON ugm.groupId = igra.userGroupId
-            WHERE ugm.userId = ? AND rp.permission = '/read' AND i.instanceGroupId = ?
-
-            UNION ALL
-
-            SELECT i.id
-            FROM instances i
-            INNER JOIN cluster_roleAssignments cra
-                ON cra.userGroupId
-            INNER JOIN usergroups_members ugm
-                ON ugm.groupId = cra.userGroupId
-            INNER JOIN roles_permissions rp
-                ON rp.roleId = cra.roleId
-            WHERE ugm.userId = ? AND rp.permission = '/read' AND i.instanceGroupId = ?
-        ) inner_table
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, userId, resourceGroupId, userId, resourceGroupId, userId, resourceGroupId);
-
-        return rows.Values().Map(x => x.id as number);
-    }
-
-    public async QueryResourceIdsThatUserHasDirectlyAccessTo(userId: number)
-    {
-        const query = `
-        SELECT ira.instanceId
-        FROM instances_roleAssignments ira
+        SELECT ira.resourceId
+        FROM resources_roleAssignments ira
+        INNER JOIN instances i
+            ON i.id = ira.resourceId
         INNER JOIN roles_permissions rp
             ON rp.roleId = ira.roleId
-        INNER JOIN usergroups_members ugm
-            ON ugm.groupId = ira.userGroupId
-        WHERE ugm.userId = ? AND rp.permission = ?
+        WHERE rp.permission = ? AND i.instanceGroupId = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select(query, userId, permissions.read);
+        const rows = await conn.Select<{ resourceId: number; }>(query, permission, resourceGroupId);
 
-        return rows.Values().Map(x => x.instanceId as number);
+        return rows.Values().Map(x => x.resourceId);
     }
 }

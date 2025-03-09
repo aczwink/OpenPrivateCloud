@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,6 @@
 
 import { RouteSetup } from "acfrontendex";
 import { DashboardComponent } from "../components/DashboardComponent";
-import { AuthGuard } from "../AuthGuard";
-import { ClusterLockedGuard } from "../ClusterLockedGuard";
 
 export const dashboardRoute: RouteSetup<{}> = {
     content: {
@@ -27,7 +25,7 @@ export const dashboardRoute: RouteSetup<{}> = {
         component: DashboardComponent
     },
     displayText: "Dashboard",
-    guards: [ClusterLockedGuard, AuthGuard],
     icon: "speedometer2",
+    requiredScopes: ["admin"],
     routingKey: "dashboard",
 };

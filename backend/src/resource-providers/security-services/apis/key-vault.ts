@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -29,6 +29,19 @@ interface CertificateDTO
 {
     type: "client" | "server";
     name: string;
+}
+
+interface CertificateImportDTO
+{
+    name: string;
+    /**
+     * @format multi-line
+     */
+    privateKey: string;
+    /**
+     * @format multi-line
+     */
+    cert: string;
 }
 
 interface KeyDTO
@@ -81,6 +94,15 @@ class _api_ extends ResourceAPIControllerBase
     )
     {
         await this.keyVaultManager.GenerateCertificate(resourceReference, cert.type, cert.name);
+    }
+
+    @Post("certificates_import")
+    public async ImportCertificate(
+        @Common resourceReference: ResourceReference,
+        @Body data: CertificateImportDTO,
+    )
+    {
+        await this.keyVaultManager.ImportCertificate(resourceReference, data.name, data.privateKey, data.cert);
     }
 
     @Get("certificates")

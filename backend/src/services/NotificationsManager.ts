@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,17 +18,16 @@
 
 import { Injectable } from "acts-util-node";
 import { ClusterConfigController } from "../data-access/ClusterConfigController";
-import { UsersController } from "../data-access/UsersController";
 import { EMailService, MailerSettings } from "./EMailService";
-import { ErrorService } from "./ErrorService";
+import { UsersManager } from "./UsersManager";
 
 const mailerSettingsConfigKey = "notifications/mailer";
    
 @Injectable
 export class NotificationsManager
 {
-    constructor(private errorService: ErrorService, private eMailService: EMailService, private usersController: UsersController,
-        private clusterConfigController: ClusterConfigController)
+    constructor(private eMailService: EMailService,
+        private clusterConfigController: ClusterConfigController, private usersManager: UsersManager)
     {
     }
 
@@ -55,17 +54,22 @@ export class NotificationsManager
         return settings;
     }
 
-    public async SendErrorNotification(userGroupId: number, subject: string, e: unknown)
+    public async SendNotification(opcUserId: number, subject: string, text: string)
     {
-        const text = this.errorService.ExtractDataAsMultipleLines(e);
-        const users = await this.usersController.QueryMembersOfGroup(userGroupId);
-        for (const user of users)
-        {
-            await this.SendNotification(user.emailAddress, subject, text);
-        }
+        const emailAddress = await this.usersManager.QueryUsersEMailAddress(opcUserId);
+        this.SendNotificationViaEMail(emailAddress, subject, text);
     }
 
-    public async SendNotification(recipientEMailAddress: string, subject: string, text: string)
+    public async SetMailerSettings(config: MailerSettings, opcUserIdThatInitiatedTheChange: number)
+    {
+        await this.clusterConfigController.UpdateOrInsertConfig(mailerSettingsConfigKey, config);
+
+        const emailAddress = await this.usersManager.QueryUsersEMailAddress(opcUserIdThatInitiatedTheChange);
+        this.SendNotificationViaEMail(emailAddress, "Test", "This is a test mail");
+    }
+
+    //Private methods
+    private async SendNotificationViaEMail(recipientEMailAddress: string, subject: string, text: string)
     {
         if( await this.IsMailerConfigured() )
         {
@@ -77,13 +81,5 @@ export class NotificationsManager
                 to: [recipientEMailAddress],
             }, settings);
         }
-    }
-
-    public async SetMailerSettings(config: MailerSettings, userIdThatInitiatedTheChange: number)
-    {
-        await this.clusterConfigController.UpdateOrInsertConfig(mailerSettingsConfigKey, config);
-
-        const user = await this.usersController.QueryUser(userIdThatInitiatedTheChange);
-        this.SendNotification(user!.emailAddress, "Test", "This is a test mail");
     }
 }

@@ -19,17 +19,6 @@
 import { Injectable } from "acts-util-node";
 import { DBConnectionsManager } from "./DBConnectionsManager";
 
-export interface EditableUserData
-{
-    firstName: string;
-}
-
-export interface PublicUserData extends EditableUserData
-{
-    id: number;
-    emailAddress: string;
-}
-
 @Injectable
 export class UsersController
 {
@@ -38,10 +27,10 @@ export class UsersController
     }
 
     //Public methods
-    public async CreateUser(emailAddress: string, serviceSecret: string)
+    public async CreateUser(oAuth2Subject: string, userName: string, serviceSecret: string)
     {
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const result = await conn.InsertRow("users", { emailAddress, firstName: emailAddress, serviceSecret });
+        const result = await conn.InsertRow("users", { oAuth2Subject, userName, serviceSecret });
         return result.insertId;
     }
 
@@ -51,62 +40,34 @@ export class UsersController
         await conn.DeleteRows("users", "id = ?", userId);
     }
 
-    public async QueryMembersOfGroup(userGroupId: number)
+    public async QueryOAuth2Subject(opcUserId: number)
     {
         let query = `
-        SELECT u.id, u.firstName, u.emailAddress
-        FROM users u
-        INNER JOIN usergroups_members ugm
-            ON u.id = ugm.userId
-        WHERE ugm.groupId = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select<PublicUserData>(query, userGroupId);
-
-        return rows;
-    }
-
-    public async QueryUserId(emailAddress: string)
-    {
-        let query = `
-        SELECT id
-        FROM users
-        WHERE emailAddress = ?
-        `;
-
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne(query, emailAddress);
-        if(row === undefined)
-            return undefined;
-        return row.id as number;
-    }
-
-    public async QueryUser(userId: number)
-    {
-        let query = `
-        SELECT id, firstName, emailAddress
+        SELECT oAuth2Subject
         FROM users
         WHERE id = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const row = await conn.SelectOne<PublicUserData>(query, userId);
-
-        return row;
+        const row = await conn.SelectOne(query, opcUserId);
+        if(row === undefined)
+            return undefined;
+        return row.oAuth2Subject as string;
     }
 
-    public async QueryUsers()
+    public async QueryUserId(oAuth2Subject: string)
     {
         let query = `
-        SELECT id, firstName, emailAddress
+        SELECT id
         FROM users
+        WHERE oAuth2Subject = ?
         `;
 
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        const rows = await conn.Select<PublicUserData>(query);
-
-        return rows;
+        const row = await conn.SelectOne(query, oAuth2Subject);
+        if(row === undefined)
+            return undefined;
+        return row.id as number;
     }
 
     public async ReadServiceSecret(userId: number)
@@ -120,12 +81,6 @@ export class UsersController
     public async UpdateServiceSecret(userId: number, serviceSecret: string)
     {        
         const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.UpdateRows("users", { serviceSecret }, "userId = ?", userId);
-    }
-
-    public async UpdateUserData(userId: number, data: EditableUserData)
-    {
-        const conn = await this.dbConnMgr.CreateAnyConnectionQueryExecutor();
-        await conn.UpdateRows("users", { firstName: data.firstName }, "id = ?", userId);
+        await conn.UpdateRows("users", { serviceSecret }, "id = ?", userId);
     }
 }

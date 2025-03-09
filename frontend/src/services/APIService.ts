@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2022 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,34 +15,32 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
+import ENV from "../env";
 import { API } from "../../dist/api";
-
-import { APIServiceBase, HTTPInterceptor, HTTPService, Injectable } from "acfrontend";
-
-export const BACKEND_PORT = 8078;
-export const BACKEND_HOSTNAME = window.location.hostname;
-export const BACKEND_HOST = BACKEND_HOSTNAME + ":" + BACKEND_PORT;
+import { APIServiceBase, HTTPInterceptor, HTTPService, Injectable, OAuth2TokenManager } from "acfrontend";
 
 @Injectable
 export class APIService extends API
 {
-    constructor(httpService: HTTPService)
+    constructor(httpService: HTTPService, oAuth2TokenManager: OAuth2TokenManager)
     {
         super( req => this.base.SendRequest(req) );
 
-        this.base = new APIServiceBase(httpService, BACKEND_HOSTNAME, BACKEND_PORT, "https");
-    }
+        this.base = new APIServiceBase(httpService, ENV.BACKEND, ENV.BACKEND_PORT, ENV.BACKEND_PROTOCOL);
 
-    //Properties    
-    public set token(token: string)
-    {
-        this.base.globalHeaders.Authorization = "Bearer " + token;
+        oAuth2TokenManager.tokenIssued.Subscribe(x => this.accessToken = x.accessToken);
     }
 
     //Public methods
     public RegisterInterceptor(interceptor: HTTPInterceptor)
     {
         this.base.RegisterInterceptor(interceptor);
+    }
+
+    //Private properties
+    private set accessToken(value: string)
+    {
+        this.base.globalHeaders.Authorization = "Bearer " + value;
     }
 
     //Private variables

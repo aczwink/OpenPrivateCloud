@@ -26,9 +26,7 @@ import { SharedFolderPermissionsManager } from "./SharedFolderPermissionsManager
 import { LightweightResourceReference, ResourceReference } from "../../common/ResourceReference";
 import { DeploymentContext, ResourceCheckResult, ResourceCheckType, ResourceState } from "../ResourceProvider";
 import { ResourceEvent, ResourceEventListener, ResourceEventsManager } from "../../services/ResourceEventsManager";
-import { HostUsersManager } from "../../services/HostUsersManager";
 import { HealthStatus } from "../../data-access/HealthController";
-import { UsersManager } from "../../services/UsersManager";
 
 interface SMBConfig
 {
@@ -48,8 +46,8 @@ export interface FileStorageConfig
 @Injectable
 export class FileStoragesManager implements ResourceEventListener
 {
-    constructor(private resourcesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager, private hostUsersManager: HostUsersManager,
-        private remoteFileSystemManager: RemoteFileSystemManager, resourceEventsManager: ResourceEventsManager, private usersManager: UsersManager,
+    constructor(private resourcesManager: ResourcesManager, private sharedFolderPermissionsManager: SharedFolderPermissionsManager,
+        private remoteFileSystemManager: RemoteFileSystemManager, resourceEventsManager: ResourceEventsManager,
         private remoteCommandExecutor: RemoteCommandExecutor, private instanceConfigController: ResourceConfigController,
         private singleSMBSharePerInstanceProvider: SingleSMBSharePerInstanceProvider)
     {
@@ -177,9 +175,9 @@ export class FileStoragesManager implements ResourceEventListener
         return path.join(dataPath, targetPath);
     }
 
-    public async GetSMBConnectionInfo(resourceReference: ResourceReference, userId: number)
+    public async GetSMBConnectionInfo(resourceReference: ResourceReference, opcUserId: number)
     {
-        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(resourceReference, userId);
+        return await this.singleSMBSharePerInstanceProvider.GetSMBConnectionInfo(resourceReference, opcUserId);
     }
 
     public GetSnapshotsPath(resourceReference: LightweightResourceReference)
@@ -245,23 +243,16 @@ export class FileStoragesManager implements ResourceEventListener
 
     public async ReceiveResourceEvent(event: ResourceEvent): Promise<void>
     {
-        if(event.type === "userCredentialsProvided")
-        {
-            const ref = await this.resourcesManager.CreateResourceReference(event.resourceId);
-            const sambaPW = await this.usersManager.QuerySambaPassword(event.userId);
-            await this.hostUsersManager.UpdateSambaPasswordOnHostIfExisting(ref!.hostId, event.userId, sambaPW!);
-        }
     }
 
     public async RefreshPermissions(resourceReference: ResourceReference)
     {
         const dataPath = this.GetDataPath(resourceReference);
 
+        await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, dataPath, false);
+
         const cfg = await this.ReadConfig(resourceReference.id);
         await this.UpdateConfig(resourceReference, cfg);
-
-        //do this after so that groups and users are definitely synced
-        await this.sharedFolderPermissionsManager.SetPermissions(resourceReference, dataPath, false);
     }
     
     public async UpdateConfig(resourceReference: ResourceReference, config: FileStorageConfig)

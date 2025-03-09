@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import { resourceProviders } from "openprivatecloud-common";
-import { CA_Config, CertificateDTO, KeyCreationDTO, KeyDTO, KeyVaultCertificate, KeyVaultCertificateInfo, SecretDTO, SecretListDTO } from "../../../dist/api";
+import { CA_Config, CertificateDTO, CertificateImportDTO, KeyCreationDTO, KeyDTO, KeyVaultCertificate, KeyVaultCertificateInfo, SecretDTO, SecretListDTO } from "../../../dist/api";
 import { APIResponseHandler, RouteSetup } from "acfrontendex";
 import { BuildCommonResourceActions, BuildResourceGeneralPageGroupEntry } from "../resources-shared/resource-general";
 import { FileDownloadService, Use } from "acfrontend";
@@ -144,6 +144,17 @@ const createCertRoute: RouteSetup<ResourceAndGroupId, CertificateDTO> = {
     routingKey: "create"
 };
 
+const importCertRoute: RouteSetup<ResourceAndGroupId, CertificateImportDTO> = {
+    content: {
+        type: "create",
+        call: (ids, cert) => Use(APIService).resourceProviders._any_.securityservices.keyvault._any_.certificates_import.post(ids.resourceGroupName, ids.resourceName, cert),
+        schema: OpenAPISchema("CertificateImportDTO"),
+    },
+    displayText: "Import server certificate",
+    icon: "upload",
+    routingKey: "import"
+};
+
 const certViewModel: RouteSetup<ResourceAndGroupId & { certName: string }, KeyVaultCertificateInfo> = {
     content: {
         type: "object",
@@ -166,7 +177,8 @@ const certsViewModel: RouteSetup<ResourceAndGroupId, KeyVaultCertificate> = {
     content: {
         type: "collection",
         actions: [
-            createCertRoute
+            createCertRoute,
+            importCertRoute
         ],
         child: certViewModel,
         id: "name",

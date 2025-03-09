@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,9 +17,7 @@
  * */
 
 import { RouteSetup } from "acfrontendex";
-import { AuthGuard } from "../AuthGuard";
 import { ViewProcessComponent } from "../components/activitymonitor/ViewProcessComponent";
-import { ClusterLockedGuard } from "../ClusterLockedGuard";
 
 export const activityMonitorRoute: RouteSetup<{}> = {
     content: {
@@ -27,7 +25,7 @@ export const activityMonitorRoute: RouteSetup<{}> = {
         component: ViewProcessComponent
     },
     displayText: "Process monitor",
-    guards: [ClusterLockedGuard, AuthGuard],
     icon: "activity",
+    requiredScopes: ["admin"],
     routingKey: "activitymonitor/{processId}",
 };

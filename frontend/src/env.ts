@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,17 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { JSX_CreateElement } from "acfrontend";
-import { RouteSetup } from "acfrontendex";
-
-export const clusterLockedRoute: RouteSetup = {
-    content: {
-        type: "component",
-        component: <div className="container text-center">
-            <h1>Cluster is locked!</h1>
-        </div>
-    },
-    displayText: "Cluster locked!",
-    icon: "shield-lock",
-    routingKey: "clusterlocked",
+export default {
+    AUTH_ENDPOINT: process.env.OPC_AUTH_ENDPOINT!,
+    BACKEND: process.env.OPC_BACKEND!,
+    BACKEND_PORT: parseInt(process.env.OPC_BACKEND_PORT!),
+    BACKEND_PROTOCOL: process.env.OPC_BACKEND_PROTOCOL! as "http" | "https",
+    CLIENT_ID: process.env.OPC_CLIENT_ID!,
+    ENDSESSION_ENDPOINT: process.env.OPC_ENDSESSION_ENDPOINT!,
+    FRONTEND_BASEURL: process.env.OPC_FRONTEND_BASEURL!,
+    TOKEN_ENDPOINT: process.env.OPC_TOKEN_ENDPOINT!,
 };

@@ -16,45 +16,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * */
 
-import { APIController, Get, Header, Post } from "acts-util-apilib";
-import { UsersController } from "../data-access/UsersController";
-import { SessionsManager } from "../services/SessionsManager";
+import { APIController, Auth, Get, Post } from "acts-util-apilib";
 import { UsersManager } from "../services/UsersManager";
-import { AuthenticationManager } from "../services/AuthenticationManager";
+import { AccessToken } from "../api_security";
 
 @APIController("user")
 class UserAPIController
 {
-    constructor(private sessionsManager: SessionsManager, private usersController: UsersController, private usersManager: UsersManager, private authenticationManager: AuthenticationManager)
+    constructor(private usersManager: UsersManager)
     {
-    }
-
-    @Get()
-    public async QueryUser(
-        @Header Authorization: string
-    )
-    {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        const user = await this.usersController.QueryUser(userId);
-        return user!;
     }
 
     @Get("secret")
     public async QuerySecret(
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        const sambaPW = await this.usersManager.QuerySambaPassword(userId);
+        const opcUserId = await this.usersManager.MapOAuth2SubjectToOPCUserId(accessToken.sub);
+        const sambaPW = await this.usersManager.QuerySambaPassword(opcUserId);
         return sambaPW ?? "";
     }
 
     @Post("secret")
     public async RotateSecret(
-        @Header Authorization: string
+        @Auth("jwt") accessToken: AccessToken
     )
     {
-        const userId = this.sessionsManager.GetUserIdFromAuthHeader(Authorization);
-        await this.usersManager.RotateSambaPassword(userId);
+        await this.usersManager.RotateSambaPassword(accessToken.sub);
     }
 }

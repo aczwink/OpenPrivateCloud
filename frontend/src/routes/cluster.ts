@@ -17,12 +17,10 @@
  * */
 
 import { RouteSetup } from "acfrontendex";
-import { AuthGuard } from "../AuthGuard";
 import { Use } from "acfrontend";
 import { APISchemaOf } from "../api-info";
-import { MailerSettings, PublicClusterSettings } from "../../dist/api";
+import { MailerSettings } from "../../dist/api";
 import { APIService } from "../services/APIService";
-import { ClusterLockedGuard } from "../ClusterLockedGuard";
 
 const notificationSettingsViewModel: RouteSetup<{}, MailerSettings> = {
     content: {
@@ -44,26 +42,6 @@ const notificationSettingsViewModel: RouteSetup<{}, MailerSettings> = {
     routingKey: "notification"
 };
 
-const publicSettingsViewModel: RouteSetup<{}, PublicClusterSettings> = {
-    content: {
-        type: "object",
-        actions: [
-            {
-                type: "edit",
-                requestObject: _ => Use(APIService).public.clusterSettings.get(),
-                schema: APISchemaOf(x => x.PublicClusterSettings),
-                updateResource: (_, newValue) => Use(APIService).cluster.config.settings.put(newValue)
-            }
-        ],
-        formTitle: _ => "",
-        requestObject: _ => Use(APIService).public.clusterSettings.get(),
-        schema: APISchemaOf(x => x.PublicClusterSettings)
-    },
-    displayText: "Public settings",
-    icon: "globe",
-    routingKey: "publicsettings",
-};
-
 export const clusterRoute: RouteSetup<{}> = {
     content: {
         type: "multiPage",
@@ -73,14 +51,13 @@ export const clusterRoute: RouteSetup<{}> = {
                 displayName: "",
                 entries: [
                     notificationSettingsViewModel,
-                    publicSettingsViewModel
                 ]
             }
         ],
         formTitle: _ => "Cluster settings",
     },
     displayText: "Cluster settings",
-    guards: [ClusterLockedGuard, AuthGuard],
     icon: "gear-fill",
+    requiredScopes: ["admin"],
     routingKey: "cluster",
 };

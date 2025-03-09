@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -760,32 +760,38 @@ export class HostFirewallManager
 
     private GenerateDestinationNAT_Rule(externalNIC: string, portForwardingRule: PortForwardingRule): NetfilterRuleCreationData
     {
-        return {
-            conditions: [
-                {
-                    op: "==",
-                    left: {
-                        type: "meta",
-                        key: "iifname"
-                    },
-                    right: {
-                        type: "value",
-                        value: externalNIC
-                    }
+        const conditions: NetfilterRuleCondition[] = [];
+
+        if(portForwardingRule.externalZoneOnly)
+        {
+            conditions.push({
+                op: "==",
+                left: {
+                    type: "meta",
+                    key: "iifname"
                 },
-                {
-                    op: "==",
-                    left: {
-                        type: "payload",
-                        protocol: portForwardingRule.protocol.toLowerCase() as any,
-                        field: "dport"
-                    },
-                    right: {
-                        type: "value",
-                        value: portForwardingRule.port.toString()
-                    }
+                right: {
+                    type: "value",
+                    value: externalNIC
                 }
-            ],
+            });
+        }
+
+        conditions.push({
+            op: "==",
+            left: {
+                type: "payload",
+                protocol: portForwardingRule.protocol.toLowerCase() as any,
+                field: "dport"
+            },
+            right: {
+                type: "value",
+                value: portForwardingRule.port.toString()
+            }
+        });
+
+        return {
+            conditions,
             policy: {
                 type: "dnat",
                 addr: portForwardingRule.targetAddress,

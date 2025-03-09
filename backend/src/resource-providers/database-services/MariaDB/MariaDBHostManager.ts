@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -111,6 +111,12 @@ export class MariaDBHostManager implements MariaDBInterface
     {
         const client = MySQLClient.CreateStandardHostClient(resourceReference.hostId);
         await client.DropUser(userName, hostName);
+    }
+
+    public async DeleteDatabase(resourceReference: LightweightResourceReference, databaseName: string): Promise<void>
+    {
+        const client = MySQLClient.CreateStandardHostClient(resourceReference.hostId);
+        await client.DropDatabase(databaseName);
     }
 
     public async ExecuteSelectQuery(resourceReference: LightweightResourceReference, query: string): Promise<any[]>

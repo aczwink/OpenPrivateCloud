@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2023-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2023-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,10 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 import crypto from "crypto";
+import fs from "fs";
 import { Injectable } from "acts-util-node";
 import { ClusterKeyStoreController } from "../data-access/ClusterKeyStoreController";
-import { ClusterEventsManager } from "./ClusterEventsManager";
 import { OPCFormat_SymmetricDecrypt, OPCFormat_SymmetricEncrypt } from "../common/crypto/symmetric";
+import { ENV_MASTER_KEYSTORE_PATH } from "../env";
 
 interface MasterKey
 {
@@ -31,8 +32,10 @@ interface MasterKey
 @Injectable
 export class ClusterKeyStoreManager
 {
-    constructor(private clusterKeyStoreController: ClusterKeyStoreController, private clusterEventsManager: ClusterEventsManager)
+    constructor(private clusterKeyStoreController: ClusterKeyStoreController)
     {
+        const data = fs.readFileSync(ENV_MASTER_KEYSTORE_PATH, "utf-8");
+        this.Unlock(data);
     }
 
     //Public methods
@@ -56,11 +59,6 @@ export class ClusterKeyStoreManager
             key: this.masterKey.key,
             type: "aes-256"
         }, unencrypted);
-    }
-
-    public IsLocked()
-    {
-        return this.masterKey === undefined;
     }
 
     public async QueryHostSecret(hostId: number, secretName: string)
@@ -95,7 +93,8 @@ export class ClusterKeyStoreManager
         await this.clusterKeyStoreController.UpdateOrInsertHostSecretValue(hostId, secretName, encryptedData);
     }
 
-    public Unlock(encodedMasterKey: string)
+    //Private methods
+    private Unlock(encodedMasterKey: string)
     {
         const parsed = JSON.parse(encodedMasterKey);
         this.masterKey = {
@@ -103,8 +102,6 @@ export class ClusterKeyStoreManager
             key: Buffer.from(parsed.key, "base64"),
             authTagLength: parsed.authTagLength,
         };
-
-        this.clusterEventsManager.PublishEvent({ type: "keyStoreUnlocked" });
     }
 
     //Private state

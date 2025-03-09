@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,9 +19,11 @@
 import { Injectable } from "acts-util-node";
 import { opcGroupPrefixes, opcSpecialGroups, opcUserPrefixes } from "../common/UserAndGroupDefinitions";
 import { PermissionsController } from "../data-access/PermissionsController";
-import { UsersController } from "../data-access/UsersController";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { LinuxUsersManager } from "./LinuxUsersManager";
+import { UsersManager } from "./UsersManager";
+import { ClusterEventsManager } from "./ClusterEventsManager";
+import { HostsController } from "../data-access/HostsController";
 
 interface SambaUser
 {
@@ -32,8 +34,14 @@ interface SambaUser
 @Injectable
 export class HostUsersManager
 {
-    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private usersController: UsersController, private linuxUsersManager: LinuxUsersManager, private permissionsController: PermissionsController)
+    constructor(private remoteCommandExecutor: RemoteCommandExecutor, private linuxUsersManager: LinuxUsersManager, private permissionsController: PermissionsController,
+        private usersManager: UsersManager, clusterEventsManager: ClusterEventsManager, private hostsController: HostsController
+    )
     {
+        clusterEventsManager.RegisterListener(event => {
+            if(event.type === "userSambaPasswordChanged")
+                this.UpdateSambaPasswordOnAllHosts(event.opcUserId);
+        })
     }
 
     //Public methods
@@ -54,9 +62,9 @@ export class HostUsersManager
         return parseInt(idPart);
     }
 
-    public MapUserToLinuxUserName(userId: number)
+    public MapUserToLinuxUserName(opcUserId: number)
     {
-        return opcUserPrefixes.user + userId;
+        return opcUserPrefixes.user + opcUserId;
     }
 
     public async RemoveGroupFromHost(hostId: number, userGroupId: number)
@@ -64,12 +72,13 @@ export class HostUsersManager
         const linuxGroupName = this.MapGroupToLinuxGroupName(userGroupId);
         await this.DeleteHostGroup(hostId, linuxGroupName);
 
-        const members = await this.usersController.QueryMembersOfGroup(userGroupId);
+        //TODO: need a better concept for this
+        /*const members = await this.usersManager.QueryGroupMembers(userGroupId);
         const userIds = await this.permissionsController.QueryAllUsersRequiredOnHost(hostId);
 
-        const userIdsToRemove = members.Values().Map(x => x.id).ToSet().Without(userIds);
+        const userIdsToRemove = members.Values().ToSet().Without(userIds);
         for (const userIdToRemove of userIdsToRemove)
-            await this.DeleteUserFromHost(hostId, userIdToRemove);
+            await this.DeleteUserFromHost(hostId, userIdToRemove);*/
     }
 
     public async ResolveHostGroupId(hostId: number, linuxGroupName: string)
@@ -92,11 +101,11 @@ export class HostUsersManager
         if(gid === undefined)
             await this.CreateHostGroup(hostId, linuxGroupName);
 
-        const members = await this.usersController.QueryMembersOfGroup(userGroupId);
+        const members = await this.usersManager.QueryGroupMembers(userGroupId);
         for (const member of members)
-            await this.SyncUserToHost(hostId, member.id);
+            await this.SyncUserToHost(hostId, member);
 
-        await this.SyncGroupMembersToHost(hostId, linuxGroupName, members.Values().Map(x => x.id).Map(this.MapUserToLinuxUserName.bind(this)).ToSet());
+        await this.SyncGroupMembersToHost(hostId, linuxGroupName, members.Values().Map(this.MapUserToLinuxUserName.bind(this)).ToSet());
     }
 
     public async SyncGroupsToHost(hostId: number, userGroupIds: number[])
@@ -107,9 +116,9 @@ export class HostUsersManager
 
     public async SyncSambaGroupMembers(hostId: number, userGroupId: number)
     {
-        const members = await this.usersController.QueryMembersOfGroup(userGroupId);
+        const members = await this.usersManager.QueryGroupMembers(userGroupId);
         for (const member of members)
-            await this.SyncSambaUserToHost(hostId, member.id);
+            await this.SyncSambaUserToHost(hostId, member);
     }
 
     public async SyncSambaGroupsMembers(hostId: number, userGroupIds: number[])
@@ -120,21 +129,13 @@ export class HostUsersManager
         }
     }
 
-    public async SyncSambaUserToHost(hostId: number, userId: number)
+    public async SyncSambaUserToHost(hostId: number, opcUserId: number)
     {
-        const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
+        const exists = await this.DoesSambaUserExistOnHost(hostId, opcUserId);
         if(!exists)
-            await this.AddDisabledSambaUser(hostId, this.MapUserToLinuxUserName(userId));
-    }
-    
-    public async UpdateSambaPasswordOnHostIfExisting(hostId: number, userId: number, newPw: string)
-    {
-        const exists = await this.DoesSambaUserExistOnHost(hostId, userId);
-        if(exists)
-        {
-            await this.UpdateSambaPassword(hostId, this.MapUserToLinuxUserName(userId), newPw);
-            await this.EnableSambaUser(hostId, userId);
-        }
+            await this.AddDisabledSambaUser(hostId, this.MapUserToLinuxUserName(opcUserId));
+        const sambaPW = await this.usersManager.QuerySambaPassword(opcUserId);
+        await this.UpdateSambaPasswordOnHost(hostId, opcUserId, sambaPW!);
     }
 
     //Private methods
@@ -165,31 +166,32 @@ export class HostUsersManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "userdel", linuxUserName], hostId);
     }
 
-    private async DeleteUserFromHost(hostId: number, userId: number)
+    private async DeleteUserFromHost(hostId: number, opcUserId: number)
     {
-        const linuxUserName = this.MapUserToLinuxUserName(userId);
+        const linuxUserName = this.MapUserToLinuxUserName(opcUserId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-x", linuxUserName], hostId);
         await this.DeleteHostUser(hostId, linuxUserName);
     }
 
-    private async DeleteUserFromHostIfNotUsed(hostId: number, userId: number)
+    private async DeleteUserFromHostIfNotUsed(hostId: number, opcUserId: number)
     {
-        const isRequired = await this.permissionsController.IsUserRequiredOnHost(hostId, userId);
+        //const isRequired = await this.permissionsController.IsUserRequiredOnHost(hostId, opcUserId);
+        const isRequired = true; //TODO: need a better concept for this
         if(!isRequired)
-            await this.DeleteUserFromHost(hostId, userId);
+            await this.DeleteUserFromHost(hostId, opcUserId);
     }
 
-    private async DoesSambaUserExistOnHost(hostId: number, userId: number)
+    private async DoesSambaUserExistOnHost(hostId: number, opcUserId: number)
     {
         const sambaUsers = await this.QuerySambaUsers(hostId);
-        const linuxUserName = this.MapUserToLinuxUserName(userId);
+        const linuxUserName = this.MapUserToLinuxUserName(opcUserId);
         const user = sambaUsers.find(x => x.unixUserName === linuxUserName);
         return user !== undefined;
     }
 
-    private async EnableSambaUser(hostId: number, userId: number)
+    private async EnableSambaUser(hostId: number, opcUserId: number)
     {
-        const linuxUserName = this.MapUserToLinuxUserName(userId);
+        const linuxUserName = this.MapUserToLinuxUserName(opcUserId);
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-se", linuxUserName], hostId);
     }
 
@@ -199,15 +201,15 @@ export class HostUsersManager
         return parseInt(idPart);
     }
 
-    private MapOPCIdToLinuxId(userOrGroupId: number)
+    private MapOPCIdToLinuxId(opcUserOrGroupId: number)
     {
         //We reserve a cross-host unique id for a user or group so that file permissions are still intact even if switchting to another host (for example because the original host is not usable anymore)
 
         //We reserve the following range of uid/gid-s for OPC users/groups: 40000-49999 (see https://en.wikipedia.org/wiki/User_identifier)
-        if(userOrGroupId > 9999)
+        if(opcUserOrGroupId > 9999)
             throw new Error("User or group id is out of supported range :S");
 
-        return 40000 + userOrGroupId;
+        return 40000 + opcUserOrGroupId;
     }
 
     private async QuerySambaUsers(hostId: number)
@@ -251,9 +253,9 @@ export class HostUsersManager
     /**
      * @returns The host user id
      */
-     private async SyncUserToHost(hostId: number, userId: number)
+     private async SyncUserToHost(hostId: number, opcUserId: number)
      {
-         const linuxUserName = this.MapUserToLinuxUserName(userId);
+         const linuxUserName = this.MapUserToLinuxUserName(opcUserId);
          const uid = await this.TryResolveHostUserId(hostId, linuxUserName);
          if(uid === undefined)
          {
@@ -297,5 +299,29 @@ export class HostUsersManager
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "smbpasswd", "-s", "-a", userName], hostId, {
             stdin
         });
+    }
+
+    private async UpdateSambaPasswordOnAllHosts(opcUserId: number)
+    {
+        const sambaPW = await this.usersManager.QuerySambaPassword(opcUserId);
+
+        const hostIds = await this.hostsController.RequestHostIds();
+        for (const hostId of hostIds)
+        {
+            await this.UpdateSambaPasswordOnHostIfExists(hostId, opcUserId, sambaPW!);
+        }
+    }
+
+    private async UpdateSambaPasswordOnHost(hostId: number, opcUserId: number, newPw: string)
+    {
+        await this.UpdateSambaPassword(hostId, this.MapUserToLinuxUserName(opcUserId), newPw);
+        await this.EnableSambaUser(hostId, opcUserId);
+    }
+
+    private async UpdateSambaPasswordOnHostIfExists(hostId: number, opcUserId: number, newPw: string)
+    {
+        const exists = await this.DoesSambaUserExistOnHost(hostId, opcUserId);
+        if(exists)
+            await this.UpdateSambaPasswordOnHost(hostId, opcUserId, newPw);
     }
 }

@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,10 +17,9 @@
  * */
 import fs from "fs";
 import * as https from "https";
-import { OpenAPI } from "acts-util-core";
+import { AbsURL, OpenAPI } from "acts-util-core";
 import { Factory, GlobalInjector, HTTP } from "acts-util-node";
 import { APIRegistry } from "acts-util-apilib";
-import { HTTPAuthHandler } from "./HTTPAuthHandler";
 import { DBConnectionsManager } from "./data-access/DBConnectionsManager";
 import { APISchemaService } from "./services/APISchemaService";
 import { HostAvailabilityManager } from "./services/HostAvailabilityManager";
@@ -32,12 +31,36 @@ import { OpenVPNGatewayManager } from "./resource-providers/network-services/Ope
 import { ProcessTrackerManager } from "./services/ProcessTrackerManager";
 import { ResourceEventsManager } from "./services/ResourceEventsManager";
 import { HostFirewallManager } from "./services/HostFirewallManager";
-import { ClusterEventsManager } from "./services/ClusterEventsManager";
 import { ClusterDataProvider } from "./services/ClusterDataProvider";
 import { HostsDataProvider } from "./services/data-providers/HostsDataProvider";
 import { ResourceGroupsDataProvider } from "./services/data-providers/ResourcesDataProvider";
+import { ENV_OIDP_ENDPOINT } from "./env";
+import ENV from "./env";
 
 const port = 8078;
+
+async function DownloadPublicKey()
+{
+    const sender = new HTTP.RequestSender();
+    const response = await sender.SendRequest({
+        body: Buffer.alloc(0),
+        headers: {
+            "Content-Type": "application/json"
+        },
+        method: "GET",
+        url: new AbsURL({
+            host: ENV_OIDP_ENDPOINT.split(":")[1].substring(2),
+            path: "/jwks",
+            port: parseInt(ENV_OIDP_ENDPOINT.split(":")[2]),
+            protocol: "https",
+            queryParams: {},
+        })
+    });
+    
+    const string = response.body.toString("utf-8");
+
+    return JSON.parse(string);
+}
 
 async function EnableHealthManagement()
 {
@@ -62,15 +85,8 @@ function EventManagementSetup()
     GlobalInjector.Resolve(HostFirewallManager); //ensure this service exists because it listens to events which have to reset the host firewall
 
     //health and availability
-    const cem = GlobalInjector.Resolve(ClusterEventsManager);
-    cem.RegisterListener(event => {
-        if(event.type === "keyStoreUnlocked")
-        {
-            console.log("Key store unlocked");
-            EnableHealthManagement();
-            SetupDataSources();
-        }
-    });
+    EnableHealthManagement();
+    SetupDataSources();
 }
 
 function SetupDataSources()
@@ -97,8 +113,16 @@ async function SetupWebServer()
     ]);
     requestHandlerChain.AddBodyParser();
 
+    requestHandlerChain.AddRequestHandler(
+        new HTTP.JWTVerifier(
+            await DownloadPublicKey(),
+            ENV_OIDP_ENDPOINT,
+            ENV.OIDP_AUDIENCE,
+            true
+        )
+    );
+
     const backendStructure: any = await import("../dist/openapi-structure.json");
-    requestHandlerChain.AddRequestHandler(GlobalInjector.Resolve(HTTPAuthHandler));
     requestHandlerChain.AddRequestHandler(new HTTP.RouterRequestHandler(openAPIDef, backendStructure, APIRegistry.endPointTargets, false));
 
     const keyPath = "/etc/OpenPrivateCloud/private.key";
