@@ -108,9 +108,7 @@ async function SetupWebServer()
     await import("./__resource-providers-registry");
 
     const requestHandlerChain = Factory.CreateRequestHandlerChain();
-    requestHandlerChain.AddCORSHandler([
-        process.env.OPC_ALLOWED_ORIGINS!
-    ]);
+    requestHandlerChain.AddCORSHandler([ENV.OPC_ALLOWED_ORIGINS]);
     requestHandlerChain.AddBodyParser();
 
     requestHandlerChain.AddRequestHandler(

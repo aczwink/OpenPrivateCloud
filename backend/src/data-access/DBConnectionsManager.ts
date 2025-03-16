@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,6 +17,7 @@
  * */
 import fs from "fs";
 import { DBConnectionPool, DBFactory, DBResource, Injectable } from "acts-util-node";
+import ENV from "../env";
 
 @Injectable
 export class DBConnectionsManager
@@ -41,8 +42,8 @@ export class DBConnectionsManager
         const dbpw = await fs.promises.readFile(configPath, "utf-8");
 
         return {
-            host: process.env.OPC_DBHOST!,
-            user: process.env.OPC_DBUSER!,
+            host: ENV.OPC_DB.host,
+            user: ENV.OPC_DB.user,
             password: dbpw.trim(),
             dbName: "openprivatecloud"
         };

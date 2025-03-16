@@ -29,7 +29,7 @@ import { fileStorageViewModel } from "./file-services/file-storage";
 import { avTranscoderViewModel } from "./multimedia-services/av-transcoder";
 import { dnsServerViewModel } from "./network-services/dns-server";
 import { wafViewModel } from "./security-services/waf";
-import { apiGatewayViewModel } from "./web-services/api-gateway";
+import { appGatewayViewModel } from "./web-services/app-gateway";
 import { jdownloaderViewModel } from "./web-services/jdownloader";
 import { letsEncryptViewModel } from "./web-services/letsencrypt-cert";
 import { nextcloudViewModel } from "./web-services/nextcloud";
@@ -51,7 +51,7 @@ export const resourceTypesRoutes: RouteSetup<ResourceAndGroupId>[] = [
     vnetViewModel,
     keyVaultViewModel,
     wafViewModel,
-    apiGatewayViewModel,
+    appGatewayViewModel,
     jdownloaderViewModel,
     letsEncryptViewModel,
     nextcloudViewModel,

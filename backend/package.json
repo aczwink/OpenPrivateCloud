@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "run-dev-server": "OPC_ALLOWED_ORIGINS=https://localhost:8079 OPC_DBHOST=localhost OPC_DBUSER=opc nodemon --exec \"npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js && sudo -u opc-controller --preserve-env=OPC_ALLOWED_ORIGINS,OPC_DBHOST,OPC_DBUSER node dist/bundle.js\"",
+    "run-dev-server": "nodemon --exec \"npx acts-util-apilib && tsc && ln -sf ./src/main.js ./dist/bundle.js && sudo -u opc-controller node dist/bundle.js\"",
     "build-release-package": "npx acts-util-apilib && npx webpack",
     "build-docker-image": "docker build -t opc-backend ."
   },

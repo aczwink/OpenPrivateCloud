@@ -24,4 +24,9 @@ export const ENV_OIDP_ENDPOINT = process.env.OPC_OIDP_ENDPOINT!;
 
 export default {
     OIDP_AUDIENCE: process.env.OPC_OIDP_AUDIENCE!,
+    OPC_ALLOWED_ORIGINS: process.env.OPC_ALLOWED_ORIGINS!,
+    OPC_DB: {
+        host: process.env.OPC_DBHOST!,
+        user: process.env.OPC_DBUSER!
+    }
 };

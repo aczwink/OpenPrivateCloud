@@ -30,36 +30,46 @@ import { resourceGroupsRoute } from "./routes/resource-groups";
 import { RegisterCustomFormats } from "./components/custom-formats/custom-formats";
 import { userSettingsViewModel } from "./routes/usersettings";
 import ENV from "./env";
+import { OIDCService, RootInjector } from "acfrontend";
 
 RegisterCustomFormats();
 
-BootstrapApp({
-    additionalRoutes: [activityMonitorRoute],
+async function StartUpApp()
+{
+    const oidcService = RootInjector.Resolve(OIDCService);
 
-    features: {
-        oAuth2: {
-            authorizeEndpoint: ENV.AUTH_ENDPOINT,
-            clientId: ENV.CLIENT_ID,
-            endSessionEndpoint: ENV.ENDSESSION_ENDPOINT,
-            flow: "authorizationCode",
-            tokenEndpoint: ENV.TOKEN_ENDPOINT,
-            ...CreateOAuth2RedirectURIs(ENV.FRONTEND_BASEURL),
+    const oidcConfig = await oidcService.RequestConfig(ENV.OIDP_ENDPOINT);
+    
+    BootstrapApp({
+        additionalRoutes: [activityMonitorRoute],
+    
+        features: {
+            oAuth2: {
+                authorizeEndpoint: oidcConfig.authorization_endpoint,
+                clientId: ENV.CLIENT_ID,
+                endSessionEndpoint: oidcConfig.end_session_endpoint,
+                flow: "authorizationCode",
+                tokenEndpoint: oidcConfig.token_endpoint,
+                ...CreateOAuth2RedirectURIs(ENV.FRONTEND_BASEURL),
+            },
+    
+            openAPI: root as OpenAPI.Root,
         },
+    
+        layout: {
+            navbar: [
+                [dashboardRoute, resourcesRoute, resourceGroupsRoute, dataExplorerRoute],
+                [accessRoute, hostsRoute, clusterRoute],
+                [userSettingsViewModel] //TODO: should go to user layout part as soon as oauth2 integration is done
+            ],
+            user: [],
+        },
+    
+        mountPoint: document.body,
+    
+        title: "OpenPrivateCloud",
+        version: "0.1 beta"
+    });
+}
 
-        openAPI: root as OpenAPI.Root,
-    },
-
-    layout: {
-        navbar: [
-            [dashboardRoute, resourcesRoute, resourceGroupsRoute, dataExplorerRoute],
-            [accessRoute, hostsRoute, clusterRoute],
-            [userSettingsViewModel] //TODO: should go to user layout part as soon as oauth2 integration is done
-        ],
-        user: [],
-    },
-
-    mountPoint: document.body,
-
-    title: "OpenPrivateCloud",
-    version: "0.1 beta"
-});
+StartUpApp();
