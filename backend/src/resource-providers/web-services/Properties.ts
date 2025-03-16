@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,9 +18,9 @@
 
 import { BaseResourceProperties } from "../ResourceProvider";
 
-export interface API_GatewayProperties extends BaseResourceProperties
+export interface AppGatewayProperties extends BaseResourceProperties
 {
-    type: "api-gateway";
+    type: "app-gateway";
 
     /**
      * @title Virtual network
@@ -103,7 +103,7 @@ export interface StaticWebsiteProperties extends BaseResourceProperties
     port: number;
 }
 
-export type WebServicesResourceProperties = API_GatewayProperties
+export type WebServicesResourceProperties = AppGatewayProperties
     | JdownloaderProperties
     | LetsEncryptProperties
     | NextcloudProperties

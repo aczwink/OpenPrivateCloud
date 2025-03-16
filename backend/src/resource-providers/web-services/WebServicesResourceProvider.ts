@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ import { StaticWebsitesManager } from "./StaticWebsitesManager";
 import { NodeAppServiceManager } from "./NodeAppServiceManager";
 import { WebServicesResourceProperties } from "./Properties";
 import { ResourceReference } from "../../common/ResourceReference";
-import { API_GatewayManager } from "./API_GatewayManager";
+import { API_GatewayManager } from "./AppGatewayManager";
 import { DataSourcesProvider } from "../../services/ClusterDataProvider";
 import { HealthStatus } from "../../data-access/HealthController";
 
@@ -83,7 +83,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
                 dataIntegrityCheckSchedule: null,
                 fileSystemType: "btrfs",
                 requiredModules: [],
-                schemaName: "API_GatewayProperties"
+                schemaName: "AppGatewayProperties"
             }
         ];
     }
@@ -93,7 +93,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     {
         switch(resourceReference.resourceTypeName)
         {
-            case resourceProviders.webServices.apiGatewayResourceType.name:
+            case resourceProviders.webServices.appGatewayResourceType.name:
                 return await this.apiGatewayManager.QueryHealthStatus(resourceReference);
             case resourceProviders.webServices.jdownloaderResourceType.name:
                 return await this.jdownloaderManager.QueryHealthStatus(resourceReference);
@@ -114,7 +114,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     {
         switch(resourceReference.resourceTypeName)
         {
-            case resourceProviders.webServices.apiGatewayResourceType.name:
+            case resourceProviders.webServices.appGatewayResourceType.name:
                 await this.apiGatewayManager.DeleteResource(resourceReference);
                 break;
             case resourceProviders.webServices.jdownloaderResourceType.name:
@@ -153,7 +153,7 @@ export class WebServicesResourceProvider implements ResourceProvider<WebServices
     {
         switch(instanceProperties.type)
         {
-            case "api-gateway":
+            case "app-gateway":
                 await this.apiGatewayManager.ProvideResource(instanceProperties, context);
                 break;
             case "jdownloader":

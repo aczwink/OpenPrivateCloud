@@ -19,7 +19,7 @@ import path from "path";
 import { Injectable } from "acts-util-node";
 import { LightweightResourceReference } from "../../common/ResourceReference";
 import { DeploymentContext } from "../ResourceProvider";
-import { API_GatewayProperties } from "./Properties";
+import { AppGatewayProperties } from "./Properties";
 import { ResourcesManager } from "../../services/ResourcesManager";
 import { ResourceConfigController } from "../../data-access/ResourceConfigController";
 import { RemoteFileSystemManager } from "../../services/RemoteFileSystemManager";
@@ -34,7 +34,7 @@ interface CertificateConfig
     keyVaultId: number;
 }
 
-export interface API_EntryConfig
+export interface AppGatewayEntryConfig
 {
     certificate?: CertificateConfig;
     backendURL: string;
@@ -42,7 +42,7 @@ export interface API_EntryConfig
     maxRequestBodySize?: number;
 }
 
-interface API_GatewaySettings
+interface AppGatewaySettings
 {
     certificate?: CertificateConfig;
 
@@ -56,10 +56,10 @@ interface API_GatewaySettings
     vnetResourceId: number;
 }
 
-interface API_GatewayConfig
+interface AppGatewayConfig
 {
-    apiEntries: API_EntryConfig[];
-    settings: API_GatewaySettings;
+    rules: AppGatewayEntryConfig[];
+    settings: AppGatewaySettings;
 }
 
 @Injectable
@@ -72,23 +72,23 @@ export class API_GatewayManager
     }
 
     //Public methods
-    public async AddAPI(resourceReference: LightweightResourceReference, api: API_EntryConfig)
+    public async AddAPI(resourceReference: LightweightResourceReference, api: AppGatewayEntryConfig)
     {
         const config = await this.ReadConfig(resourceReference.id);
-        config.apiEntries.push(api);
+        config.rules.push(api);
         await this.UpdateConfig(resourceReference.id, config);
 
         this.UpdateGateway(resourceReference);
     }
 
-    public async DeleteAPI(resourceReference: LightweightResourceReference, api2delete: API_EntryConfig)
+    public async DeleteAPI(resourceReference: LightweightResourceReference, api2delete: AppGatewayEntryConfig)
     {
         const config = await this.ReadConfig(resourceReference.id);
 
-        const idx = config.apiEntries.findIndex(x => x.frontendDomainName === api2delete.frontendDomainName);
+        const idx = config.rules.findIndex(x => x.frontendDomainName === api2delete.frontendDomainName);
         if(idx === -1)
             return false;
-        config.apiEntries.Remove(idx);
+        config.rules.Remove(idx);
         
         await this.UpdateConfig(resourceReference.id, config);
 
@@ -104,12 +104,12 @@ export class API_GatewayManager
         await this.resourcesManager.RemoveResourceStorageDirectory(resourceReference);
     }
 
-    public async ProvideResource(resourceProperties: API_GatewayProperties, context: DeploymentContext)
+    public async ProvideResource(resourceProperties: AppGatewayProperties, context: DeploymentContext)
     {
         const vnetRef = await this.resourcesManager.CreateResourceReferenceFromExternalId(resourceProperties.vnetResourceExternalId);
 
         await this.UpdateConfig(context.resourceReference.id, {
-            apiEntries: [],
+            rules: [],
             settings: {
                 frontendPorts: [],
                 maxRequestBodySize: 1 * 1024 * 1024, //1 MiB is default for nginx
@@ -124,7 +124,7 @@ export class API_GatewayManager
     public async QueryAPIs(resourceReference: LightweightResourceReference)
     {
         const config = await this.ReadConfig(resourceReference.id);
-        return config.apiEntries;
+        return config.rules;
     }
 
     public async QueryInfo(resourceReference: LightweightResourceReference)
@@ -148,20 +148,20 @@ export class API_GatewayManager
         return config.settings;
     }
 
-    public async UpdateAPI(resourceReference: LightweightResourceReference, oldFrontendDomainName: string, newAPI_Props: API_EntryConfig)
+    public async UpdateAPI(resourceReference: LightweightResourceReference, oldFrontendDomainName: string, newAPI_Props: AppGatewayEntryConfig)
     {
         const config = await this.ReadConfig(resourceReference.id);
 
-        const idx = config.apiEntries.findIndex(x => x.frontendDomainName === oldFrontendDomainName);
-        config.apiEntries.Remove(idx);
-        config.apiEntries.push(newAPI_Props);
+        const idx = config.rules.findIndex(x => x.frontendDomainName === oldFrontendDomainName);
+        config.rules.Remove(idx);
+        config.rules.push(newAPI_Props);
         
         await this.UpdateConfig(resourceReference.id, config);
 
         this.UpdateGateway(resourceReference);
     }
 
-    public async UpdateSettings(resourceReference: LightweightResourceReference, settings: API_GatewaySettings)
+    public async UpdateSettings(resourceReference: LightweightResourceReference, settings: AppGatewaySettings)
     {
         const config = await this.ReadConfig(resourceReference.id);
         config.settings = settings;
@@ -170,7 +170,7 @@ export class API_GatewayManager
     }
 
     //Private methods
-    private async AddRuleCertVolumes(apiEntries: API_EntryConfig[], volumes: DockerContainerConfigVolume[])
+    private async AddRuleCertVolumes(apiEntries: AppGatewayEntryConfig[], volumes: DockerContainerConfigVolume[])
     {
         const mounted = new Set();
         for (const rule of apiEntries)
@@ -199,7 +199,7 @@ export class API_GatewayManager
         }
     }
 
-    private Generate404Config(config: API_GatewayConfig): string
+    private Generate404Config(config: AppGatewayConfig): string
     {
         const listen = this.GenerateListenStatements(config.settings);
         const ssl = this.GenerateSSLStatements(config.settings);
@@ -223,7 +223,7 @@ server {
         `.trim();
     }
 
-    private GenerateAPI_nginxConfig(settings: API_GatewaySettings, config: API_EntryConfig)
+    private GenerateAPI_nginxConfig(settings: AppGatewaySettings, config: AppGatewayEntryConfig)
     {
         const listen = this.GenerateListenStatements(settings, config);
         const maxBodySizeConfig = (config.maxRequestBodySize === undefined) ? settings.maxRequestBodySize : config.maxRequestBodySize;
@@ -248,7 +248,7 @@ server {
         `.trim();
     }
 
-    private GenerateListenStatements(settings: API_GatewaySettings, rule?: API_EntryConfig)
+    private GenerateListenStatements(settings: AppGatewaySettings, rule?: AppGatewayEntryConfig)
     {
         const cert = rule?.certificate ?? settings.certificate;
         const wantSSL = (cert === undefined) ? "" : " ssl";
@@ -256,7 +256,7 @@ server {
         return frontEndPorts;
     }
 
-    private GenerateSSLStatements(settings: API_GatewaySettings, rule?: API_EntryConfig)
+    private GenerateSSLStatements(settings: AppGatewaySettings, rule?: AppGatewayEntryConfig)
     {
         const cert = rule?.certificate ?? settings.certificate;
         if(cert === undefined)
@@ -279,13 +279,13 @@ server {
         };
     }
 
-    private async ReadConfig(resourceId: number): Promise<API_GatewayConfig>
+    private async ReadConfig(resourceId: number): Promise<AppGatewayConfig>
     {
-        const config = await this.resourceConfigController.QueryConfig<API_GatewayConfig>(resourceId);
+        const config = await this.resourceConfigController.QueryConfig<AppGatewayConfig>(resourceId);
         return config!;
     }
 
-    private async UpdateConfig(resourceId: number, config: API_GatewayConfig)
+    private async UpdateConfig(resourceId: number, config: AppGatewayConfig)
     {
         await this.resourceConfigController.UpdateOrInsertConfig(resourceId, config);
 
@@ -293,7 +293,7 @@ server {
         if(config.settings.certificate !== undefined)
             dependencies.push(config.settings.certificate.keyVaultId);
 
-        for (const rule of config.apiEntries)
+        for (const rule of config.rules)
         {
             if(rule.certificate !== undefined)
                 dependencies.push(rule.certificate.keyVaultId)
@@ -302,7 +302,7 @@ server {
         await this.resourceDependenciesController.SetResourceDependencies(resourceId, dependencies);
     }
 
-    private async RestartGateway(resourceReference: LightweightResourceReference, resourceDir: string, config: API_GatewayConfig)
+    private async RestartGateway(resourceReference: LightweightResourceReference, resourceDir: string, config: AppGatewayConfig)
     {
         const vNetRef = await this.resourcesManager.CreateResourceReference(config.settings.vnetResourceId);
 
@@ -331,7 +331,7 @@ server {
                 readOnly: true
             });
 
-            await this.AddRuleCertVolumes(config.apiEntries, volumes);
+            await this.AddRuleCertVolumes(config.rules, volumes);
         }
 
         const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);
@@ -358,7 +358,7 @@ server {
         const resourceDir = this.resourcesManager.BuildResourceStoragePath(resourceReference);
         const config = await this.ReadConfig(resourceReference.id);
 
-        const siteConfigs = config.apiEntries.map(x => this.GenerateAPI_nginxConfig(config.settings, x));
+        const siteConfigs = config.rules.map(x => this.GenerateAPI_nginxConfig(config.settings, x));
         siteConfigs.unshift(this.Generate404Config(config)); //nginx uses first server for everything that does not map to a valid domain name
         await this.remoteFileSystemManager.WriteTextFile(resourceReference.hostId, path.join(resourceDir, "default.conf"), siteConfigs.join("\n"));
 

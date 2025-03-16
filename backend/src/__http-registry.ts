@@ -41,7 +41,7 @@ import "./resource-providers/network-services/api/openvpn-gateway";
 import "./resource-providers/network-services/api/vnet";
 import "./resource-providers/security-services/apis/key-vault";
 import "./resource-providers/security-services/apis/waf";
-import "./resource-providers/web-services/apis/API_Gateway";
+import "./resource-providers/web-services/apis/AppGateway";
 import "./resource-providers/web-services/apis/jdownloader";
 import "./resource-providers/web-services/apis/lets-encrypt";
 import "./resource-providers/web-services/apis/nextcloud";

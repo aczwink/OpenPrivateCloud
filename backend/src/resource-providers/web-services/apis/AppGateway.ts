@@ -20,8 +20,8 @@ import { ResourceAPIControllerBase } from "../../ResourceAPIControllerBase";
 import { APIController, Body, BodyProp, Common, Delete, Get, NotFound, Path, Post, Put } from "acts-util-apilib";
 import { ResourcesManager } from "../../../services/ResourcesManager";
 import { ResourceReference } from "../../../common/ResourceReference";
-import { c_apiGatewayResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
-import { API_EntryConfig, API_GatewayManager } from "../API_GatewayManager";
+import { c_appGatewayResourceTypeName, c_webServicesResourceProviderName } from "openprivatecloud-common/dist/constants";
+import { AppGatewayEntryConfig, API_GatewayManager } from "../AppGatewayManager";
 import { DockerContainerLogDto } from "../../compute-services/api/docker-container-app-service";
 import { KeyVaultManager } from "../../security-services/KeyVaultManager";
 import { Of } from "acts-util-core";
@@ -72,12 +72,12 @@ interface API_GatewaySettingsDTO
     vnetResourceId: string;
 }
 
-@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_apiGatewayResourceTypeName}/{resourceName}`)
+@APIController(`resourceProviders/{resourceGroupName}/${c_webServicesResourceProviderName}/${c_appGatewayResourceTypeName}/{resourceName}`)
 class _api_ extends ResourceAPIControllerBase
 {
     constructor(resourcesManager: ResourcesManager, private apiGatewayManager: API_GatewayManager, private keyVaultManager: KeyVaultManager)
     {
-        super(resourcesManager, c_webServicesResourceProviderName, c_apiGatewayResourceTypeName);
+        super(resourcesManager, c_webServicesResourceProviderName, c_appGatewayResourceTypeName);
     }
 
     @Common()
@@ -89,7 +89,7 @@ class _api_ extends ResourceAPIControllerBase
         return this.FetchResourceReference(resourceGroupName, resourceName);
     }
 
-    @Post("apis")
+    @Post("rules")
     public async AddAPI(
         @Common resourceReference: ResourceReference,
         @Body dto: AppGatewayRoutingRuleDTO
@@ -99,7 +99,7 @@ class _api_ extends ResourceAPIControllerBase
         await this.apiGatewayManager.AddAPI(resourceReference, rule);
     }
 
-    @Delete("apis")
+    @Delete("rules")
     public async DeleteAPI(
         @Common resourceReference: ResourceReference,
         @Body api: AppGatewayRoutingRuleDTO
@@ -110,8 +110,8 @@ class _api_ extends ResourceAPIControllerBase
             return NotFound("API not found");
     }
 
-    @Get("apis")
-    public async QueryAPIs(
+    @Get("rules")
+    public async QueryRules(
         @Common resourceReference: ResourceReference,
     )
     {
@@ -119,7 +119,7 @@ class _api_ extends ResourceAPIControllerBase
         return await rules.Values().Map(this.MapRuleToDTO.bind(this)).PromiseAll();
     }
 
-    @Put("apis")
+    @Put("rules")
     public async UpdateAPI(
         @Common resourceReference: ResourceReference,
         @BodyProp oldFrontendDomainName: string,
@@ -194,7 +194,7 @@ class _api_ extends ResourceAPIControllerBase
     }
 
     //Private methods
-    private async MapDTOToRule(dto: AppGatewayRoutingRuleDTO): Promise<API_EntryConfig>
+    private async MapDTOToRule(dto: AppGatewayRoutingRuleDTO): Promise<AppGatewayEntryConfig>
     {
         const certRef = (dto.keyVaultCertificateReference === undefined) ? undefined : await this.keyVaultManager.ResolveKeyVaultReference(dto.keyVaultCertificateReference);
 
@@ -209,7 +209,7 @@ class _api_ extends ResourceAPIControllerBase
         }
     }
 
-    private async MapRuleToDTO(rule: API_EntryConfig): Promise<AppGatewayRoutingRuleDTO>
+    private async MapRuleToDTO(rule: AppGatewayEntryConfig): Promise<AppGatewayRoutingRuleDTO>
     {
         const certRef = (rule.certificate === undefined) ? undefined : await this.keyVaultManager.CreateKeyVaultReference(rule.certificate.keyVaultId, "certificate", rule.certificate.certificateName);
 

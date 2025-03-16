@@ -1,6 +1,6 @@
 /**
  * OpenPrivateCloud
- * Copyright (C) 2019-2024 Amir Czwink (amir130@hotmail.de)
+ * Copyright (C) 2019-2025 Amir Czwink (amir130@hotmail.de)
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName, c_databaseServicesResourceProviderName, c_mariadbResourceTypeName, c_webServicesResourceProviderName, c_nextcloudResourceTypeName, c_letsencryptCertResourceTypeName, c_nodeAppServiceResourceTypeName, c_staticWebsiteResourceTypeName, c_jdownloaderResourceTypeName, c_multimediaServicesResourceProviderName, c_avTranscoderResourceTypeName, c_dockerContainerResourceTypeName, c_dnsServerResourceTypeName, c_virtualNetworkResourceTypeName, c_securityServicesResourceProviderName, c_keyVaultResourceTypeName, c_apiGatewayResourceTypeName, c_wafResourceTypeName } from "./constants";
+import { c_backupServicesResourceProviderName, c_backupVaultResourceTypeName, c_computeServicesResourceProviderName, c_virtualMachineResourceTypeName, c_fileServicesResourceProviderName, c_fileStorageResourceTypeName, c_networkServicesResourceProviderName, c_openVPNGatewayResourceTypeName, c_databaseServicesResourceProviderName, c_mariadbResourceTypeName, c_webServicesResourceProviderName, c_nextcloudResourceTypeName, c_letsencryptCertResourceTypeName, c_nodeAppServiceResourceTypeName, c_staticWebsiteResourceTypeName, c_jdownloaderResourceTypeName, c_multimediaServicesResourceProviderName, c_avTranscoderResourceTypeName, c_dockerContainerResourceTypeName, c_dnsServerResourceTypeName, c_virtualNetworkResourceTypeName, c_securityServicesResourceProviderName, c_keyVaultResourceTypeName, c_appGatewayResourceTypeName, c_wafResourceTypeName } from "./constants";
 
 export const resourceProviders =
 {
@@ -91,8 +91,8 @@ export const resourceProviders =
     webServices: {
         name: c_webServicesResourceProviderName,
 
-        apiGatewayResourceType: {
-            name: c_apiGatewayResourceTypeName
+        appGatewayResourceType: {
+            name: c_appGatewayResourceTypeName
         },
 
         jdownloaderResourceType: {

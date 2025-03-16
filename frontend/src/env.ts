@@ -16,13 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
+import { AbsURL } from "acts-util-core";
+
+const url = AbsURL.Parse(process.env.OPC_BACKEND_URL!);
+
 export default {
-    AUTH_ENDPOINT: process.env.OPC_AUTH_ENDPOINT!,
-    BACKEND: process.env.OPC_BACKEND!,
-    BACKEND_PORT: parseInt(process.env.OPC_BACKEND_PORT!),
-    BACKEND_PROTOCOL: process.env.OPC_BACKEND_PROTOCOL! as "http" | "https",
+    BACKEND: {
+        domainName: url.host,
+        port: url.port,
+        protocol: url.protocol
+    },
     CLIENT_ID: process.env.OPC_CLIENT_ID!,
-    ENDSESSION_ENDPOINT: process.env.OPC_ENDSESSION_ENDPOINT!,
     FRONTEND_BASEURL: process.env.OPC_FRONTEND_BASEURL!,
-    TOKEN_ENDPOINT: process.env.OPC_TOKEN_ENDPOINT!,
+    OIDP_ENDPOINT: process.env.OPC_OIDP_ENDPOINT!,
 };

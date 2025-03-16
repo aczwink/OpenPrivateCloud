@@ -26,7 +26,7 @@ export class APIService extends API
     {
         super( req => this.base.SendRequest(req) );
 
-        this.base = new APIServiceBase(httpService, ENV.BACKEND, ENV.BACKEND_PORT, ENV.BACKEND_PROTOCOL);
+        this.base = new APIServiceBase(httpService, ENV.BACKEND.domainName, ENV.BACKEND.port, ENV.BACKEND.protocol);
 
         oAuth2TokenManager.tokenIssued.Subscribe(x => this.accessToken = x.accessToken);
     }

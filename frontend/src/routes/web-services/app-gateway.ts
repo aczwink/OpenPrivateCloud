@@ -27,7 +27,7 @@ type ResourceAndGroupId = { resourceGroupName: string; resourceName: string };
 
 function BuildResourceId(resourceGroupName: string, resourceName: string)
 {
-    return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.apiGatewayResourceType.name + "/" + resourceName;
+    return "/" + resourceGroupName + "/" + resourceProviders.webServices.name + "/" + resourceProviders.webServices.appGatewayResourceType.name + "/" + resourceName;
 }
 
 const overviewViewModel: RouteSetup<ResourceAndGroupId, ContainerInfo> = {
@@ -35,7 +35,7 @@ const overviewViewModel: RouteSetup<ResourceAndGroupId, ContainerInfo> = {
         type: "object",
         actions: [],
         formTitle: _ => "Overview",
-        requestObject: ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.info.get(ids.resourceGroupName, ids.resourceName),
+        requestObject: ids => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.info.get(ids.resourceGroupName, ids.resourceName),
         schema: OpenAPISchema("ContainerInfo")
     },
     displayText: "Overview",
@@ -43,40 +43,40 @@ const overviewViewModel: RouteSetup<ResourceAndGroupId, ContainerInfo> = {
     routingKey: "overview",
 };
 
-const createAPIRoute: RouteSetup<ResourceAndGroupId, AppGatewayRoutingRuleDTO> = {
+const createRuleRoute: RouteSetup<ResourceAndGroupId, AppGatewayRoutingRuleDTO> = {
     content: {
         type: "create",
-        call: (ids, api) => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.apis.post(ids.resourceGroupName, ids.resourceName, api),
+        call: (ids, api) => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.rules.post(ids.resourceGroupName, ids.resourceName, api),
         schema: OpenAPISchema("AppGatewayRoutingRuleDTO"),
     },
-    displayText: "Create API",
+    displayText: "Create rule",
     icon: "plus",
     routingKey: "create",
 };
 
-const apisViewModel: RouteSetup<ResourceAndGroupId, AppGatewayRoutingRuleDTO> = {
+const rulesViewModel: RouteSetup<ResourceAndGroupId, AppGatewayRoutingRuleDTO> = {
     content: {
         type: "list",
         actions: [
-            createAPIRoute
+            createRuleRoute
         ],
         boundActions: [
             {
                 type: "edit",
-                updateResource: (ids, newProps, oldProps) => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.apis.put(ids.resourceGroupName, ids.resourceName, { oldFrontendDomainName: oldProps.frontendDomainName, newProps }),
+                updateResource: (ids, newProps, oldProps) => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.rules.put(ids.resourceGroupName, ids.resourceName, { oldFrontendDomainName: oldProps.frontendDomainName, newProps }),
                 schema: OpenAPISchema("AppGatewayRoutingRuleDTO")
             },
             {
                 type: "delete",
-                deleteResource: (ids, api) => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.apis.delete(ids.resourceGroupName, ids.resourceName, api),
+                deleteResource: (ids, api) => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.rules.delete(ids.resourceGroupName, ids.resourceName, api),
             }
         ],
-        requestObjects: ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.apis.get(ids.resourceGroupName, ids.resourceName),
+        requestObjects: ids => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.rules.get(ids.resourceGroupName, ids.resourceName),
         schema: OpenAPISchema("AppGatewayRoutingRuleDTO")
     },
-    displayText: "APIs",
+    displayText: "Routing rules",
     icon: "list",
-    routingKey: "apis"
+    routingKey: "rules"
 };
 
 const settingsViewModel: RouteSetup<ResourceAndGroupId, API_GatewaySettingsDTO> = {
@@ -98,13 +98,13 @@ const settingsViewModel: RouteSetup<ResourceAndGroupId, API_GatewaySettingsDTO> 
                         hostName: ""
                     };
                 },
-                requestObject: ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.settings.get(ids.resourceGroupName, ids.resourceName),
+                requestObject: ids => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.settings.get(ids.resourceGroupName, ids.resourceName),
                 schema: OpenAPISchema("API_GatewaySettingsDTO"),
-                updateResource: (ids, settings) => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.settings.put(ids.resourceGroupName, ids.resourceName, settings),
+                updateResource: (ids, settings) => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.settings.put(ids.resourceGroupName, ids.resourceName, settings),
             }
         ],
         formTitle: _ => "Settings",
-        requestObject: ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.settings.get(ids.resourceGroupName, ids.resourceName),
+        requestObject: ids => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.settings.get(ids.resourceGroupName, ids.resourceName),
         schema: OpenAPISchema("API_GatewaySettingsDTO"),
     },
     displayText: "Server settings",
@@ -117,7 +117,7 @@ const logViewModel: RouteSetup<ResourceAndGroupId, DockerContainerLogDto> = {
         type: "object",
         actions: [],
         formTitle: _ => "Logs",
-        requestObject: async ids => Use(APIService).resourceProviders._any_.webservices.apigateway._any_.log.get(ids.resourceGroupName, ids.resourceName),
+        requestObject: async ids => Use(APIService).resourceProviders._any_.webservices.appgateway._any_.log.get(ids.resourceGroupName, ids.resourceName),
         schema: OpenAPISchema("DockerContainerLogDto"),
     },
     displayText: "Live log",
@@ -125,7 +125,7 @@ const logViewModel: RouteSetup<ResourceAndGroupId, DockerContainerLogDto> = {
     routingKey: "logs",
 };
 
-export const apiGatewayViewModel: RouteSetup<ResourceAndGroupId> = {
+export const appGatewayViewModel: RouteSetup<ResourceAndGroupId> = {
     content: {
         type: "multiPage",
         actions: [
@@ -136,7 +136,7 @@ export const apiGatewayViewModel: RouteSetup<ResourceAndGroupId> = {
                 displayName: "",
                 entries: [
                     overviewViewModel,
-                    apisViewModel,
+                    rulesViewModel,
                     settingsViewModel,
                     logViewModel
                 ]
@@ -145,7 +145,7 @@ export const apiGatewayViewModel: RouteSetup<ResourceAndGroupId> = {
         ],
         formTitle: ids => ids.resourceName,
     },
-    displayText: "API Gateway",
+    displayText: "Application Gateway",
     icon: "sign-turn-right",
-    routingKey: `${resourceProviders.webServices.name}/${resourceProviders.webServices.apiGatewayResourceType.name}/{resourceName}`
+    routingKey: `${resourceProviders.webServices.name}/${resourceProviders.webServices.appGatewayResourceType.name}/{resourceName}`
 };
