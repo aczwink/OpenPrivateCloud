@@ -19,10 +19,18 @@ services:
 
   backend:
     container_name: opc-backend
+    depends_on:
+      - db
     environment:
+      - NODE_EXTRA_CA_CERTS=/etc/OpenPrivateCloud/oidp-ca.crt
       - OPC_ALLOWED_ORIGINS=https://localhost:8079
       - OPC_DBHOST=10.1.0.2
       - OPC_DBUSER=opc
+      - OPC_MASTER_KEYSTORE_PATH=/etc/OpenPrivateCloud/masterkey.json
+      - OPC_OIDP_AUDIENCE=https://localhost:8078
+      - OPC_OIDP_CLIENT_ID=YOUR_OIDP_CLIENT_ID
+      - OPC_OIDP_CLIENT_SECRET=YOUR_OIDP_CLIENT_SECRET
+      - OPC_OIDP_ENDPOINT=https://YOUR_OIDP_DOMAIN_NAME:3000
     image: ghcr.io/aczwink/openprivatecloud-backend
     network_mode: host
     restart: always
@@ -35,6 +43,9 @@ services:
       - NGINX_HOST=localhost
       - NGINX_PORT=443 #port inside container
       - OPC_BACKEND_URL=https://localhost:8078
+      - OPC_CLIENT_ID=YOUR_OPC_CLIENT_ID
+      - OPC_FRONTEND_BASEURL=https://localhost:8079
+      - OPC_OIDP_ENDPOINT=localhost:3000
     image: ghcr.io/aczwink/openprivatecloud-frontend
     networks:
       opcnet:
@@ -50,5 +61,5 @@ networks:
     driver: bridge
     ipam:
      config:
-       - subnet: 10.1.0.0/16
+       - subnet: 10.1.0.0/24
          gateway: 10.1.0.1

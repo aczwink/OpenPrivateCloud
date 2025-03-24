@@ -40,11 +40,8 @@ export class UsersManager
             const response = await this.oidpService.users._any_.get(oAuth2Subject);
             if(response.statusCode !== 200)
                 throw new Error("TODO");
-            if(response.data.userAccount.type !== "human")
-                throw new Error("TODO");
-
-            //TODO: oidp should expose ID
-            const userId = await this.usersController.CreateUser(response.data.userAccount.eMailAddress, response.data.ad.userPrincipalName, this.CreateSambaPassword());
+            
+            const userId = await this.usersController.CreateUser(response.data.userAccount.externalId, response.data.ad.userPrincipalName, this.CreateSambaPassword());
             return userId;
         }
 
