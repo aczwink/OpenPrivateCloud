@@ -34,6 +34,7 @@ services:
     environment:
       - NGINX_HOST=localhost
       - NGINX_PORT=443 #port inside container
+      - OPC_BACKEND_URL=https://localhost:8078
     image: ghcr.io/aczwink/openprivatecloud-frontend
     networks:
       opcnet:
