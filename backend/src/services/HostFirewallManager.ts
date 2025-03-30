@@ -260,9 +260,7 @@ export class HostFirewallManager
                 chains: [
                     {
                         name: "PREROUTING",
-                        rules: [
-                            ...zones.external.portForwardingRules.map(this.GenerateDestinationNAT_Rule.bind(this, externalNIC))
-                        ],
+                        rules: zones.external.portForwardingRules.Values().Map(this.GenerateDestinationNAT_Rules.bind(this, externalNIC, zones.customZones)).Map(x => x.Values()).Flatten().ToArray(),
                         hook: "prerouting",
                         prio: "dstnat",
                         type: "nat"
@@ -758,46 +756,63 @@ export class HostFirewallManager
         return result;
     }
 
-    private GenerateDestinationNAT_Rule(externalNIC: string, portForwardingRule: PortForwardingRule): NetfilterRuleCreationData
+    private GenerateDestinationNAT_Rule(nicName: string, portForwardingRule: PortForwardingRule): NetfilterRuleCreationData
     {
-        const conditions: NetfilterRuleCondition[] = [];
-
-        if(portForwardingRule.externalZoneOnly)
-        {
-            conditions.push({
-                op: "==",
-                left: {
-                    type: "meta",
-                    key: "iifname"
-                },
-                right: {
-                    type: "value",
-                    value: externalNIC
-                }
-            });
-        }
-
-        conditions.push({
-            op: "==",
-            left: {
-                type: "payload",
-                protocol: portForwardingRule.protocol.toLowerCase() as any,
-                field: "dport"
-            },
-            right: {
-                type: "value",
-                value: portForwardingRule.port.toString()
-            }
-        });
-
         return {
-            conditions,
+            conditions: [
+                {
+                    op: "==",
+                    left: {
+                        type: "meta",
+                        key: "iifname"
+                    },
+                    right: {
+                        type: "value",
+                        value: nicName
+                    }
+                },
+                {
+                    op: "==",
+                    left: {
+                        type: "payload",
+                        protocol: portForwardingRule.protocol.toLowerCase() as any,
+                        field: "dport"
+                    },
+                    right: {
+                        type: "value",
+                        value: portForwardingRule.port.toString()
+                    }
+                }
+            ],
             policy: {
                 type: "dnat",
                 addr: portForwardingRule.targetAddress,
                 port: portForwardingRule.targetPort
             }
         };
+    }
+
+    private GenerateDestinationNAT_Rules(externalNIC: string, customZones: FirewallZone[], portForwardingRule: PortForwardingRule): NetfilterRuleCreationData[]
+    {
+        const rules = [
+            this.GenerateDestinationNAT_Rule(externalNIC, portForwardingRule),
+        ];
+
+        if(portForwardingRule.externalZoneOnly)
+            return rules;
+
+        for (const zone of customZones)
+        {
+            if(zone.name.startsWith("vpn-"))
+            {
+                for (const interfaceName of zone.interfaceNames)
+                {
+                    rules.push(this.GenerateDestinationNAT_Rule(interfaceName, portForwardingRule));   
+                }
+            }
+        }
+
+        return rules;
     }
 
     private GenerateIncomingDestinationNAT_ForwardRule(externalNIC: string, zones: FirewallZone[], portForwardingRule: PortForwardingRule): NetfilterRuleCreationData

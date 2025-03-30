@@ -75,6 +75,9 @@ export interface PortForwardingRule
     port: number;
     targetAddress: string;
     targetPort: number;
+    /**
+     * Forward only packets from the external zone or include VPNs also.
+     */
     externalZoneOnly: boolean;
 }
 

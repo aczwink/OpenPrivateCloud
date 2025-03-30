@@ -330,9 +330,8 @@ server {
                 hostPath: hostPaths.keyPath,
                 readOnly: true
             });
-
-            await this.AddRuleCertVolumes(config.rules, volumes);
         }
+        await this.AddRuleCertVolumes(config.rules, volumes);
 
         const dockerNetwork = await this.managedDockerContainerManager.ResolveVNetToDockerNetwork(vNetRef!);
         const containerConfig: DockerContainerConfig = {
