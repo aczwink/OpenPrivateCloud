@@ -18,7 +18,7 @@
 import path from "path";
 import { GlobalInjector, Injectable } from "acts-util-node";
 import { HostStoragesController } from "../data-access/HostStoragesController";
-import { DistroPackageManager, ModuleName } from "../distro/DistroPackageManager";
+import { ModuleName } from "../distro/DistroPackageManager";
 import { SambaSharesManager } from "../resource-providers/file-services/SambaSharesManager";
 import { DistroInfoService } from "./DistroInfoService";
 import { HostStoragesManager } from "./HostStoragesManager";
@@ -26,58 +26,11 @@ import { RemoteFileSystemManager } from "./RemoteFileSystemManager";
 import { SystemServicesManager } from "./SystemServicesManager";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 import { RemoteRootFileSystemManager } from "./RemoteRootFileSystemManager";
-import DebianPackageManager from "../distro/debian/PackageManager";
-
- 
-@Injectable
-class InternalModulesManager
-{
-    constructor(private distroInfoService: DistroInfoService)
-    {
-    }
-    
-    //Public methods
-    public async Install(hostId: number, moduleName: ModuleName)
-    {
-        const distroPackageManager = await this.ResolveDistroPackageManager(hostId);
-        await distroPackageManager.Install(hostId, moduleName);
-    }
-
-    public async IsModuleInstalled(hostId: number, moduleName: ModuleName): Promise<boolean>
-    {
-        const distroPackageManager = await this.ResolveDistroPackageManager(hostId);
-        return (await distroPackageManager.IsModuleInstalled(hostId, moduleName));
-    }
-
-    public async Uninstall(hostId: number, moduleName: ModuleName)
-    {
-        const distroPackageManager = await this.ResolveDistroPackageManager(hostId);
-        await distroPackageManager.Uninstall(hostId, moduleName);
-    }
-
-    //Private methods
-    private async ResolveDistroPackageManager(hostId: number): Promise<DistroPackageManager>
-    {
-        const id = await this.distroInfoService.FetchId(hostId);
-        return this.ResolveDistroPackageManagerById(id!);
-    }
-
-    private ResolveDistroPackageManagerById(id: string): DistroPackageManager
-    {
-        switch(id)
-        {
-            case "debian":
-            case "ubuntu":
-                return GlobalInjector.Resolve(DebianPackageManager);
-        }
-        throw new Error("Distribution not supported: " + id);
-    }
-}
 
 @Injectable
 export class ModulesManager
 {
-    constructor(private internalModulesManager: InternalModulesManager)
+    constructor()
     {
     }
 
@@ -87,11 +40,6 @@ export class ModulesManager
         const isInstalled = await this.internalModulesManager.IsModuleInstalled(hostId, moduleName);
         if(!isInstalled)
             await this.Install(hostId, moduleName);
-    }
-
-    public async Uninstall(hostId: number, moduleName: ModuleName)
-    {
-        await this.internalModulesManager.Uninstall(hostId, moduleName);
     }
 
     //Private methods

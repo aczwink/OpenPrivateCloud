@@ -28,7 +28,6 @@ import { SSHConnection, Command } from "./SSHService";
 interface CommandOptions
 {
     hostIdOrHostName: number | string;
-    stdin?: string;
     workingDirectory?: string;
 }
 
@@ -139,64 +138,6 @@ export class SSHCommandExecutor
     }
 
     //Private methods
-    private CommandToString(command: Command): { commandLine: string; sudo: boolean }
-    {
-        function EscapeArg(part: string)
-        {
-            if(part.includes(" "))
-            {
-                if(part.startsWith('"') && part.endsWith('"'))
-                {
-                    //TODO: handle case where this includes another unescaped double quote
-                }
-                else if(part.startsWith("'") && part.endsWith("'"))
-                {
-                    //TODO: is this case safe?
-                    return part;
-                }
-                else if(part.includes('"'))
-                    return part.ReplaceAll(" ", "\\ ");
-                return '"' + part.ReplaceAll('"', '\\"') + '"';
-            }
-
-            return part;
-        }
-        function AddSudoArgsIfRequired(command: string[])
-        {
-            if(command[0] === "sudo")
-            {
-                return "sudo --stdin -k " + command.slice(1).map(EscapeArg).join(" ");
-            }
-            return command.map(EscapeArg).join(" ");
-        }
-
-        if(Array.isArray(command))
-        {
-            return {
-                commandLine: AddSudoArgsIfRequired(command),
-                sudo: command[0] === "sudo"
-            };
-        }
-
-        let op;
-        switch(command.type)
-        {
-            case "pipe":
-                op = "|";
-                break;
-            case "redirect-stdout":
-                op = ">";
-                break;
-        }
-
-        const nested = this.CommandToString(command.source).commandLine + " " + op + " " + this.CommandToString(command.target).commandLine;
-
-        return {
-            commandLine: (command.sudo === true ? "sudo --stdin sh -c '" + nested + "'" : nested),
-            sudo: command.sudo === true
-        }
-    }
-
     private async CreateTracker(command: Command, options: CommandOptions)
     {
         return await this.processTrackerManager.Create(options.hostIdOrHostName, this.CommandToString(command).commandLine);
@@ -239,27 +180,6 @@ export class SSHCommandExecutor
         };
     }
 
-    private async ExecuteCommandAsSingleCommand(connection: SSHConnection, command: Command, options: CommandOptions, tracker: ProcessTracker)
-    {
-        const cmd = this.CommandToString(command);
-        const channel = await connection.ExecuteInteractiveCommand(cmd.commandLine, cmd.sudo);
-
-        if(options.stdin !== undefined)
-            channel.stdin.write(options.stdin);
-
-        const exitCode = await new Promise<number>( (resolve, reject) => {
-            channel.stdout.setEncoding("utf-8");
-            channel.stderr.setEncoding("utf-8");
-
-            channel.stdout.on("data", tracker.Add.bind(tracker));
-            channel.stderr.on("data", tracker.Add.bind(tracker));
-            
-            this.RegisterExitEvents(channel, tracker, resolve, reject);
-        });
-
-        return exitCode;
-    }
-
     private async ExecuteCommandUsingShell(connection: SSHConnection, command: Command, options: CommandOptions)
     {
         const shell = await this._LegacySpawnShell(connection, () => null, options.hostIdOrHostName as number);
@@ -268,18 +188,5 @@ export class SSHCommandExecutor
         await shell.ExecuteCommand(command as string[]);
 
         await shell.Close();
-    }
-
-    private RegisterExitEvents(channel: ClientChannel, tracker: ProcessTracker, resolve: (value: number) => void, reject: (reason: any) => void)
-    {
-        channel.on("error", reject);
-        channel.on("exit", code => {
-            tracker.Add("Process exit code is:", code.toString());
-            resolve(code);
-        });
-        channel.on("close", (code: any, signal: any) => {
-            tracker.Add("Processed closed.", code, signal);
-            resolve(code);
-        });
     }
 }

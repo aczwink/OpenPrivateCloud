@@ -27,33 +27,6 @@ class DebianPackageManager implements DistroPackageManager
     {
     }
 
-    //Public methods
-    public async Install(hostId: number, moduleName: ModuleName)
-    {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt-get", "update"], hostId);
-        await this.DoDebConfig(hostId, moduleName);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "install", ...this.MapModuleToPackageList(moduleName)], hostId);
-    }
-
-    public async IsModuleInstalled(hostId: number, moduleName: ModuleName): Promise<boolean>
-    {
-        const installedPackages = await this.FetchInstalledPackages(hostId);
-        const packages = this.MapModuleToPackageList(moduleName);
-        for (const packageName of packages)
-        {
-            const installed = await this.IsPackageInstalled(hostId, installedPackages, packageName, new Set());
-            if(!installed)
-                return false;
-        }
-        return true;
-    }
-
-    public async Uninstall(hostId: number, moduleName: ModuleName)
-    {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "DEBIAN_FRONTEND=noninteractive", "apt", "-y", "purge", ...this.MapModuleToPackageList(moduleName)], hostId);
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "apt", "-y", "autoremove"], hostId);
-    }
-
     //Private methods
     private async DoDebConfig(hostId: number, moduleName: ModuleName)
     {
@@ -66,47 +39,6 @@ class DebianPackageManager implements DistroPackageManager
                 await this.SetDebConfValue(hostId, "davfs2", "davfs2/suid_file", false);
                 break;
         }
-    }
-
-    private async FetchInstalledPackages(hostId: number)
-    {
-        const aptResult = await this.remoteCommandExecutor.ExecuteBufferedCommand(["apt", "list", "--installed"], hostId);
-        const lines = aptResult.stdOut.split("\n");
-
-        const result = [];
-        for (let index = 0; index < lines.length; index++)
-        {
-            const line = lines[index];
-            const parts = line.split("/");
-            if(parts.length > 0)
-                result.push(parts[0].trim());
-        }
-        return result;
-    }
-
-    private async IsPackageInstalled(hostId: number, installedPackages: string[], packageName: string, uninstalled: Set<string>): Promise<boolean>
-    {
-        const allPackages = installedPackages;
-        if(allPackages.Contains(packageName))
-            return true;
-
-        if(uninstalled.has(packageName)) //prevent cycles. For example btrfs-progs causes this
-            return false;
-        uninstalled.add(packageName);
-
-        //check if it is a virtual package
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommand(["apt-cache", "showpkg", packageName], hostId);
-        const literal = "Reverse Provides:";
-        const pos = result.stdOut.indexOf(literal) + literal.length;
-        const reverseProvidesPart = result.stdOut.substring(pos).trimStart().split("\n");
-        const providers = [];
-        for (const line of reverseProvidesPart)
-        {
-            providers.push(line.split(" ")[0]);
-        }
-        const childrenResults = await providers.Values().Distinct(x => x).Filter(x => x.length > 0).Map(x => this.IsPackageInstalled(hostId, installedPackages, x, uninstalled)).PromiseAll();
-
-        return childrenResults.Values().Filter(x => x).Any();
     }
 
     private MapModuleToPackageList(moduleName: ModuleName)

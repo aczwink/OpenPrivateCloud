@@ -16,7 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * */
 
-import { Dictionary } from "acts-util-core";
 import { Injectable } from "acts-util-node";
 import { RemoteCommandExecutor } from "./RemoteCommandExecutor";
 
@@ -39,34 +38,5 @@ export class DistroInfoService
     {
         const result = await this.FetchFields(hostId);
         return result.PRETTY_NAME!;
-    }
-
-    public async FetchId(hostId: number)
-    {
-        const result = await this.FetchFields(hostId);
-        return result.ID;
-    }
-
-    //Private methods
-    private async FetchFields(hostId: number)
-    {
-        const fields = await this.remoteCommandExecutor.ExecuteBufferedCommand(["cat", "/etc/*release"], hostId);
-        const lines = fields.stdOut.split("\n");
-        const result: Dictionary<string> = {};
-
-        for (let index = 0; index < lines.length; index++)
-        {
-            const line = lines[index].trim();
-            const split = line.split("=");
-            if(split.length === 2)
-            {
-                let value = split[1].trim();
-                if( (value.length >= 2) && (value[0] == '"') && (value[value.length-1] == '"') )
-                    value = value.substr(1, value.length - 2);
-                result[split[0]] = value;
-            }
-        }
-
-        return result;
     }
 }

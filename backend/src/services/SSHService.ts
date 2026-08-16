@@ -21,13 +21,6 @@ import { Injectable, Promisify } from "acts-util-node";
 import { Readable } from "stream";
 import { TimeUtil } from "acts-util-core";
 
-export type Command = string[] | {
-    type: "redirect-stdout" | "pipe",
-    sudo?: boolean;
-    source: Command;
-    target: Command;
-};
-
 export interface SSHConnection
 {
     AppendFile(remotePath: string, content: string): Promise<void>;
@@ -52,7 +45,7 @@ export interface SSHConnection
 
 class SSHConnectionImpl implements SSHConnection
 {
-    constructor(private conn: ssh2.Client, private sftp: ssh2.SFTPWrapper, private password: string)
+    constructor(private sftp: ssh2.SFTPWrapper)
     {
     }
 
@@ -111,26 +104,6 @@ class SSHConnectionImpl implements SSHConnection
                     resolve(null);
             });
         });
-    }
-
-    public async ExecuteInteractiveCommand(commandLine: string, asRoot?: boolean): Promise<ssh2.ClientChannel>
-    {
-        const channel = await new Promise<ssh2.ClientChannel>( (resolve, reject) => {
-            this.conn.exec(commandLine, {
-                //pty: hasSudo
-            }, (err, channel) => {
-
-                if(err)
-                    reject(err);
-                else
-                    resolve(channel);
-            });
-        });
-
-        if(asRoot === true)
-            channel.stdin.write(this.password + "\n");
-
-        return channel;
     }
 
     public ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>
