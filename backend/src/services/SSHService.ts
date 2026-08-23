@@ -26,7 +26,6 @@ export interface SSHConnection
     AppendFile(remotePath: string, content: string): Promise<void>;
     ChangeMode(remotePath: string, mode: number): Promise<void>;
     ChangeOwnerAndGroup(remotePath: string, ownerUserId: number, groupUserId: number): Promise<void>;
-    Close(): void;
     CreateDirectory(remotePath: string, attributes?: ssh2.InputAttributes): Promise<Error | null>;
     ExecuteInteractiveCommand(command: string, asRoot?: boolean): Promise<ssh2.ClientChannel>;
     ListDirectoryContents(remotePath: string): Promise<ssh2.FileEntry[]>;
@@ -86,11 +85,6 @@ class SSHConnectionImpl implements SSHConnection
                     resolve();
             });
         });
-    }
-
-    public Close(): void
-    {
-        this.conn.end();
     }
 
     public CreateDirectory(remotePath: string, attributes?: ssh2.InputAttributes): Promise<Error | null>

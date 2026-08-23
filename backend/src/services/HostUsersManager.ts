@@ -153,17 +153,11 @@ export class HostUsersManager
     private async CreateHostUser(hostId: number, linuxUserName: string, primaryLinuxGroupName: string)
     {
         const uid = this.MapOPCIdToLinuxId(this.MapLinuxUserNameToUserId(linuxUserName));
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "useradd", "-M", "-u", uid.toString(), "-g", primaryLinuxGroupName, linuxUserName], hostId);
     }
 
     private async DeleteHostGroup(hostId: number, linuxGroupName: string)
     {
         await this.remoteCommandExecutor.ExecuteCommand(["sudo", "groupdel", linuxGroupName], hostId);
-    }
-
-    private async DeleteHostUser(hostId: number, linuxUserName: string)
-    {
-        await this.remoteCommandExecutor.ExecuteCommand(["sudo", "userdel", linuxUserName], hostId);
     }
 
     private async DeleteUserFromHost(hostId: number, opcUserId: number)
@@ -277,17 +271,6 @@ export class HostUsersManager
         if(result.exitCode === 2)
             return undefined;
         return parseInt(result.stdOut.split(":")[2]);
-    }
-
-    private async TryResolveHostUserId(hostId: number, linuxUserName: string)
-    {
-        const result = await this.remoteCommandExecutor.ExecuteBufferedCommandWithExitCode(["id", "-u", linuxUserName], hostId);
-        const uid = parseInt(result.stdOut);
-        if(isNaN(uid))
-            return undefined;
-        if(result.exitCode === 1)
-            return undefined;
-        return uid;
     }
 
     /**

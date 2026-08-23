@@ -138,11 +138,6 @@ export class SSHCommandExecutor
     }
 
     //Private methods
-    private async CreateTracker(command: Command, options: CommandOptions)
-    {
-        return await this.processTrackerManager.Create(options.hostIdOrHostName, this.CommandToString(command).commandLine);
-    }
-
     private async ExecuteBufferedCommandInternal(connection: SSHConnection, command: string[], options: CommandOptions)
     {
         const tracker = await this.CreateTracker(command, options);

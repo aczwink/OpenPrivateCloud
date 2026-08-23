@@ -21,13 +21,6 @@ import { DateTime, GlobalInjector, Injectable } from "acts-util-node";
 import { HostsController } from "../data-access/HostsController";
 import { ErrorService } from "./ErrorService";
 
-enum Status
-{
-    Running = 0,
-    Finished = 1,
-    Failed = 2
-}
-
 interface ProcessTrackerReadOnly
 {
     /**
@@ -47,18 +40,14 @@ interface ProcessTrackerReadOnlyWithId extends ProcessTrackerReadOnly
 
 export interface ProcessTracker extends ProcessTrackerReadOnly
 {
-    Add(...text: string[]): void;
     Fail(e: unknown): void;
-    Finish(): void;
 }
 
 class ProcessTrackerImpl implements ProcessTracker
 {
-    constructor(private _hostName: string, private _title: string, private finalizer: () => void)
+    constructor(private _hostName: string, private _title: string)
     {
         this._startTime = DateTime.Now();
-        this._status = Status.Running;
-        this.entries = [];
     }
 
     //Properties
@@ -88,14 +77,6 @@ class ProcessTrackerImpl implements ProcessTracker
     }
 
     //Public methods
-    public Add(...text: string[])
-    {
-        this.entries.push({
-            text: text.join(" "),
-            timeStamp: new Date()
-        });
-    }
-
     public Fail(e: unknown): void
     {
         const data = GlobalInjector.Resolve(ErrorService).ExtractData(e);
@@ -104,16 +85,8 @@ class ProcessTrackerImpl implements ProcessTracker
         this.finalizer();
     }
 
-    public Finish(): void
-    {
-        this._status = Status.Finished;
-        this.finalizer();
-    }
-
     //Private variables
     private _startTime: DateTime;
-    private _status: Status;
-    private entries: { timeStamp: Date; text: string; }[];
 }
 
 @Injectable
@@ -121,8 +94,6 @@ export class ProcessTrackerManager
 {
     constructor(private hostsController: HostsController)
     {
-        this.trackerCounter = 0;
-        this.trackers = {};
     }
 
     //Properties
@@ -145,8 +116,6 @@ export class ProcessTrackerManager
     //Public methods
     public async Create(hostIdOrHostName: number | string, title: string): Promise<ProcessTracker>
     {
-        const id = this.trackerCounter++;
-
         let hostName;
         if(typeof hostIdOrHostName === "number")
         {
@@ -156,7 +125,7 @@ export class ProcessTrackerManager
         else
             hostName = hostIdOrHostName;
 
-        const tracker = new ProcessTrackerImpl(hostName, title, this.OnTrackerFinished.bind(this, id));
+        const tracker = new ProcessTrackerImpl(hostName, title);
         this.trackers[id] = tracker;
 
         return tracker;
@@ -178,14 +147,5 @@ export class ProcessTrackerManager
     }
 
     //Private variables
-    private trackerCounter: number;
     private trackers: Dictionary<ProcessTracker>;
-
-    //Event handlers
-    private OnTrackerFinished(trackerId: number)
-    {
-        setTimeout(() => {
-            delete this.trackers[trackerId];
-        }, 60 * 60 * 1000);
-    }
 }
